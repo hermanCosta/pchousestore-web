@@ -1,0 +1,43 @@
+sequenceDiagram
+    autonumber
+    actor Operador
+    participant Web as React SPA
+    participant AS as OpenIddict Authorization Server
+    participant API as ASP.NET Core API (JWT Bearer)
+    participant DB as MySQL
+
+    Operador->>Web: Seleciona a loja e inicia login
+    Web->>AS: Authorization Request (code + PKCE S256 + state + nonce)
+    AS-->>Web: Tela de autenticação da loja
+    Operador->>AS: Código e senha da loja
+    AS->>DB: Validar ShopAccessCredential e Shop ativo
+    DB-->>AS: Shop + Company válidos
+    AS->>DB: Criar/retomar ShopSession sem EmployeeId
+    AS-->>Web: Redirect URI exata + authorization code
+    Web->>AS: Token Request (code + code_verifier)
+    AS->>DB: Validar código, PKCE, client e sessão da loja
+    AS-->>Web: ID token (Shop) + access token (JWT) + refresh (se habilitado)
+    Note over Web,AS: Token representa somente o contexto da loja; nenhum EmployeeId/role é emitido.
+
+    loop Cada chamada protegida da API
+        Web->>API: HTTP + Authorization: Bearer access_token
+        API->>API: Validar assinatura, iss, aud, exp, nbf, jti e scope shop.api
+        API->>DB: Confirmar ShopSession ativa e resolver CompanyId/ShopId
+        API-->>Web: 401/403 se token, sessão ou escopo forem inválidos
+    end
+
+    loop Cada operação de negócio protegida
+        Operador->>Web: Informa employee_code + senha individual
+        Web->>API: Comando + credencial pontual do funcionário + Bearer token da loja
+        API->>DB: Validar Employee, hash, status, Company e role/action
+        API->>DB: Criar EmployeeActionAuthorization curta, action-scoped e single-use
+        API->>DB: Consumir autorização + persistir operação na mesma transação
+        DB-->>API: Operação gravada com EmployeeId responsável
+        API-->>Web: Resultado
+        Note over Web,API: O próximo comando protegido exige nova autenticação individual.
+    end
+
+    Operador->>Web: Sair da loja
+    Web->>AS: End-session / revoke refresh grant
+    AS->>DB: Revogar ShopSession e autorização/token family
+    Note over AS,DB: API rejeita chamadas vinculadas à ShopSession revogada.

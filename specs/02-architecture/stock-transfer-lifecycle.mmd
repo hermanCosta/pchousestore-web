@@ -1,0 +1,16 @@
+flowchart TD
+    A[Create StockTransfer in source Shop] --> B[DRAFT]
+    B --> C{Dispatch authorized by source employee?}
+    C -- No --> B
+    C -- Yes --> D[Validate available stock; exclude reserved quantities]
+    D --> E[Post TRANSFER_OUT movement; decrease source stock]
+    E --> F[IN_TRANSIT; stock unavailable to both Shops]
+    F --> G[Destination employee authenticates in destination Shop]
+    G --> H[Count actual received quantities]
+    H --> I[Post TRANSFER_IN; increase destination stock]
+    I --> J{All dispatched quantity received?}
+    J -- Yes --> K[RECEIVED]
+    J -- No --> L[PARTIALLY_RECEIVED; remaining quantity stays in transit]
+    L --> G
+    B --> M[Cancel before dispatch]
+    M --> N[CANCELLED; no stock movement]

@@ -1,0 +1,14 @@
+digraph DocumentsERD {
+  graph [rankdir=LR, bgcolor="white", pad="0.25", nodesep="0.55", ranksep="0.75", labelloc="t", label="Document registry and reprint audit", fontsize=18, fontname="Arial"];
+  node [shape=plain, fontname="Arial"];
+  edge [fontname="Arial", fontsize=9, color="#475569", arrowsize=0.8];
+  SHOP [label=< <table border="1" cellborder="0" cellspacing="0" cellpadding="5"><tr><td bgcolor="#21466F"><font color="white"><b>SHOP</b></font></td></tr><tr><td align="left">PK ShopId</td></tr><tr><td align="left">FK CompanyId</td></tr><tr><td align="left">Name</td></tr></table> >];
+  EMPLOYEE [label=< <table border="1" cellborder="0" cellspacing="0" cellpadding="5"><tr><td bgcolor="#21466F"><font color="white"><b>EMPLOYEE</b></font></td></tr><tr><td align="left">PK EmployeeId</td></tr><tr><td align="left">FK CompanyId</td></tr><tr><td align="left">EmployeeCode</td></tr><tr><td align="left">Role</td></tr></table> >];
+  GENERATED_DOCUMENT [label=< <table border="1" cellborder="0" cellspacing="0" cellpadding="5"><tr><td bgcolor="#1688C9"><font color="white"><b>GENERATED_DOCUMENT</b></font></td></tr><tr><td align="left">PK GeneratedDocumentId</td></tr><tr><td align="left">FK CompanyId, ShopId</td></tr><tr><td align="left">DocumentType, DocumentNumber</td></tr><tr><td align="left">SourceType, SourceId, SourceVersion</td></tr><tr><td align="left">TemplateKey, TemplateVersion, LayoutCode</td></tr><tr><td align="left">IssuedAtUtc, IssuedByEmployeeId</td></tr><tr><td align="left">SnapshotJson, ContentHash, Status</td></tr></table> >];
+  DOCUMENT_REPRINT_EVENT [label=< <table border="1" cellborder="0" cellspacing="0" cellpadding="5"><tr><td bgcolor="#1688C9"><font color="white"><b>DOCUMENT_REPRINT_EVENT</b></font></td></tr><tr><td align="left">PK DocumentReprintEventId</td></tr><tr><td align="left">FK GeneratedDocumentId, ShopId</td></tr><tr><td align="left">PrintedAtUtc, PrintedByEmployeeId</td></tr><tr><td align="left">LayoutCode, CopyLabel, Reason</td></tr></table> >];
+  SHOP -> GENERATED_DOCUMENT [label="1 to many"];
+  EMPLOYEE -> GENERATED_DOCUMENT [label="issued by"];
+  GENERATED_DOCUMENT -> DOCUMENT_REPRINT_EVENT [label="1 to many"];
+  SHOP -> DOCUMENT_REPRINT_EVENT [label="1 to many"];
+  EMPLOYEE -> DOCUMENT_REPRINT_EVENT [label="printed by"];
+}

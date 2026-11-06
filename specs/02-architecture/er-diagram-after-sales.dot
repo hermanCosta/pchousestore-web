@@ -1,0 +1,29 @@
+digraph AfterSales {
+  graph [rankdir=LR, bgcolor="white", pad="0.25", nodesep="0.45", ranksep="0.65", fontname="Arial", label="pcHouseStore Web — Inspections, Complaints and Cash Closing", labelloc=t, fontsize=18];
+  node [shape=record, style="rounded,filled", fillcolor="#F7F9FC", color="#516276", fontname="Arial", fontsize=9, margin="0.10,0.07"];
+  edge [color="#64748B", fontname="Arial", fontsize=8, arrowsize=0.7];
+  StoredImage [label="{STORED_IMAGE|id PK\lcompany_id FK\lshop_id FK\lcontent MEDIUMBLOB\lthumbnail_content BLOB?\lcontent_type / size / SHA-256\luploader / authorization\l}"];
+  RefurbishedUnit [label="{REFURBISHED_UNIT|id PK\lcurrent_shop_id FK\lasset_code UK\lserial_number\lcondition_grade_id FK\lfunctional_test_status\lstatus\l}"];
+  ConditionGrade [label="{REFURBISHED_CONDITION_GRADE|id PK\lcompany_id FK\lcode A/B/C\ldisplay_name\ldescription\l}"];
+  Inspection [label="{REFURBISHED_UNIT_INSPECTION|id PK\lrefurbished_unit_id FK\lshop_id FK\lcondition_grade_id FK\lfunctional_test_status\lchecklist_json\lknown_defects\linspected_by_employee_id FK\lauthorization_id FK\linspected_at\l}"];
+  Warranty [label="{REFURBISHED_UNIT_WARRANTY|id PK\lrefurbished_unit_id FK\lsale_item_id FK\lduration_months=12\lstarts_at\lexpires_at\l}"];
+  Complaint [label="{CUSTOMER_COMPLAINT_CASE|id PK\lshop_id FK\lcustomer_id FK\lsale_item_id FK?\lservice_order_id FK?\lclaim_basis\lreported_at\lstatus\lassigned_employee_id FK?\l}"];
+  ClaimEvent [label="{CUSTOMER_COMPLAINT_CASE_EVENT|id PK\lcomplaint_case_id FK\levent_type\lfrom/to_status\lnote\lcustomer_visible\lemployee_id/auth FK\loccurred_at\l}"];
+  ClaimFile [label="{CUSTOMER_COMPLAINT_CASE_ATTACHMENT|id PK\lcomplaint_case_id FK\lstored_image_id FK\lcaption / image_role\l}"];
+  Resolution [label="{CUSTOMER_COMPLAINT_RESOLUTION|id PK\lcomplaint_case_id FK UK\lresolution_type\lrefund_payment_transaction_id FK?\lreplacement_refurbished_unit_id FK?\lservice_order_id FK?\lresolved_by_employee_id FK\l}"];
+  DailyClose [label="{DAILY_CLOSING|id PK\lshop_id FK\lbusiness_date\lstatus OPEN/CLOSED\lopening_float\lexpected_cash\lcounted_cash\lcash_variance\lopened_at/closed_at\l}"];
+  CashCount [label="{DAILY_CLOSING_CASH_COUNT|id PK\ldaily_closing_id FK\ldenomination\lquantity\lsubtotal\l}"];
+  CashMovement [label="{CASH_MOVEMENT|id PK\lshop_id FK\ldaily_closing_id FK\lmovement_type\ldirection\lamount\lemployee_id/auth FK\l}"];
+  Correction [label="{DAILY_CLOSING_CORRECTION|id PK\ldaily_closing_id FK\lsigned_amount\lreason\lemployee_id/auth FK\lcreated_at\l}"];
+  RefurbishedUnit -> ConditionGrade [label="grade"];
+  RefurbishedUnit -> Inspection [label="has history"];
+  ConditionGrade -> Inspection [label="grade snapshot"];
+  RefurbishedUnit -> Warranty [label="sold guarantee"];
+  Complaint -> ClaimEvent [label="timeline"];
+  Complaint -> ClaimFile [label="evidence"];
+  StoredImage -> ClaimFile [label="binary content"];
+  Complaint -> Resolution [label="one final remedy"];
+  DailyClose -> CashCount [label="denominations"];
+  DailyClose -> CashMovement [label="drawer events"];
+  DailyClose -> Correction [label="post-close corrections"];
+}

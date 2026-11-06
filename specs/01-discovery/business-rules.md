@@ -57,3 +57,29 @@ Stored labels are IN_PROGRESS, FIXED, NOT_FIXED, FINISHED, PICKED, REFUNDED, CAN
 ## Important implementation note
 
 Do not translate UI validation directly into API validation without evaluating the domain. API validation must be authoritative so that the rules apply regardless of client.
+
+## Target-domain decisions recorded (2026-11-04; authentication clarification 2026-11-05)
+
+The following are product-owner decisions for the new system, not claims about legacy behavior:
+
+- **DECIDED — One Company, multiple Shops:** one legal/business company has multiple store/branch records. Company-level master data is shared; sales, service orders, inventory, payments and cash movements are scoped to the active Shop.
+- **DECIDED — Shop session:** after initial Shop authentication, the persistent application session represents the Shop, not an employee. Any employee may use the active Shop session.
+- **DECIDED — Employee attribution per protected action:** the employee performing each committed business operation must authenticate with their own credential. A short-lived, single-use authorization is consumed for that operation; the employee identity is not retained as the persistent session identity.
+- **DECIDED — Product-only stock:** only catalogue entries of kind `PRODUCT` have stock balances/movements; balances are separate per Shop. `SERVICE` entries are non-stock.
+- **DECIDED — Transaction payments:** each payment/deposit/refund event is one `PaymentTransaction`, which can have multiple `PaymentAllocation` rows (e.g. cash plus card). The gross amount is stored once.
+- **DECIDED — Shop/date closing:** each Shop has at most one `DailyClosing` per business date, unique on `(ShopId, BusinessDate)`. Each close includes only that Shop’s operations; other Shops may close the same date independently.
+
+- **DECIDED — Whole product quantities:** product stock, reservations, transfers, returns and product lines use whole units; fractional product stock is invalid.
+- **DECIDED — Optional reservation:** product stock may be explicitly reserved and the reservation may be released/cancelled without changing on-hand stock. A later payment rechecks availability before deduction.
+- **DECIDED — Sale stock posting:** product stock is deducted only when settled payments reduce the sale balance to zero. Partial payments do not consume stock.
+- **DECIDED — Service stock posting:** an order moving to `FIXED` keeps its product reservations. Product stock is deducted when settled payments and explicitly applied deposits reduce the service balance to zero (the defined payment-completion trigger); the later `PICKED` event records handover and does not trigger stock deduction. Quantity-tracked stock may become negative. Deposits not explicitly applied and partial payments do not consume stock.
+- **DECIDED — Selected return lines:** when a Sale or ServiceOrder is `REFUNDED` or `CANCELLED`, the operator may select product lines/quantities physically returned to stock. Unselected items are not restocked automatically. Financial refund is separate from physical stock return.
+- **DECIDED — Inter-shop transfer:** use transfer document with source dispatch, in-transit status and destination receipt; only receipt adds quantity to destination stock.
+- **DECIDED — Refurbished equipment:** support configurable categories such as PCs, consoles and TVs, category-defined technical fields and one serialized record per physical unit.
+
+The precise requirements and remaining decisions are documented in [Architecture Decision Records](../02-architecture/architecture-decisions.md), [Target Domain Model](../02-architecture/domain-model.md) and [Relational Database Model](../02-architecture/database-model.md).
+
+
+- **DECIDED — Service parts procurement:** when a required product part is unavailable or only partly available, the order can enter `AWAITING_PARTS`. Available quantities are reserved; shortages are tracked in a Shop-wide Service Parts Purchase Queue through multiple `ServiceProcurementRequest` rounds per ServiceOrder, with line-level reference images, source/order links, expected delivery dates and tracking links. Partial receipts post only actual received stock and reserve allocated quantities. When all blocking requirements are reserved, an employee explicitly resumes repair to `IN_PROGRESS`. Supplier payment/AP and supplier-return handling remain outside initial scope.
+
+See [Service Parts Procurement Workflow](../02-architecture/service-parts-procurement.md), [Service Parts Purchase Queue](../02-architecture/service-procurement-queue.md), and ADR-013/ADR-014 for the target design.

@@ -85,5 +85,12 @@ This is a descriptive observation, not an endorsement of the same layering in th
 - Map every entity relationship and database constraint.
 - Inspect remaining views and modal workflows.
 - Inspect status transitions and payment rules.
-- Inspect JasperReports parameters and output requirements.
+- Report-template discovery is complete; see [Legacy Report and Print Inventory](legacy-report-inventory.md).
 - Identify any scheduled tasks, external integrations or printer dependencies.
+
+
+## 8. Report and print inventory
+
+**CONFIRMED:** the legacy repository includes 15 JasperReports `.jrxml` templates and 13 compiled `.jasper` files. Five report-generator methods are connected to active service-order, sale, refurbished-sale and daily-close UI workflows. A separate Swing refurbished-unit label is also implemented. Detailed template, method and caller mapping is documented in [Legacy Report and Print Inventory](legacy-report-inventory.md).
+
+The web solution will rebuild these document behaviours as versioned PDF templates. JasperReports binaries are not a target runtime dependency. The legacy refurbished label's six-month warranty text is obsolete relative to the approved 12-month commercial guarantee.

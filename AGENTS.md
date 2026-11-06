@@ -33,6 +33,8 @@ For every feature:
 - Use asynchronous I/O and propagate CancellationToken.
 - Centralize validation and exception handling.
 - Use secure password hashing and established authentication mechanisms; never reproduce plaintext or reversible password handling from the legacy system.
+- Model one Company with multiple Shops. The persistent session authenticates the Shop, not an employee.
+- Require an individual employee credential challenge for each protected committed operation and consume a short-lived, single-use EmployeeActionAuthorization atomically.
 - Keep secrets out of source control; use environment configuration or secret stores.
 - Do not execute destructive SQL or change the legacy repository.
 
@@ -46,3 +48,7 @@ For every feature:
 ## Scope control
 
 Do not implement a feature while its business-critical rules remain OPEN. Record the blocker and continue with independent discovery tasks.
+
+## Current domain decision register
+
+Use `specs/02-architecture/product-owner-decisions.md` as the consolidated product-owner decision ledger. A decision is not approved merely because it appears in a proposed role/action matrix.

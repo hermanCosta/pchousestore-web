@@ -1,0 +1,13 @@
+flowchart TD
+    A[Service booking] --> B[Create ServiceDeposit with purpose]
+    B --> C[Receive deposit via PaymentTransaction: DEPOSIT_RECEIPT]
+    C --> D{Deposit purpose / disposition}
+    D -->|Parts preorder or booking advance| E[Hold as customer deposit]
+    D -->|Security| F[Hold separately as security]
+    E --> G{Apply to service invoice?}
+    F --> H{Refund or validly forfeit?}
+    G -->|Yes| I[DepositApplication: non-cash order credit]
+    G -->|No| E
+    H -->|Refund| J[DEPOSIT_REFUND transaction]
+    H -->|Forfeit with approval| K[Deposit event: FORFEITED]
+    H -->|Continue holding| F

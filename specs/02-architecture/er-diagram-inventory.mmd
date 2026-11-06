@@ -1,0 +1,119 @@
+erDiagram
+    COMPANY ||--o{ SHOP : owns
+    SHOP ||--o{ SHOP_INVENTORY : holds
+    CATALOG_ITEM ||--o| PRODUCT : subtype
+    PRODUCT_CATEGORY ||--o{ PRODUCT : classifies
+    PRODUCT_CATEGORY ||--o{ PRODUCT_ATTRIBUTE_DEFINITION : defines
+    PRODUCT ||--o{ REFURBISHED_UNIT : serializes
+    REFURBISHED_UNIT ||--o{ REFURBISHED_UNIT_ATTRIBUTE_VALUE : has
+    PRODUCT_ATTRIBUTE_DEFINITION ||--o{ REFURBISHED_UNIT_ATTRIBUTE_VALUE : specifies
+    PRODUCT ||--o{ SHOP_INVENTORY : balanced_at
+    SHOP_INVENTORY ||--o{ INVENTORY_MOVEMENT : ledger
+    SHOP ||--o{ INVENTORY_RESERVATION : scopes
+    INVENTORY_RESERVATION ||--|{ INVENTORY_RESERVATION_LINE : contains
+    SHOP_INVENTORY o|--o{ INVENTORY_RESERVATION_LINE : reserves_quantity
+    REFURBISHED_UNIT o|--o{ INVENTORY_RESERVATION_LINE : reserves_unit
+    SHOP ||--o{ STOCK_TRANSFER : source_or_destination
+    STOCK_TRANSFER ||--|{ STOCK_TRANSFER_LINE : includes
+    PRODUCT ||--o{ STOCK_TRANSFER_LINE : moves
+    REFURBISHED_UNIT o|--o{ STOCK_TRANSFER_LINE : identifies_unit
+    SHOP ||--o{ STOCK_RETURN : receives
+    STOCK_RETURN ||--|{ STOCK_RETURN_LINE : selects
+    REFURBISHED_UNIT o|--o{ STOCK_RETURN_LINE : identifies_unit
+
+    SHOP_INVENTORY {
+        bigint id PK
+        bigint shop_id FK
+        bigint product_catalog_item_id FK
+        int quantity_on_hand
+        int quantity_reserved
+        int minimum_quantity
+    }
+    INVENTORY_RESERVATION {
+        bigint id PK
+        bigint shop_id FK
+        bigint sale_id FK
+        bigint service_order_id FK
+        string status
+    }
+    INVENTORY_RESERVATION_LINE {
+        bigint id PK
+        bigint reservation_id FK
+        bigint sale_item_id FK
+        bigint service_order_item_id FK
+        bigint shop_inventory_id FK
+        bigint refurbished_unit_id FK
+        int quantity_reserved
+        int quantity_consumed
+        int quantity_released
+    }
+    INVENTORY_MOVEMENT {
+        bigint id PK
+        bigint shop_id FK
+        bigint product_catalog_item_id FK
+        bigint shop_inventory_id FK
+        bigint refurbished_unit_id FK
+        int quantity_delta
+        string movement_kind
+    }
+    STOCK_TRANSFER {
+        bigint id PK
+        bigint source_shop_id FK
+        bigint destination_shop_id FK
+        string status
+    }
+    STOCK_TRANSFER_LINE {
+        bigint id PK
+        bigint stock_transfer_id FK
+        bigint product_catalog_item_id FK
+        bigint refurbished_unit_id FK
+        int quantity_requested
+        int quantity_dispatched
+        int quantity_received
+    }
+    STOCK_RETURN {
+        bigint id PK
+        bigint shop_id FK
+        bigint sale_id FK
+        bigint service_order_id FK
+    }
+    STOCK_RETURN_LINE {
+        bigint id PK
+        bigint stock_return_id FK
+        bigint sale_item_id FK
+        bigint service_order_item_id FK
+        bigint refurbished_unit_id FK
+        int quantity_returned
+    }
+    PRODUCT_CATEGORY {
+        bigint id PK
+        bigint company_id FK
+        bigint parent_category_id FK
+        string name
+        string code
+    }
+    PRODUCT_ATTRIBUTE_DEFINITION {
+        bigint id PK
+        bigint product_category_id FK
+        string code
+        string data_type
+        string unit
+    }
+    REFURBISHED_UNIT {
+        bigint id PK
+        bigint product_catalog_item_id FK
+        bigint current_shop_id FK
+        string asset_code
+        string serial_number
+        string condition_grade
+        string status
+    }
+    REFURBISHED_UNIT_ATTRIBUTE_VALUE {
+        bigint id PK
+        bigint refurbished_unit_id FK
+        bigint product_attribute_definition_id FK
+        string text_value
+        decimal number_value
+        boolean boolean_value
+        date date_value
+    }

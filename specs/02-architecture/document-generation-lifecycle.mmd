@@ -1,0 +1,13 @@
+flowchart TD
+    A[Business event committed] --> B[Resolve document type and source record]
+    B --> C[Validate active Shop and Employee permissions]
+    C --> D[Build immutable snapshot]
+    D --> E[Persist GeneratedDocument metadata and snapshot]
+    E --> F[Select retained template version and layout]
+    F --> G[Render PDF]
+    G --> H[Preview / Download / Browser Print]
+    H --> I{Reprint?}
+    I -- No --> J[Complete]
+    I -- Yes --> K[Append DocumentReprintEvent]
+    K --> F
+    G -.-> L[No financial or inventory side effect]

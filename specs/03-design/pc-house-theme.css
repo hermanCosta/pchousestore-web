@@ -1,0 +1,25 @@
+/* PC House web theme — visually approximated from pchouse.ie, not official brand tokens. */
+:root {
+  --pc-navy-900: #21466F;
+  --pc-navy-800: #28547F;
+  --pc-blue-600: #1688C9;
+  --pc-blue-500: #239DD8;
+  --pc-cyan-400: #27B8E8;
+  --pc-orange-500: #EA842B;
+
+  --pc-surface-0: #FFFFFF;
+  --pc-surface-50: #F5F7FA;
+  --pc-border: #DCE3EA;
+  --pc-text-900: #243447;
+  --pc-text-600: #5D6B79;
+
+  --app-primary: var(--pc-blue-600);
+  --app-primary-hover: var(--pc-navy-800);
+  --app-navigation-bg: var(--pc-navy-900);
+  --app-canvas: var(--pc-surface-50);
+  --app-card: var(--pc-surface-0);
+  --app-border: var(--pc-border);
+  --app-text: var(--pc-text-900);
+  --app-text-muted: var(--pc-text-600);
+  --app-promotion: var(--pc-orange-500);
+}

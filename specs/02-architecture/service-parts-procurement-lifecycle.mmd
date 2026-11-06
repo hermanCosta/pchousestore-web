@@ -1,0 +1,38 @@
+flowchart TD
+    A[Service order booked / diagnosed] --> B[Add product line and ServicePartRequirement]
+    B --> C[Check active Shop stock]
+    C --> D{Required quantity fully available?}
+    D -- Yes --> E[Reserve required quantity]
+    D -- No --> F[Reserve available quantity]
+    F --> G[Set ServiceOrder to AWAITING_PARTS when blocking]
+    F --> H[Create ServiceProcurementRequest for this sourcing round]
+    H --> I[Add request lines linked to ServicePartRequirement]
+    I --> J[Capture/upload reference photos and compatibility notes]
+    J --> K[Publish into Shop-wide Service Parts Purchase Queue]
+    K --> L[Buyer reviews by ServiceOrder ID, priority and needed-by date]
+    L --> M[Create/reuse SupplierPurchase]
+    M --> N[Allocate SupplierPurchaseLine to one or more request lines]
+    N --> O[Record source/order URL, order date, ETA and tracking URL]
+    O --> P[Track status / ETA changes in event timeline]
+    P --> Q[Receive partial or full delivery]
+    Q --> R[Record actual accepted whole-unit quantity]
+    R --> S[Post PURCHASE_RECEIPT_IN]
+    S --> T[Reserve allocated received quantity for linked requirement]
+    T --> U[Recalculate request and request-line statuses]
+    U --> V{All blocking requirements fully reserved?}
+    E --> V
+    V -- No --> P
+    V -- Yes --> W[Employee authenticates: Resume repair]
+    W --> X[ServiceOrder returns to IN_PROGRESS]
+    X --> Y[Repair completed: FIXED]
+    Y --> Z[Reservations remain active]
+    Z --> AA[Full payment; balance reaches zero]
+    AA --> AB[Consume reserved stock]
+    AB --> AC[Later physical handover: PICKED]
+
+    G --> AC[Cancel service / requirement]
+    AC --> AD[Release active reservations]
+    AD --> AE[Received parts remain Shop stock unless separately returned]
+
+    K -.-> AF[Later discovery: create new request number for same ServiceOrder]
+    AF -.-> I

@@ -1,0 +1,15 @@
+flowchart TD
+    A[Refurbished Sale] --> B[Create weekly InstallmentPlan]
+    B --> C[Generate dated InstallmentSchedule rows]
+    C --> D[Reserve exact RefurbishedUnit]
+    D --> E[Receive weekly payment]
+    E --> F[PaymentTransaction + PaymentAllocation]
+    F --> G[InstallmentSettlement allocations]
+    G --> H{All plan amounts settled?}
+    H -->|No| E
+    H -->|Yes, LAYAWAY| I[Authorize handover]
+    I --> J[Consume stock / mark unit SOLD]
+    H -->|Early handover requested| K{CREDIT_SALE legal gate approved?}
+    K -->|No| L[Reject early handover]
+    K -->|Yes| M[Authorize credit-sale handover]
+    M --> J

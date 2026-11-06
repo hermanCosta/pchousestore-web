@@ -1,0 +1,27 @@
+flowchart TD
+    A[Product line added to Sale or ServiceOrder] --> B{Reserve stock?}
+    B -- No --> C[No reservation; available stock unchanged]
+    B -- Yes --> D[Create InventoryReservation]
+    D --> E[Increase reserved; on-hand unchanged]
+    E --> F{Release reservation?}
+    F -- Yes --> G[Release reservation]
+    G --> H[Decrease reserved; on-hand unchanged]
+    F -- No --> I{Business flow}
+    C --> I
+    H --> I
+    I -- Sale --> J[Sale fully settled]
+    I -- Service order --> K[Status becomes FIXED]
+    K --> L[Keep reservation active]
+    L --> M[Service balance reaches zero]
+    J --> N[Consume active reservation; deduct any remaining quantity]
+    M --> N
+    N --> O[Decrease on-hand; create outbound InventoryMovement]
+    O --> P[Later physical handover: PICKED]
+    P --> Q{Later REFUNDED or CANCELLED?}
+    Q -- No --> R[Stock remains consumed]
+    Q -- Yes --> S[Operator selects returned product lines and quantities]
+    S --> T[Create StockReturn + selected lines]
+    T --> U[Increase stock for selected quantities only]
+
+    V[Unpaid Sale/ServiceOrder cancelled] --> W[Release active reservations only]
+    W --> X[No stock-in movement]

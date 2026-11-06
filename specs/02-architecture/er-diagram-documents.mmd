@@ -1,0 +1,46 @@
+erDiagram
+    SHOP ||--o{ GENERATED_DOCUMENT : owns
+    EMPLOYEE ||--o{ GENERATED_DOCUMENT : issues
+    GENERATED_DOCUMENT ||--o{ DOCUMENT_REPRINT_EVENT : has
+    SHOP ||--o{ DOCUMENT_REPRINT_EVENT : scopes
+    EMPLOYEE ||--o{ DOCUMENT_REPRINT_EVENT : prints
+
+    SHOP {
+      bigint ShopId PK
+      bigint CompanyId FK
+      string Name
+    }
+    EMPLOYEE {
+      bigint EmployeeId PK
+      bigint CompanyId FK
+      string EmployeeCode
+      string Role
+    }
+    GENERATED_DOCUMENT {
+      char36 GeneratedDocumentId PK
+      bigint CompanyId FK
+      bigint ShopId FK
+      string DocumentType
+      string DocumentNumber
+      string SourceType
+      string SourceId
+      string SourceVersion
+      string TemplateKey
+      string TemplateVersion
+      string LayoutCode
+      datetime IssuedAtUtc
+      bigint IssuedByEmployeeId FK
+      json SnapshotJson
+      string ContentHash
+      string Status
+    }
+    DOCUMENT_REPRINT_EVENT {
+      bigint DocumentReprintEventId PK
+      char36 GeneratedDocumentId FK
+      bigint ShopId FK
+      datetime PrintedAtUtc
+      bigint PrintedByEmployeeId FK
+      string LayoutCode
+      string CopyLabel
+      string Reason
+    }

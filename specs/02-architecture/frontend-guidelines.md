@@ -25,6 +25,12 @@
 
 Every data view must define loading, empty, error and success states. Forms must provide inline validation, keyboard support and accessible labels. Destructive actions require confirmation and clear feedback.
 
+## Brand and assets
+
+- Follow [PC House Brand Identity](../03-design/brand-identity.md) and import shared CSS tokens from `../03-design/pc-house-theme.css` into the application theme.
+- Use the owner-approved logo from the single `public/brand/` asset location. Do not hotlink the third-party image CDN in production and do not generate substitute marks.
+- The palette values are approximate until the owner approves the official master artwork.
+
 ## Quality
 
 - Strict TypeScript; avoid any.

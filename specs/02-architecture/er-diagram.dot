@@ -1,0 +1,97 @@
+digraph TARGET {
+ graph [rankdir=LR, splines=polyline, nodesep=.35, ranksep=.75, pad=.30, bgcolor="white", fontname="Arial", fontsize=18, labelloc="t", label="pcHouseStore Web — Proposed Relational DER\nOne Company | Multiple Shops | Company-wide employee password + global roles | Signed integer stock | VAT feature flag | 12-month refurbished guarantee | Service procurement | Shop/date closing"];
+ node [shape=box, style="rounded,filled", fillcolor="#F8FAFC", color="#64748B", fontname="Arial", fontsize=9, margin="0.12,0.08"];
+ edge [fontname="Arial", fontsize=8, color="#526273", arrowsize=0.65];
+ subgraph cluster_access { label="COMPANY, SHOPS & ACCESS"; color="#94A3B8"; company; shop; credential; session; person; employee; employeerole; authorization; taxconfig; taxcode; taxrate; }
+ subgraph cluster_master { label="SHARED COMPANY MASTER DATA"; color="#94A3B8"; customer; catalog; product; service; refurb; device; fault; }
+ subgraph cluster_stock { label="SHOP INVENTORY"; color="#94A3B8"; inventory; movement; }
+ subgraph cluster_operations { label="SHOP OPERATIONS & FINANCE"; color="#94A3B8"; sale; saleitem; serviceorder; serviceitem; orderfault; orderevent; note; payment; allocation; cashmove; closing; }
+ subgraph cluster_procurement { label="SERVICE PARTS PROCUREMENT"; color="#D97706"; supplier; supplierpurchase; supplierline; partrequirement; procurementrequest; procurementrequestline; procurementimage; procurementrequestevent; procallocation; purchaseevent; }
+ storedimage [label="STORED_IMAGE\nPK id; FK company_id, shop_id\ncontent MEDIUMBLOB; thumbnail BLOB\nMIME, size, SHA-256; upload authorization"];
+ company [label="COMPANY\nPK id\nOne legal entity"];
+ shop [label="SHOP\nPK id; FK company_id\ncode, name, address"];
+ credential [label="SHOP_ACCESS_CREDENTIAL\nPK id; FK shop_id\nlogin_code, password_hash"];
+ session [label="SHOP_SESSION\nPK id; FK shop_id\ntoken_hash, expiry, revoked_at\nNo EmployeeId"];
+ person [label="PERSON\nPK id; FK company_id\nname, contact, email"];
+ employee [label="EMPLOYEE\nPK id; FK company_id, person_id\nemployee_code, password_hash; cross-Shop identity"];
+ employeerole [label="EMPLOYEE_ROLE_ASSIGNMENT\nPK id; FK employee_id\nMANAGER / TECHNICIAN; Company-wide"];
+ authorization [label="EMPLOYEE_ACTION_AUTHORIZATION\nPK id; FK session, shop, employee\naction_code, operation_context_hash, auth/expiry/consumed_at\nshort-lived; single-use"];
+ customer [label="CUSTOMER\nPK id; FK company_id, person_id\nshared by Shops"];
+ catalog [label="CATALOG_ITEM\nPK id; FK company_id\nkind PRODUCT|SERVICE, SKU, price"];
+ product [label="PRODUCT\nPK/FK catalog_item_id\nshared product definition"];
+ service [label="SERVICE\nPK/FK catalog_item_id\nno inventory"];
+ refurb [label="REFURBISHED_PRODUCT\nPK/FK product_catalog_item_id\nserial/category/model"];
+ refurbimage [label="REFURBISHED_UNIT_IMAGE\nPK id; FK refurbished_unit_id\nFK stored_image_id; role, caption, order"];
+ refurbwarranty [label="REFURBISHED_UNIT_WARRANTY\nPK id; FK refurbished_unit_id, sale_item_id\n12 months; starts at handover; commercial"];
+ inventory [label="SHOP_INVENTORY\nPK id; FK shop_id, product_id\nqty_on_hand, minimum_qty\nUNIQUE(shop_id, product_id)"];
+ movement [label="INVENTORY_MOVEMENT\nPK id; FK shop_inventory_id, auth_id\nkind, qty_delta, occurred_at"];
+ device [label="DEVICE\nPK id; FK company_id, customer_id\nbrand, model, serial"];
+ fault [label="FAULT\nPK id; FK company_id\ncode, description"];
+ supplier [label="SUPPLIER\nPK id; FK company_id\nname, website, contact, active"];
+ supplierpurchase [label="SUPPLIER_PURCHASE\nPK id; FK shop_id, supplier_id?\nexternal_order_reference, purchase_url\nordered_at, expected_delivery_at\ntracking_url, status, currency"];
+ supplierline [label="SUPPLIER_PURCHASE_LINE\nPK id; FK supplier_purchase_id, product_id\nquantity_ordered, quantity_received\nunit_cost, product_url"];
+ partrequirement [label="SERVICE_PART_REQUIREMENT\nPK id; FK service_order_id, service_order_item_id\nrequired_quantity INT, blocks_work, status\nDurable total demand / reservation state"];
+ procurementrequest [label="SERVICE_PROCUREMENT_REQUEST\nPK id; FK shop_id, service_order_id\nrequest_number (unique per ServiceOrder)\nstatus, priority, needed_by, assigned_employee_id\nOne purchasing round; many per service order"];
+ procurementrequestline [label="SERVICE_PROCUREMENT_REQUEST_LINE\nPK id; FK request_id, requirement_id\nquantity_requested INT\npart_number_snapshot, compatibility_notes"];
+ procurementimage [label="SERVICE_PROCUREMENT_REQUEST_IMAGE\nPK id; FK request_line_id\nFK stored_image_id\nrole, caption, order; uploader/audit in STORED_IMAGE"];
+ procurementrequestevent [label="SERVICE_PROCUREMENT_REQUEST_EVENT\nPK id; FK request_id, request_line_id?\nevent_type, snapshots, payload_json\nemployee_id + action_authorization_id, occurred_at"];
+ procallocation [label="SERVICE_PART_PROCUREMENT_ALLOCATION\nPK id; FK supplier_purchase_line_id, request_line_id\nquantity_allocated INT, quantity_received INT"];
+ purchaseevent [label="SUPPLIER_PURCHASE_EVENT\nPK id; FK supplier_purchase_id\nevent_type, ETA/tracking/status snapshot\nemployee_id, action_authorization_id, occurred_at"];
+ sale [label="SALE\nPK id; FK shop_id, customer_id?\nseller_employee_id, action_auth_id\ntype, status, total, balance"];
+ saleitem [label="SALE_ITEM\nPK id; FK sale_id, catalog_item_id\ndescription/price snapshots"];
+ serviceorder [label="SERVICE_ORDER\nPK id; FK shop_id, customer_id\ndevice_id?, responsible_employee_id\ncreated_by_employee_id, action_auth_id"];
+ serviceitem [label="SERVICE_ORDER_ITEM\nPK id; FK service_order_id, catalog_item_id\ndescription/price snapshots"];
+ orderfault [label="SERVICE_ORDER_FAULT\nPK id; FK service_order_id, fault_id"];
+ orderevent [label="SERVICE_ORDER_EVENT\nPK id; FK service_order_id, shop_id\nemployee_id, employee_action_authorization_id\nevent_type, from/to status, occurred_at"];
+ note [label="BUSINESS_NOTE\nPK id; FK sale_id XOR order_id\nemployee_id, action_auth_id"];
+ payment [label="PAYMENT_TRANSACTION\nPK id; FK shop_id, employee_id, auth_id\nSale XOR ServiceOrder XOR ServiceDeposit\nkind, EUR amount, status, original_txn_id?"];
+ deposit [label="SERVICE_DEPOSIT\nPK id; FK service_order_id, shop_id\npurpose, target, status"];
+ depapply [label="DEPOSIT_APPLICATION\nPK id; FK deposit_id, service_order_id\namount, employee/auth; non-cash credit"];
+ plan [label="INSTALLMENT_PLAN\nPK id; FK sale_id, shop_id\nWEEKLY; LAYAWAY / CREDIT_SALE"];
+ schedule [label="INSTALLMENT_SCHEDULE\nPK id; FK plan_id\nsequence, due_date, amount, status"];
+ settle [label="INSTALLMENT_SETTLEMENT\nPK id; FK schedule_id, payment_transaction_id\namount_applied"];
+ refundline [label="PAYMENT_REFUND_LINE\nPK id; FK refund_payment_transaction_id\nitem allocation?, quantity?, amount"];
+ paymentmethod [label="PAYMENT_METHOD\nPK id; configurable tender catalogue"];
+ allocation [label="PAYMENT_ALLOCATION\nPK id; FK payment_transaction_id, payment_method_id\napplied, tendered, change"];
+ finpolicy [label="SHOP_FINANCIAL_POLICY\nPK id; FK shop_id\nEUR; cash rounding; approval thresholds"];
+ taxconfig [label="COMPANY_TAX_CONFIGURATION\nPK id; FK company_id (unique)\nvat_enabled; NOT_REVIEWED / READY\nregistration/pricing mode?"];
+ taxcode [label="COMPANY_TAX_CODE\nPK id; FK company_id\ncode; treatment; is_active"];
+ taxrate [label="COMPANY_TAX_RATE\nPK id; FK tax_code_id\nrate DECIMAL(9,6); effective dates"];
+ actionapproval [label="BUSINESS_ACTION_APPROVAL\nPK id; FK shop_id\nrequester, approver, reason, action_code"];
+ payment -> allocation [label="1:N"]; paymentmethod -> allocation [label="1:N"]; shop -> finpolicy [label="1:1"]; shop -> paymentmethod [label="via ShopPaymentMethod"]; serviceorder -> deposit [label="1:N"]; deposit -> depapply [label="1:N"]; serviceorder -> depapply [label="1:N"]; sale -> plan [label="0..1"]; plan -> schedule [label="1:N"]; schedule -> settle [label="1:N"]; payment -> settle [label="1:N"]; payment -> refundline [label="0..N"]; shop -> actionapproval [label="1:N; financial actions only; no procurement approval"];
+ allocation [label="PAYMENT_ALLOCATION\nPK id; FK payment_transaction_id\nmethod, applied, tendered, change"];
+ cashmove [label="CASH_MOVEMENT\nPK id; FK shop_id, employee_id, auth_id\ndirection, amount, occurred_at"];
+ closing [label="DAILY_CLOSING\nPK id; FK shop_id, closing_employee_id, auth_id\nbusiness_date; UNIQUE(shop_id,date)\nper-Shop reconciliation only"];
+ company -> shop [label="1:N"];
+ shop -> credential [label="1:1"]; shop -> session [label="1:N"];
+ company -> person [label="1:N"]; company -> employee [label="1:N"]; company -> customer [label="1:N"]; company -> taxconfig [label="1:1"]; company -> taxcode [label="1:N"]; taxcode -> taxrate [label="1:N effective-dated"];
+ person -> employee [label="1:N"]; person -> customer [label="1:N"];
+ employee -> employeerole [label="1:N Company-wide roles"];
+ session -> authorization [label="1:N"]; shop -> authorization [label="1:N"]; employee -> authorization [label="1:N"];
+ company -> catalog [label="1:N"]; catalog -> product [label="1:0..1"]; catalog -> service [label="1:0..1"]; product -> refurb [label="1:0..1"]; refurb -> refurbimage [label="1:N photo relations"]; storedimage -> refurbimage [label="1:1 BLOB content"]; refurb -> refurbwarranty [label="0..1 warranty"]; saleitem -> refurbwarranty [label="0..1 per sold unit"];
+ shop -> inventory [label="1:N"]; product -> inventory [label="1:N"]; inventory -> movement [label="1:N"]; authorization -> movement [label="actor"];
+ company -> device [label="1:N"]; customer -> device [label="1:N"]; company -> fault [label="1:N"];
+ shop -> sale [label="1:N"]; customer -> sale [label="0..1:N"]; employee -> sale [label="seller"]; authorization -> sale [label="actor"];
+ sale -> saleitem [label="1:N"]; taxcode -> saleitem [label="tax snapshot"]; taxrate -> saleitem [label="rate snapshot"]; catalog -> saleitem [label="1:N"];
+ shop -> serviceorder [label="1:N"]; customer -> serviceorder [label="1:N"]; device -> serviceorder [label="0..1:N"]; employee -> serviceorder [label="responsible/creator"]; authorization -> serviceorder [label="actor"];
+ serviceorder -> serviceitem [label="1:N"]; taxcode -> serviceitem [label="tax snapshot"]; taxrate -> serviceitem [label="rate snapshot"]; catalog -> serviceitem [label="1:N"]; serviceorder -> orderfault [label="1:N"]; fault -> orderfault [label="1:N"];
+ serviceorder -> partrequirement [label="1:N"]; serviceitem -> partrequirement [label="0..1 per PRODUCT line"];
+ serviceorder -> procurementrequest [label="1:N; multiple rounds"]; shop -> procurementrequest [label="1:N; queue scope"];
+ procurementrequest -> procurementrequestline [label="1:N"]; partrequirement -> procurementrequestline [label="1:N across rounds"];
+ procurementrequestline -> procurementimage [label="1:N reference images"];
+ procurementrequest -> procurementrequestevent [label="1:N immutable audit history"];
+ employee -> procurementrequestevent [label="actor"]; authorization -> procurementrequestevent [label="actor authorization"];
+ company -> supplier [label="1:N"]; supplier -> supplierpurchase [label="0..1:N source"];
+ shop -> supplierpurchase [label="1:N"];
+ supplierpurchase -> supplierline [label="1:N"]; product -> supplierline [label="ordered product"];
+ supplierline -> procallocation [label="1:N"]; procurementrequestline -> procallocation [label="1:N; request-line allocations"];
+ procurementrequestline -> employee [style=dashed,label="uploaded_by / assigned buyer"];
+ supplierpurchase -> purchaseevent [label="1:N timeline"]; employee -> purchaseevent [label="actor"]; authorization -> purchaseevent [label="actor auth"];
+ supplierline -> movement [style=dashed,label="PURCHASE_RECEIPT_IN"]
+ serviceorder -> orderevent [label="1:N"]; employee -> orderevent [label="actor"]; authorization -> orderevent [label="actor auth"];
+ authorization -> note [label="actor"]; sale -> note [label="0..1:N"]; serviceorder -> note [label="0..1:N"];
+ shop -> payment [label="1:N"]; employee -> payment [label="actor"]; authorization -> payment [label="actor"]; sale -> payment [label="0..1:N XOR"]; serviceorder -> payment [label="0..1:N XOR"];
+ payment -> payment [label="original/refund link", style=dashed];
+ shop -> cashmove [label="1:N"]; employee -> cashmove [label="actor"]; authorization -> cashmove [label="actor"];
+ shop -> closing [label="1:N; UNIQUE(shop,date)"]; employee -> closing [label="closer"]; authorization -> closing [label="same-Shop close auth"];
+}

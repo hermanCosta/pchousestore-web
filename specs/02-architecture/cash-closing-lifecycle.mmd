@@ -1,0 +1,20 @@
+flowchart TD
+  A[Manager opens Shop cash day] --> B[Count and record opening float]
+  B --> C[DailyClosing status OPEN]
+  C --> D[Settled cash sale/deposit receipts]
+  C --> E[Cash in / cash out / safe drops]
+  C --> F[Cash refunds / deposit refunds]
+  D --> G[Calculate expected cash]
+  E --> G
+  F --> G
+  G --> H[Count notes and coins by denomination]
+  H --> I[Variance = counted - expected]
+  I --> J{Variance zero?}
+  J -->|Yes| K[Manager closes day]
+  J -->|No| L[Enter reason and manager closes]
+  L --> K
+  K --> M[DailyClosing immutable: CLOSED]
+  M --> N{Post-close correction?}
+  N -->|No| O[Keep final record]
+  N -->|Yes| P[Manager creates audited correction]
+  P --> O

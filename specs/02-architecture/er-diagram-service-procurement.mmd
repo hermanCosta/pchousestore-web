@@ -1,0 +1,153 @@
+erDiagram
+    SHOP ||--o{ SUPPLIER_PURCHASE : places
+    SHOP ||--o{ SERVICE_PROCUREMENT_REQUEST : queues
+    COMPANY ||--o{ SUPPLIER : registers
+    SUPPLIER o|--o{ SUPPLIER_PURCHASE : source_for
+    SUPPLIER_PURCHASE ||--|{ SUPPLIER_PURCHASE_LINE : contains
+    PRODUCT ||--o{ SUPPLIER_PURCHASE_LINE : ordered_product
+    SERVICE_ORDER ||--o{ SERVICE_PART_REQUIREMENT : requires_parts
+    SERVICE_ORDER_ITEM ||--o| SERVICE_PART_REQUIREMENT : durable_requirement_for
+    SERVICE_ORDER ||--o{ SERVICE_PROCUREMENT_REQUEST : requests_parts_over_time
+    SERVICE_PROCUREMENT_REQUEST ||--|{ SERVICE_PROCUREMENT_REQUEST_LINE : contains
+    SERVICE_PART_REQUIREMENT ||--o{ SERVICE_PROCUREMENT_REQUEST_LINE : sourced_in_rounds
+    SERVICE_PROCUREMENT_REQUEST_LINE ||--o{ SERVICE_PROCUREMENT_REQUEST_IMAGE : illustrated_by
+    SERVICE_PROCUREMENT_REQUEST ||--o{ SERVICE_PROCUREMENT_REQUEST_EVENT : audit_history
+    EMPLOYEE ||--o{ SERVICE_PROCUREMENT_REQUEST_EVENT : performs
+    EMPLOYEE_ACTION_AUTHORIZATION ||--o| SERVICE_PROCUREMENT_REQUEST_EVENT : authorizes
+    SERVICE_PROCUREMENT_REQUEST_LINE ||--o{ SERVICE_PART_PROCUREMENT_ALLOCATION : ordered_through
+    SUPPLIER_PURCHASE_LINE ||--o{ SERVICE_PART_PROCUREMENT_ALLOCATION : allocated_to
+    SUPPLIER_PURCHASE ||--o{ SUPPLIER_PURCHASE_EVENT : history
+    SUPPLIER_PURCHASE_LINE ||--o{ INVENTORY_MOVEMENT : receipt
+    INVENTORY_MOVEMENT ||--o{ INVENTORY_RESERVATION_LINE : followed_by_reservation
+
+    SHOP {
+      bigint id PK
+      bigint company_id FK
+      varchar name
+    }
+    SERVICE_ORDER {
+      bigint id PK
+      bigint shop_id FK
+      varchar status
+    }
+    SERVICE_ORDER_ITEM {
+      bigint id PK
+      bigint service_order_id FK
+      bigint catalog_item_id FK
+      int quantity
+    }
+    SERVICE_PART_REQUIREMENT {
+      bigint id PK
+      bigint service_order_id FK
+      bigint service_order_item_id FK
+      int required_quantity
+      boolean blocks_work
+      varchar status
+    }
+    SERVICE_PROCUREMENT_REQUEST {
+      bigint id PK
+      bigint shop_id FK
+      bigint service_order_id FK
+      int request_number
+      varchar status
+      varchar priority
+      datetime requested_at
+      date needed_by
+      bigint assigned_employee_id FK
+    }
+    SERVICE_PROCUREMENT_REQUEST_LINE {
+      bigint id PK
+      bigint service_procurement_request_id FK
+      bigint service_part_requirement_id FK
+      int quantity_requested
+      varchar part_number_snapshot
+      text compatibility_notes
+    }
+    SERVICE_PROCUREMENT_REQUEST_IMAGE {
+      bigint id PK
+      bigint service_procurement_request_line_id FK
+      bigint stored_image_id FK
+      varchar content_type
+      bigint size_bytes
+      char sha256
+      varchar image_role
+      bigint uploaded_by_employee_id FK
+      datetime uploaded_at
+    }
+    SERVICE_PROCUREMENT_REQUEST_EVENT {
+      bigint id PK
+      bigint service_procurement_request_id FK
+      bigint service_procurement_request_line_id FK
+      bigint employee_id FK
+      bigint employee_action_authorization_id FK
+      varchar event_type
+      json payload_json
+      datetime occurred_at
+    }
+    SUPPLIER {
+      bigint id PK
+      bigint company_id FK
+      varchar name
+      varchar website
+    }
+    SUPPLIER_PURCHASE {
+      bigint id PK
+      bigint shop_id FK
+      bigint supplier_id FK
+      varchar external_order_reference
+      varchar purchase_url
+      varchar tracking_url
+      datetime ordered_at
+      datetime expected_delivery_at
+      varchar status
+    }
+    SUPPLIER_PURCHASE_LINE {
+      bigint id PK
+      bigint supplier_purchase_id FK
+      bigint product_catalog_item_id FK
+      int quantity_ordered
+      int quantity_received
+      decimal unit_cost
+      varchar product_url
+    }
+    SERVICE_PART_PROCUREMENT_ALLOCATION {
+      bigint id PK
+      bigint supplier_purchase_line_id FK
+      bigint service_procurement_request_line_id FK
+      int quantity_allocated
+      int quantity_received
+    }
+    SUPPLIER_PURCHASE_EVENT {
+      bigint id PK
+      bigint supplier_purchase_id FK
+      bigint employee_id FK
+      bigint employee_action_authorization_id FK
+      varchar event_type
+      datetime expected_delivery_at_snapshot
+      datetime occurred_at
+    }
+    INVENTORY_MOVEMENT {
+      bigint id PK
+      bigint shop_inventory_id FK
+      bigint supplier_purchase_line_id FK
+      int quantity_delta
+      varchar movement_kind
+    }
+    INVENTORY_RESERVATION_LINE {
+      bigint id PK
+      bigint service_order_item_id FK
+      bigint shop_inventory_id FK
+      int quantity_reserved
+    }
+
+
+  STORED_IMAGE {
+      bigint id PK
+      bigint company_id FK
+      bigint shop_id FK
+      mediumblob content
+      blob thumbnail_content
+      varchar content_type
+      int size_bytes
+      binary sha256
+  }
