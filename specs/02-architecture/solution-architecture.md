@@ -57,6 +57,18 @@ Feature-oriented Application organization:
 - CashManagement (one physical till per Shop in the initial release; opening float, Shop-scoped CashMovement, DailyClosing unique per Shop/business date, variance and immutable corrections)
 - Reporting
 
+### Module boundaries, layers and communication
+
+- The feature areas above are the first-release modules. Each module owns its use cases, domain rules and tables; another module must not read or change those tables directly.
+- A module exposes only the application operations other modules need. Cross-module work uses those in-process contracts synchronously. The Application layer orchestrates a use case that spans modules.
+- Use one MySQL database and one EF Core `DbContext` in the initial release, with entity configurations grouped by owning module. A multi-module use case that must be atomic uses one database transaction.
+- Do not add message brokers, distributed transactions or cross-module domain-event infrastructure in the initial release.
+- Dependencies point inward: Domain has no project dependencies; Application depends on Domain; Infrastructure depends on Application and Domain; API depends on Application and Infrastructure and is the composition root. Frontend communicates with backend only through versioned HTTP API contracts.
+- Domain contains business entities, value objects and invariants. Application contains use cases, cross-module orchestration, input validation and authorization. Infrastructure contains EF Core, database configuration and external adapters. API contains HTTP endpoints, DTO mapping, authentication/token validation and dependency composition.
+- Keep persistence entities out of API contracts. Use asynchronous I/O and propagate `CancellationToken`. Return consistent Problem Details errors and centralize exception handling.
+- Backend uses xUnit; frontend uses Vitest and React Testing Library. Unit tests cover domain/application behavior; integration tests cover API, persistence and module boundaries. Use MySQL-compatible integration coverage for persistence behavior.
+- Apply the repository's .NET formatting and frontend lint/format checks in CI. Do not introduce additional architecture tooling before it solves a concrete problem.
+
 ## 4. Frontend organization
 
 ```text
