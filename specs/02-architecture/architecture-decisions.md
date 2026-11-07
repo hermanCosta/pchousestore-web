@@ -561,3 +561,45 @@ pchousestore-web/
 - Infrastructure configuration and deployment assets are organized under `infrastructure/`.
 - This ADR records repository organization only. The solution and physical application/test projects are created in Phase 2 — Technical Foundation. It does not authorize starting application implementation during Phase 1.
 - Existing approved SDD v19 product and security decisions remain unchanged.
+
+
+## ADR-034 — Simple modular monolith baseline
+
+**Status:** DECIDED at the project owner's request to settle the Phase 1 architecture baseline.
+
+**Decision:** Keep the first release as one modular monolith. The business capability areas listed in the solution architecture are its modules. Each module owns its use cases, domain rules and database tables. A module may expose application operations for other modules to call; other modules must not access its tables directly.
+
+### Layers and dependencies
+
+- **Domain** owns business entities, value objects and invariants and has no dependency on other application projects.
+- **Application** owns use cases, validation, authorization and orchestration; it depends on Domain.
+- **Infrastructure** owns EF Core persistence and external adapters; it depends on Application and Domain.
+- **API** owns HTTP endpoints/contracts, authentication and dependency composition; it depends on Application and Infrastructure and is the composition root.
+- The frontend calls the backend through versioned HTTP API contracts and does not reference backend projects.
+
+### Module communication and persistence
+
+- Modules call another module only through its published Application contract, synchronously in-process.
+- A use case spanning modules is orchestrated by Application. If it must be atomic, it runs in one database transaction.
+- The initial release uses one MySQL database and one EF Core DbContext, with entity configuration grouped by owning module.
+- Do not introduce a message broker, distributed transaction coordinator or cross-module event framework in the initial release.
+
+### Minimum development practices
+
+- Keep persistence entities out of API contracts; use explicit DTOs.
+- Use asynchronous I/O and propagate CancellationToken. Centralize validation and exception-to-Problem-Details handling.
+- Use xUnit for backend tests and Vitest with React Testing Library for frontend tests. Cover domain/application behavior with unit tests and API/persistence behavior with integration tests.
+- Run .NET formatting and frontend lint/format checks in CI. Add no architectural tooling without a concrete need.
+
+### Deferred decisions
+
+- Refresh tokens are disabled for the v1 public SPA client. Re-enabling them requires a later ADR with rotation and reuse detection.
+- Set and validate ShopSession idle/absolute timeouts and signing-certificate deployment/rotation before production; these do not change the Shop-only token identity boundary.
+- Select hosting/deployment technology during deployment planning and the report-generation library when report requirements are specified. Neither blocks the Phase 2 foundation.
+- GDPR image retention, VAT/legal configuration, role-matrix refinement and other product decisions remain governed by their existing specifications and ADRs; this ADR does not resolve them.
+
+### Consequences
+
+- Module boundaries are enforced by code ownership and application contracts, with a single database transaction available to straightforward cross-module use cases.
+- The architecture remains deployable as one application without introducing distributed systems infrastructure.
+- Phase 2 can create the approved solution and project structure using these rules. This ADR does not authorize implementing feature workflows before their approved specifications.
