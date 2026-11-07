@@ -20,11 +20,13 @@ Modernizar a aplicação como uma solução web com React + TypeScript e ASP.NET
 - Arquitetura: monólito modular
 - Testes: xUnit, testes de integração, Vitest e React Testing Library
 
-## Estado do projeto
+## Estado do projeto — Fase 2
 
-O baseline v19 consolida uma empresa com várias lojas/filiais e adiciona autenticação OAuth 2.0 / OpenID Connect para a API ASP.NET Core. A sessão persistente é autenticada pela loja, sem identidade de funcionário; cada comando operacional protegido exige a credencial individual de quem o executa. O estoque é controlado por loja, com reservas, transferências, equipamentos recondicionados serializados e recebimentos de compras externas. Para serviços, inclui o estado `AWAITING_PARTS`, uma fila de compras por loja, várias solicitações por ordem de serviço em momentos diferentes, fotos de referência por peça, rastreamento de fornecedor, links de compra e transporte, previsão de entrega, recebimento parcial e reserva dos itens destinados à ordem. Pagamentos, depósitos, parcelamentos, estornos e fechamento diário por loja também estão especificados. Este pacote contém documentação, especificações de tela, regras de estoque/garantia, configuração fiscal, segurança OAuth/OIDC e diagramas atualizados, não implementação de frontend ou backend. O modelo relacional e o DER permanecem em DRAFT até a validação das pendências listadas.
+O baseline v19 consolida uma empresa com várias lojas/filiais e adiciona autenticação OAuth 2.0 / OpenID Connect para a API ASP.NET Core. A sessão persistente é autenticada pela loja, sem identidade de funcionário; cada comando operacional protegido exige a credencial individual de quem o executa. O estoque é controlado por loja, com reservas, transferências, equipamentos recondicionados serializados e recebimentos de compras externas. Para serviços, inclui o estado `AWAITING_PARTS`, uma fila de compras por loja, várias solicitações por ordem de serviço em momentos diferentes, fotos de referência por peça, rastreamento de fornecedor, links de compra e transporte, previsão de entrega, recebimento parcial e reserva dos itens destinados à ordem. Pagamentos, depósitos, parcelamentos, estornos e fechamento diário por loja também estão especificados. A documentação registra as regras aprovadas e as pendências ainda abertas. A fundação técnica está sendo criada na Fase 2, sem fluxos de negócio.
 
 Consulte [specs/README.md](specs/README.md) para navegar pela documentação.
+
+A Fase 1 de descoberta e decisões arquiteturais foi concluída e o PR #1 foi mesclado. A Fase 2 iniciou na branch `phase2/technical-foundation`, com a solução .NET 10, os projetos em camadas, o app React/TypeScript/Vite e a configuração de CI. Nenhuma funcionalidade de negócio foi implementada. Consulte os ADRs 033 e 034 em [architecture-decisions.md](specs/02-architecture/architecture-decisions.md) e o [migration backlog](specs/06-migration/migration-backlog.md).
 
 ## Princípios
 

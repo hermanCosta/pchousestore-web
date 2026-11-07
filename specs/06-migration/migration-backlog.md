@@ -1,6 +1,6 @@
 # Migration Backlog
 
-**Status:** DISCOVERY
+**Status:** PHASE 2 — TECHNICAL FOUNDATION
 
 | ID | Workstream | Depends on | Status |
 |---|---|---|---|
@@ -14,7 +14,7 @@
 | DISC-08 | Resolve Shop login, employee password challenge and Company-wide role model | DISC-02 | DECISIONS RECORDED; Manager full / Technician restricted matrix specified |
 | SPEC-01 | Approve Company/Shop model and authentication boundaries | DISC-03, DISC-04, DISC-08 | DECISIONS RECORDED; MODEL REVIEW PENDING |
 | SPEC-02 | Approve design system and navigation | DISC-02 | PENDING |
-| BASE-01 | Bootstrap .NET solution and React app | SPEC-01 | PENDING |
+| BASE-01 | Bootstrap .NET solution and React app | SPEC-01, ADR-033, ADR-034 | DONE — .NET solution/layers, MySQL EF Core context, React/TypeScript/Vite shell, lint/format configuration and CI scaffold created; backend build and frontend build/lint pass |
 | AUTH-01 | Shop authentication/session and employee action authorization | SPEC-01 | SPECIFIED — Shop-only principal and one-time employee challenge; implementation pending |
 | AUTH-02 | OAuth 2.0 / OIDC authorization server and JWT Bearer API validation | AUTH-01, DATA-02 | SPECIFIED — Authorization Code + PKCE, OpenIddict default, Shop-only claims; implementation and security test pending |
 | AUTH-03 | Token/session revocation, refresh-token rotation and signing-key lifecycle | AUTH-02 | SPECIFIED — refresh optional; rotation/reuse detection mandatory if enabled; implementation pending |
