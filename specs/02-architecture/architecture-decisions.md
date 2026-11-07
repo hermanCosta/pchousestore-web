@@ -524,3 +524,40 @@ See [Image Upload Policy](image-upload-policy.md). Limits are configurable and c
 - OpenIddict authorization/token tables are added through provider-managed EF Core migrations. Shop and Employee password hashes remain logically separate.
 - Provider package version, signing-certificate lifecycle, refresh-token enablement and ShopSession idle/absolute timeout values are implementation/deployment tasks.
 
+
+
+## ADR-033 — Repository layout for backend and frontend
+
+**Status:** APPROVED — repository structure selected by the project owner; physical project creation is deferred to Phase 2.
+
+**Decision:** Use Option B for the repository layout. Place the .NET solution at the repository root, backend projects under `src/`, the React application under `frontend/pchousestore-web/`, backend and frontend tests under `tests/`, and infrastructure assets under `infrastructure/`.
+
+```text
+pchousestore-web/
+├── PcHouseStore.sln
+├── src/
+│   ├── PcHouseStore.Api/
+│   ├── PcHouseStore.Application/
+│   ├── PcHouseStore.Domain/
+│   └── PcHouseStore.Infrastructure/
+├── frontend/
+│   └── pchousestore-web/
+├── tests/
+│   ├── PcHouseStore.UnitTests/
+│   ├── PcHouseStore.IntegrationTests/
+│   └── frontend/
+├── infrastructure/
+├── specs/
+├── .github/
+├── AGENTS.md
+└── README.md
+```
+
+### Consequences
+
+- `PcHouseStore.sln` is the root solution for the backend and backend test projects.
+- Backend projects are organized under `src/`; the React + TypeScript + Vite application is under `frontend/pchousestore-web/`.
+- Backend unit and integration tests and frontend tests are organized under `tests/`.
+- Infrastructure configuration and deployment assets are organized under `infrastructure/`.
+- This ADR records repository organization only. The solution and physical application/test projects are created in Phase 2 — Technical Foundation. It does not authorize starting application implementation during Phase 1.
+- Existing approved SDD v19 product and security decisions remain unchanged.
