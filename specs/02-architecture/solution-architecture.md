@@ -16,20 +16,32 @@ Modular monolith with explicit module boundaries.
 - Infrastructure — EF Core mappings, persistence, file/report generation and external adapters.
 - MySQL — relational persistence.
 
-## 3. Backend project proposal
+## 3. Approved repository layout
+
+The approved repository layout is:
 
 ```text
-src/
-  PcHouseStore.Api/
-  PcHouseStore.Application/
-  PcHouseStore.Domain/
-  PcHouseStore.Infrastructure/
-tests/
-  PcHouseStore.UnitTests/
-  PcHouseStore.IntegrationTests/
-frontend/
-  pchousestore-web/
+pchousestore-web/
+├── PcHouseStore.sln
+├── src/
+│   ├── PcHouseStore.Api/
+│   ├── PcHouseStore.Application/
+│   ├── PcHouseStore.Domain/
+│   └── PcHouseStore.Infrastructure/
+├── frontend/
+│   └── pchousestore-web/
+├── tests/
+│   ├── PcHouseStore.UnitTests/
+│   ├── PcHouseStore.IntegrationTests/
+│   └── frontend/
+├── infrastructure/
+├── specs/
+├── .github/
+├── AGENTS.md
+└── README.md
 ```
+
+This layout records the repository organization approved in ADR-033. The solution and application/test projects will be physically created in Phase 2 — Technical Foundation; this decision does not start application implementation.
 
 Feature-oriented Application organization:
 
