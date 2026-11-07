@@ -129,9 +129,9 @@ Each feature owns its screens, API functions, schemas, hooks and feature-specifi
 
 ## 8. Decisions still open
 
-- Access-token/ShopSession idle and absolute timeout values; initial access-token default is 10 minutes and must be validated in security testing.
-- Whether refresh tokens are enabled in v1; if enabled for the SPA public client, rotation and reuse detection are mandatory.
-- Final OpenIddict package versions and signing-certificate deployment/rotation approach.
+- ShopSession idle and absolute timeout values must be set and validated before production; access tokens remain short-lived with the 10-minute configurable default.
+- Refresh tokens are disabled for the v1 SPA client. Reconsider only through a later ADR that includes rotation and reuse detection.
+- Final OpenIddict package versions and signing-certificate deployment/rotation approach are Phase 2 security setup decisions.
 - MANAGER full-access / TECHNICIAN restricted service-and-technical permission baseline is defined in [Employee Access and Roles](employee-access-and-roles.md); visibility within service context remains to be refined.
 - Hosting and deployment provider.
 - Report generation library.
