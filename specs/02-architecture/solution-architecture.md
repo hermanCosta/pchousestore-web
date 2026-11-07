@@ -16,20 +16,32 @@ Modular monolith with explicit module boundaries.
 - Infrastructure — EF Core mappings, persistence, file/report generation and external adapters.
 - MySQL — relational persistence.
 
-## 3. Backend project proposal
+## 3. Approved repository layout
+
+The approved repository layout is:
 
 ```text
-src/
-  PcHouseStore.Api/
-  PcHouseStore.Application/
-  PcHouseStore.Domain/
-  PcHouseStore.Infrastructure/
-tests/
-  PcHouseStore.UnitTests/
-  PcHouseStore.IntegrationTests/
-frontend/
-  pchousestore-web/
+pchousestore-web/
+├── PcHouseStore.sln
+├── src/
+│   ├── PcHouseStore.Api/
+│   ├── PcHouseStore.Application/
+│   ├── PcHouseStore.Domain/
+│   └── PcHouseStore.Infrastructure/
+├── frontend/
+│   └── pchousestore-web/
+├── tests/
+│   ├── PcHouseStore.UnitTests/
+│   ├── PcHouseStore.IntegrationTests/
+│   └── frontend/
+├── infrastructure/
+├── specs/
+├── .github/
+├── AGENTS.md
+└── README.md
 ```
+
+This layout records the repository organization approved in ADR-033. The solution and application/test projects will be physically created in Phase 2 — Technical Foundation; this decision does not start application implementation.
 
 Feature-oriented Application organization:
 
@@ -44,6 +56,18 @@ Feature-oriented Application organization:
 - Finance (Shop-scoped PaymentTransaction + PaymentAllocation)
 - CashManagement (one physical till per Shop in the initial release; opening float, Shop-scoped CashMovement, DailyClosing unique per Shop/business date, variance and immutable corrections)
 - Reporting
+
+### Module boundaries, layers and communication
+
+- The feature areas above are the first-release modules. Each module owns its use cases, domain rules and tables; another module must not read or change those tables directly.
+- A module exposes only the application operations other modules need. Cross-module work uses those in-process contracts synchronously. The Application layer orchestrates a use case that spans modules.
+- Use one MySQL database and one EF Core `DbContext` in the initial release, with entity configurations grouped by owning module. A multi-module use case that must be atomic uses one database transaction.
+- Do not add message brokers, distributed transactions or cross-module domain-event infrastructure in the initial release.
+- Dependencies point inward: Domain has no project dependencies; Application depends on Domain; Infrastructure depends on Application and Domain; API depends on Application and Infrastructure and is the composition root. Frontend communicates with backend only through versioned HTTP API contracts.
+- Domain contains business entities, value objects and invariants. Application contains use cases, cross-module orchestration, input validation and authorization. Infrastructure contains EF Core, database configuration and external adapters. API contains HTTP endpoints, DTO mapping, authentication/token validation and dependency composition.
+- Keep persistence entities out of API contracts. Use asynchronous I/O and propagate `CancellationToken`. Return consistent Problem Details errors and centralize exception handling.
+- Backend uses xUnit; frontend uses Vitest and React Testing Library. Unit tests cover domain/application behavior; integration tests cover API, persistence and module boundaries. Use MySQL-compatible integration coverage for persistence behavior.
+- Apply the repository's .NET formatting and frontend lint/format checks in CI. Do not introduce additional architecture tooling before it solves a concrete problem.
 
 ## 4. Frontend organization
 
@@ -105,9 +129,9 @@ Each feature owns its screens, API functions, schemas, hooks and feature-specifi
 
 ## 8. Decisions still open
 
-- Access-token/ShopSession idle and absolute timeout values; initial access-token default is 10 minutes and must be validated in security testing.
-- Whether refresh tokens are enabled in v1; if enabled for the SPA public client, rotation and reuse detection are mandatory.
-- Final OpenIddict package versions and signing-certificate deployment/rotation approach.
+- ShopSession idle and absolute timeout values must be set and validated before production; access tokens remain short-lived with the 10-minute configurable default.
+- Refresh tokens are disabled for the v1 SPA client. Reconsider only through a later ADR that includes rotation and reuse detection.
+- Final OpenIddict package versions and signing-certificate deployment/rotation approach are Phase 2 security setup decisions.
 - MANAGER full-access / TECHNICIAN restricted service-and-technical permission baseline is defined in [Employee Access and Roles](employee-access-and-roles.md); visibility within service context remains to be refined.
 - Hosting and deployment provider.
 - Report generation library.
