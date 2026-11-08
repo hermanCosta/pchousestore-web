@@ -121,8 +121,9 @@ The operational formula, opening-float capture, refund/change/cash movement trea
 
 - Cancelling an unpaid sale/order releases any active reservation and creates no return movement.
 - When the Sale or ServiceOrder status is `REFUNDED` or `CANCELLED`, the operator may select which previously consumed product lines and quantities are physically returned to stock.
-- `StockReturn`/`StockReturnLine` records that selection. Only selected quantities produce positive inventory movements; the whole sale/order is never restocked automatically.
+- `StockReturn`/`StockReturnLine` records the physical selection. Only selected quantities explicitly assigned RESTOCK after inspection produce positive inventory movements; the whole sale/order is never restocked automatically.
 - A return quantity cannot exceed the consumed quantity minus quantities already returned. A returned serialized refurbished unit must be the exact original unit.
+- Approved disposition: physical receipt starts in `PENDING_INSPECTION`; only an explicit `RESTOCK` disposition creates a positive movement. `QUARANTINE` and `DISPOSE` do not increase sellable stock. A serialized returned unit remains `QUARANTINED` until a passing inspection and explicit restock.
 - Financial refund and stock return are separate records linked where relevant: a monetary refund does not, by itself, prove that goods physically returned to inventory.
 
 ### Consequences and safeguards
@@ -168,7 +169,7 @@ The operational formula, opening-float capture, refund/change/cash movement trea
 
 ### Still to define
 
-Condition-grade vocabulary, mandatory serial number rules by category, serial-number uniqueness scope, acquisition/source details, commercial guarantee coverage/exclusions and claim procedure, and inspection/disposition after customer returns. The 12-month duration and handover start date are decided.
+Acquisition/source details, commercial guarantee coverage/exclusions and claim procedure remain to be defined. Condition grades, serial capture/uniqueness and return inspection/disposition are now defined in the product-owner decisions and stock workflow. The 12-month duration and handover start date are decided.
 
 ## ADR-009 — Ireland monetary and cash-rounding baseline
 
@@ -241,7 +242,7 @@ The Central Bank of Ireland confirms that cash rounding is voluntary, applies on
 
 ## Non-decisions — must not be inferred
 
-The following remain open: customer/device visibility; mandatory serial-number/uniqueness rules by category and acquisition/source fields; commercial-guarantee coverage/exclusions; enabled payment methods/provider settlement/fees; refund thresholds/alternative-tender policy; deposit expiry/forfeiture terms; VAT registration/status/rates/pricing/tax posting pending Irish tax review; instalment late-payment policy and any future CREDIT_SALE handover (disabled pending legal review); complete Sale/ServiceOrder transition matrix. Reservation expiry and multiple stock locations are intentionally out of initial scope; one stock pool per Shop and explicit release/consumption are the baseline. Condition grades A/B/C, complaint workflow, role matrix, image limits and daily cash-close formula are now specified in their linked documents.
+The following remain open: customer/device visibility; refurbished-unit acquisition/source fields; commercial-guarantee coverage/exclusions; enabled payment methods/provider settlement/fees; refund thresholds/alternative-tender policy; deposit expiry/forfeiture terms; VAT registration/status/rates/pricing/tax posting pending Irish tax review; instalment late-payment policy and any future CREDIT_SALE handover (disabled pending legal review); complete Sale/ServiceOrder transition matrix. Reservation expiry and multiple stock locations are intentionally out of initial scope; one stock pool per Shop and explicit release/consumption are the baseline. Condition grades A/B/C, Company-unique asset codes and normalized manufacturer+serial uniqueness, complaint workflow, approved return disposition, role matrix, image limits and daily cash-close formula are specified in their linked documents.
 
 ## ADR-013 — Supplier procurement and parts-waiting service workflow
 
@@ -489,7 +490,7 @@ See [Image Upload Policy](image-upload-policy.md). Limits are configurable and c
 
 ## ADR-030 — Refurbished-unit internal asset code and manufacturer serial
 
-**Decision:** Every physical refurbished unit has a required Company-unique `asset_code`. Manufacturer `serial_number` is captured whenever present; it is optional only where no manufacturer serial exists. Populated normalized serial numbers are unique within the Company.
+**Decision:** Every physical refurbished unit has a required Company-unique `asset_code`. Manufacturer `serial_number` is captured whenever present; it is optional only where no manufacturer serial exists. The normalized `(manufacturer, serial_number)` pair is unique within the Company when populated.
 
 ## ADR-031 — Weekly instalment arrears are status-only in v1
 

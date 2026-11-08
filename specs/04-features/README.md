@@ -32,3 +32,7 @@ Do not use guessed requirements to fill gaps.
 - Reports and receipts
 
 Feature scopes must be approved after discovery. A Java class is not automatically a distinct web feature.
+
+## Current drafts
+
+- [Shop authentication and API access](authentication-and-shop-context.md) — DRAFT; product/technical approval and DATA-02 are pending.

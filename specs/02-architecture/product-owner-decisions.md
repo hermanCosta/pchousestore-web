@@ -1,6 +1,6 @@
 # Product-owner Decisions and Remaining Questions — pcHouseStore Web
 
-**Revision:** v16 · 5 November 2026  
+**Revision:** v19 · 8 November 2026
 **Status:** Confirmed product decisions are incorporated. A small set of commercial/legal details remains explicitly proposed or deferred; the model is not a production-approved DDL.
 
 ## Confirmed decisions
@@ -9,9 +9,11 @@
 |---|---|
 | Organization | One legal Company with multiple operational Shops/branches. |
 | Shop access | Persistent session represents the active Shop only; it has no Employee identity. |
+| Shop sign-in identifier | Stable Shop code + Shop credential password. |
 | Employee identity | One Company-wide employee identity; employee code + individual password works in every Shop. Every protected operation requires a fresh, one-use employee authorization. |
 | Roles | `MANAGER` has full access across every Shop. `TECHNICIAN` has partial technical/operational access under the matrix in `employee-access-and-roles.md`; the proposed baseline is ready for implementation subject to owner review. |
 | Inventory | Only Product catalogue items have stock. Product quantities are whole units. Quantity-tracked stock may become negative; reservations cannot. One stock pool per Shop; no reservation-expiry automation or multiple internal locations in v1. |
+| Physical stock returns | Receive selected returned goods as `PENDING_INSPECTION`, outside sellable stock. Only an explicit inspection disposition `RESTOCK` creates an inbound movement; `QUARANTINE` and `DISPOSE` do not increase sellable stock. A serialized refurbished return remains `QUARANTINED` until inspection passes and it is explicitly restocked. |
 | Stock deduction | Sale and ServiceOrder product stock is consumed when the outstanding balance reaches zero through settled payments and explicitly applied service deposits. Partial payment does not consume stock. Service parts stay reserved at `FIXED` until full settlement; payment consumes them before `PICKED`. |
 | Payment transaction | One `PaymentTransaction` may have multiple `PaymentAllocation` records; mixed cash/card is one financial transaction, not duplicate gross sales. |
 | Tender methods | Initial release supports `CASH` and `CARD` only. Card is recorded after approval on an external card terminal; no payment-processor integration is selected or required for v1. |
@@ -85,6 +87,7 @@ Image retention is tied to the business record. Deletion is initially soft/audit
 6. **Customer data/image retention:** image storage is MySQL-only, but exact business-record retention period and lawful purge schedule remain to be approved. Soft delete is used in v1.
 7. **TECHNICIAN permission matrix:** partial access is confirmed; the proposed action-level matrix is in `employee-access-and-roles.md` and still needs owner sign-off before fine-grained API policies are frozen.
 8. **Complete Sale/ServiceOrder status transition matrix and executable production DDL/EF Core migration review.**
+9. **Shop and employee authentication operations:** Shop credential provisioning/recovery remains open. ShopSession timeout values and multi-device/sign-out policy must remain configurable and be decided before production. Employee password/recovery policy, final MANAGER/TECHNICIAN action matrix and multi-role assignment remain open.
 
 **Deferred by owner instruction:** installment delinquency treatment beyond `OVERDUE`, renegotiation/late fees, and accounting/bookkeeper reconciliation mapping. These are not v1 implementation blockers.
 

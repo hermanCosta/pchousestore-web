@@ -71,7 +71,7 @@
 
 - Cancelling an unpaid Sale/ServiceOrder releases active reservations and creates no positive stock movement.
 - When a Sale or ServiceOrder is in `REFUNDED` or `CANCELLED`, the operator may select the product lines and quantities physically returned to inventory.
-- `StockReturn` and `StockReturnLine` record only the selected products. Each selected quantity creates a positive stock movement; unselected lines are not restocked automatically.
+- `StockReturn` and `StockReturnLine` record only physically received, selected products. Receipt starts pending inspection and does not change sellable stock; only an explicit `RESTOCK` decision creates a positive movement. Serialized refurbished units remain quarantined until inspection passes.
 - A stock return cannot exceed the product quantity already consumed minus previous returns. A serialized refurbished return must identify the exact original physical unit.
 - Financial refund and physical stock return are separate facts. A `PaymentTransaction` of kind `REFUND` does not automatically restock goods.
 
@@ -174,7 +174,7 @@
 | ShopInventory | InventoryMovement, active reservation counter | Reserve/release/consume/adjust stock atomically |
 | InventoryReservation | InventoryReservationLine | Create, release or consume reservation lines with balance counters |
 | StockTransfer | StockTransferLine and transfer-linked movements | Dispatch at source; receive at destination; handle partial receipt |
-| StockReturn | StockReturnLine and return-linked movements | Select physically returned goods and restock once |
+| StockReturn | StockReturnLine and return-linked movements | Record selected physical returns; separate receipt, inspection, quarantine/disposal and stock credit |
 | RefurbishedUnit | RefurbishedUnitAttributeValue, RefurbishedUnitImage, RefurbishedUnitInspection, RefurbishedUnitWarranty, movements/reservations | Register one device; inspect and grade A/B/C; upload images; reserve, transfer, sell or return the exact unit; issue 12-month commercial guarantee on handover |
 | CustomerComplaintCase | CustomerComplaintCaseEvent, CustomerComplaintCaseAttachment, CustomerComplaintResolution | Register and track statutory/commercial/service complaints; preserve evidence, inspection, communications and remedy trail |
 | DailyClosing | DailyClosingCashCount, DailyClosingCorrection | Open with counted opening float; calculate expected drawer; count and close once per Shop/date; preserve later corrections separately |

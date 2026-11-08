@@ -59,7 +59,7 @@ The employee challenge mechanism is a password. The same Company-wide employee a
 - Employee password recovery/reset workflow and password policy.
 - The detailed action-by-action permission matrix for `MANAGER` and `TECHNICIAN`; these roles are Company-wide and work in all Shops.
 - Whether the same employee may hold both roles (allowed by the current data model).
-- Shop access credential provisioning, rotation, recovery, and whether the login identifier is a branch code, username or other value.
-- Shared workstation lifecycle, idle timeout and whether a ShopSession may be active on several devices simultaneously.
-- Initial access-token lifetime is 10 minutes; final ShopSession idle/absolute timeout values and whether v1 needs refresh tokens remain open.
+- Shop access credential provisioning, rotation and recovery remain open. Shop sign-in identifier is the stable Shop code (product-owner confirmation 2026-11-07).
+- Shared workstation lifecycle, idle/absolute timeout values and whether a ShopSession may be active on several devices simultaneously must be decided before production; keep timeout values configurable (product-owner confirmation 2026-11-07).
+- Initial access-token lifetime is 10 minutes. Final ShopSession idle/absolute timeout values remain open. Refresh tokens are disabled for the v1 SPA by ADR-034; reconsideration requires a later ADR with rotation and reuse detection.
 - Final signing key/certificate storage, rotation and backup/recovery procedure remain deployment tasks.

@@ -1,6 +1,6 @@
 # Stock, Reservations, Transfers and Refurbished Equipment
 
-**Status:** DRAFT — owner decisions recorded 2026-11-05 and reconfirmed in v12. See ADR-003, ADR-006 through ADR-008 and ADR-018.
+**Status:** DRAFT — owner decisions recorded 2026-11-05, reconfirmed in v12, and physical return disposition approved 2026-11-08. See ADR-003, ADR-006 through ADR-008 and ADR-018.
 
 ## 1. Quantity policy
 
@@ -74,7 +74,16 @@ The detailed workflow is specified in [Service Parts Procurement Workflow](servi
 - A quantity return cannot exceed `consumed_quantity - already_returned_quantity` for the source line.
 - An unpaid cancellation only releases reservations; it must not create a positive `RETURN_IN` movement because no stock was previously deducted.
 - For serialized refurbished units, the exact original unit must be selected; a different device with similar model/specification is not interchangeable in the stock ledger.
-- Returned item inspection/condition disposition is still open. The model reserves fields for condition/disposition metadata but does not finalize a damaged-vs-resellable policy.
+
+### Approved return inspection and disposition
+
+- Physical receipt creates a selected `StockReturnLine` in `PENDING_INSPECTION`; this records custody but does not increase sellable stock.
+- An authorized inspection assigns one disposition: `RESTOCK`, `QUARANTINE` or `DISPOSE`. Only `RESTOCK` creates a positive `RETURN_IN` movement and increases `ShopInventory`.
+- A serialized refurbished return must be the exact unit from the original sale. On receipt it becomes `QUARANTINED`; it can return to `AVAILABLE` only after a passing inspection and explicit `RESTOCK` disposition.
+- For quantity-tracked products, split a return line when only part of its quantity can be restocked. Quantities pending inspection or quarantined are excluded from sellable on-hand/available balances; keep the return record as their custody/audit record.
+- Refund settlement and `REFUNDED`/`CANCELLED` status never trigger physical receipt, inspection or restocking. Unpaid cancellation still releases reservations only.
+
+This decision determines stock availability and audit mechanics only. It does not decide refund entitlement, consumer-law remedies, employee role permissions or any customer-facing assessment standard.
 
 ## 7. Inter-shop transfer
 
@@ -110,7 +119,7 @@ Recommended unit fields:
 
 - Internal `asset_code` (required and unique), QR/barcode value if used.
 - Manufacturer `serial_number` (capture whenever the manufacturer provides one; optional only when no manufacturer serial exists).
-- `brand`, `model`, condition grade, free-text description/notes. `asset_code` is mandatory and unique within the Company; populated normalized manufacturer serial is also unique within the Company.
+- `brand`, `model`, condition grade, free-text description/notes. `asset_code` is mandatory and unique within the Company; the normalized manufacturer + serial pair is also unique within the Company when populated.
 - Acquisition date/cost and asking price if the purchase/resale process needs them.
 - `current_shop_id` and status (`AVAILABLE`, `RESERVED`, `IN_TRANSIT`, `SOLD`, `QUARANTINED`, `DISPOSED`).
 
@@ -147,5 +156,5 @@ Every refurbished unit sold by the Company carries a 12-month commercial guarant
 1. Serial policy is specified: internal asset code is mandatory/Company-unique; manufacturer serial is captured when present and is Company-unique when populated. Exact acquisition/source fields can be refined during DDL review.
 2. The 12-month commercial guarantee duration is confirmed. Proposed coverage/exclusions and remedy terms are in [Refurbished Condition Grades and Customer Complaint Workflow](refurbished-condition-and-complaints.md), but must be reviewed before customer-facing publication.
 3. Initial stock design is one stock pool per Shop. Reservation-expiry automation and multiple internal stock locations are intentionally out of scope. Reservations remain active until explicitly released or consumed. Partial reservation/sourcing is supported for service-part requirements.
-4. Returned products are credited only through selected `StockReturnLine` quantities. The operational inspection/disposition policy for damaged or incomplete returns remains a future refinement; no automatic restock should occur merely because money was refunded.
+4. Returned goods enter pending inspection outside sellable stock; only an explicit RESTOCK disposition credits inventory. Serialized units remain quarantined until inspection passes and restock is approved.
 5. `CREDIT_SALE` handover-before-full-payment remains disabled pending Irish legal/regulatory review; the initial enabled mode is `LAYAWAY`.

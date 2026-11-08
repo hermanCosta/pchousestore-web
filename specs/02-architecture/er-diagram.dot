@@ -10,12 +10,12 @@ digraph TARGET {
  storedimage [label="STORED_IMAGE\nPK id; FK company_id, shop_id\ncontent MEDIUMBLOB; thumbnail BLOB\nMIME, size, SHA-256; upload authorization"];
  company [label="COMPANY\nPK id\nOne legal entity"];
  shop [label="SHOP\nPK id; FK company_id\ncode, name, address"];
- credential [label="SHOP_ACCESS_CREDENTIAL\nPK id; FK shop_id\nlogin_code, password_hash"];
- session [label="SHOP_SESSION\nPK id; FK shop_id\ntoken_hash, expiry, revoked_at\nNo EmployeeId"];
+ credential [label="SHOP_ACCESS_CREDENTIAL\nPK/FK shop_id\npassword_hash, is_active\nShop code is login identifier"];
+ session [label="SHOP_SESSION\nPK id (sid); FK shop_id\noidc_authorization_id, expiry, revoked_at\nNo token hash or EmployeeId"];
  person [label="PERSON\nPK id; FK company_id\nname, contact, email"];
  employee [label="EMPLOYEE\nPK id; FK company_id, person_id\nemployee_code, password_hash; cross-Shop identity"];
- employeerole [label="EMPLOYEE_ROLE_ASSIGNMENT\nPK id; FK employee_id\nMANAGER / TECHNICIAN; Company-wide"];
- authorization [label="EMPLOYEE_ACTION_AUTHORIZATION\nPK id; FK session, shop, employee\naction_code, operation_context_hash, auth/expiry/consumed_at\nshort-lived; single-use"];
+ employeerole [label="EMPLOYEE_ROLE_ASSIGNMENT\nPK id; FK employee_id\nCompany-wide; role combination OPEN"];
+ authorization [label="EMPLOYEE_ACTION_AUTHORIZATION\nPK id; composite FKs session/shop/company/employee\naction_code, optional context hash, auth/expiry/consumed_at\nshort-lived; single-use"];
  customer [label="CUSTOMER\nPK id; FK company_id, person_id\nshared by Shops"];
  catalog [label="CATALOG_ITEM\nPK id; FK company_id\nkind PRODUCT|SERVICE, SKU, price"];
  product [label="PRODUCT\nPK/FK catalog_item_id\nshared product definition"];

@@ -1,4 +1,5 @@
 erDiagram
+    %% Authorization composite FKs: (shop_session_id,shop_id), (shop_id,company_id), (employee_id,company_id).
     COMPANY ||--o{ SHOP : operates
     SHOP ||--|| SHOP_ACCESS_CREDENTIAL : authenticates_with
     SHOP ||--o{ SHOP_SESSION : opens
@@ -100,18 +101,17 @@ erDiagram
       boolean is_active
     }
     SHOP_ACCESS_CREDENTIAL {
-      bigint id PK
-      bigint shop_id FK,UK
-      varchar login_code UK
+      bigint shop_id PK,FK
       varchar password_hash
       boolean is_active
     }
     SHOP_SESSION {
       bigint id PK
       bigint shop_id FK
-      varchar session_token_hash
+      varchar oidc_authorization_id
       datetime issued_at
-      datetime expires_at
+      datetime idle_expires_at
+      datetime absolute_expires_at
       datetime revoked_at
     }
     PERSON {
@@ -132,16 +132,17 @@ erDiagram
     EMPLOYEE_ROLE_ASSIGNMENT {
         bigint id PK
         bigint employee_id FK
-        enum role_code "MANAGER | TECHNICIAN"
+        varchar role_code "combination policy OPEN"
         boolean is_active
     }
     EMPLOYEE_ACTION_AUTHORIZATION {
       bigint id PK
+      bigint company_id FK
       bigint shop_session_id FK
       bigint shop_id FK
       bigint employee_id FK
       varchar action_code
-      varchar operation_context_hash
+      binary operation_context_hash nullable
       datetime authenticated_at
       datetime expires_at
       datetime consumed_at
