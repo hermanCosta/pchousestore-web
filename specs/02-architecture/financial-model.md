@@ -1,6 +1,6 @@
 # Financial Model — Ireland deployment
 
-**Status:** DRAFT · v15 incorporates CASH/CARD-only tender, Manager-only refunds, deposit terms, MySQL image storage policy and deferred processor integration. This is an operational data model, not legal, tax or accounting advice.
+**Status:** Approved operational v1 financial rules; customer-facing deposit wording, legal terms, tax and accounting mappings remain subject to external review. Revision v16 (8 November 2026). This is an operational data model, not legal, tax or accounting advice.
 
 ## 1. Scope and decisions
 
@@ -173,7 +173,7 @@ The formula is the v1 operational till-control baseline. Detailed accounting cha
 12. Cash total €10.22 may be rounded to €10.20 only when the Shop has opted in and the bill is fully cash-paid; line/tax values remain €10.22-derived and the adjustment is stored separately.
 13. Card/bank-transfer totals are never rounded. Exact cash payment can bypass rounding.
 14. A mixed cash/card transaction is not rounded under the initial implementation rule.
-15. Procurement purchase creation/linkage/receipt succeeds without a separate approval record, but still requires the acting employee password challenge and event audit. Financial approvals for refunds/deposit forfeiture remain policy-configured and are independently tested.
+15. Procurement purchase creation/linkage/receipt succeeds without a separate approval record, but still requires the acting employee password challenge and event audit. Refunds and deposit forfeitures use one Manager authorization at every amount; no second approver or configurable threshold applies.
 
 ## 10. Open and deferred items
 

@@ -1,6 +1,6 @@
 # Stock, Reservations, Transfers and Refurbished Equipment
 
-**Status:** DRAFT — owner decisions recorded 2026-11-05, reconfirmed in v12, and physical return disposition approved 2026-11-08. See ADR-003, ADR-006 through ADR-008 and ADR-018.
+**Status:** DRAFT — owner decisions recorded 2026-11-05, reconfirmed in v12, physical return disposition approved 2026-11-08 and product-transfer discrepancy handling approved 2026-11-08. Cross-Shop service-order transfer is a separate requirement with a separate SPEC pending. See ADR-003, ADR-006 through ADR-008 and ADR-018.
 
 ## 1. Quantity policy
 
@@ -98,6 +98,16 @@ A transfer has source Shop, destination Shop, one or more product lines and a li
 - `CANCELLED`: allowed only before dispatch. A dispatched transfer requires a reverse/corrective transfer rather than status-only cancellation.
 
 Dispatch is an employee-authorized action in the source Shop session. Receipt is a separate employee-authorized action in the destination Shop session. Both Shops must belong to the same Company and must be different. At dispatch, only unreserved available quantities may leave the source. At receipt, record actual count, not merely requested count.
+
+### Approved transfer discrepancy handling
+
+- Post inbound inventory only for quantities physically counted and accepted by the destination Shop; accepted quantity cannot exceed dispatched quantity.
+- A short or damaged quantity is not accepted into destination sellable stock. Keep it outstanding on the transfer and record the discrepancy, reason, observed quantity and employee authorization. The transfer remains `PARTIALLY_RECEIVED` until every dispatched quantity is received or corrected by a separately documented transfer.
+- Do not automatically write off lost or damaged in-transit units. If the goods cannot be received or corrected, the transfer remains open; any future loss-adjustment workflow requires a separate decision and authorization.
+- If more units arrive than were dispatched, do not post the excess to inventory or alter the dispatch record. Record the overage and handle the extra units through a separately authorized transfer/document.
+- For serialized units, reconcile the exact dispatched unit IDs. A damaged unit stays unavailable until the receiving Shop records its disposition; an unaccounted unit keeps the transfer open.
+
+Each discrepancy action requires employee authorization; the specific action-level role remains subject to the open role matrix.
 
 Serialized refurbished devices transfer by unit ID with quantity exactly one. A serialized unit in transit is unavailable in both Shops.
 

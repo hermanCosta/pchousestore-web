@@ -93,9 +93,9 @@
 - The business date is calculated using the Shop's configured time zone. Event timestamps remain stored consistently (UTC).
 - Company-wide reporting may aggregate completed Shop closings, but this must not create a consolidated company-wide `DailyClosing` or mix the cash drawers.
 
-### Still to define
+### Deferred accounting and processor work
 
-The operational formula, opening-float capture, refund/change/cash movement treatment and immutable correction workflow are specified in [Cash Closing Policy](cash-closing-policy.md). Accounting chart/tax mappings and electronic processor reconciliation still require finance review.
+The v1 operational formula, opening-float capture, refund/change/cash-movement treatment and immutable correction workflow are approved in [Cash Closing Policy](cash-closing-policy.md). Accounting chart/tax mappings and electronic processor reconciliation still require finance review.
 
 ## ADR-006 — Stock reservations, payment posting and selected returns
 
@@ -153,6 +153,15 @@ The operational formula, opening-float capture, refund/change/cash movement trea
 - Serialized refurbished units are transferred by exact `RefurbishedUnit` identity with quantity one.
 - Dispatch and receipt are separate protected actions and are attributed to different employee authorizations when performed by different Shops.
 - The initial model assumes one stock pool per Shop. Multiple warehouses/shelves/stock locations inside a Shop are not introduced in this decision.
+- Only verified, acceptable quantities up to the dispatched amount are received into destination stock. Short/damaged quantities remain outstanding; overages are excluded and require a separate document. Log discrepancies and keep unresolved shortages open; do not write off or close them automatically.
+
+### Service-order transfer (separate from Product stock transfer)
+
+**Owner decision:** A service order/work item may be sent to another Shop. The destination Shop assumes operational and financial responsibility; all transactions from the transfer onward run through the destination.
+
+**Owner decision:** Already-settled transactions remain attributed to the source Shop. The outstanding service balance and held/unapplied deposit liability move to the destination through an auditable internal transfer event, with no duplicate cash receipt; all future transactions use the destination Shop.
+
+**Still open:** service-device custody, service-part inventory attribution, transfer authorization/action policy and exact append-only transfer fields. The legacy reassigns the order's Company and adds an `OrderNote`; it does not define these target-model rules because the web model has one Company with multiple Shops.
 
 ## ADR-008 — Refurbished categories, technical specifications and unit serialization
 
@@ -194,7 +203,7 @@ The Central Bank of Ireland confirms that cash rounding is voluntary, applies on
 - `ServiceDeposit` is linked to exactly one ServiceOrder and Shop. Supported purposes include `PARTS_PREORDER`, `BOOKING_ADVANCE`, `SECURITY` and `OTHER`.
 - The deposit receipt and its tender allocation are recorded at the moment money is received, including when the order is first booked.
 - A deposit held as security or a parts reservation is not automatically considered payment of the service invoice. It only reduces `balance_due` when an explicit `DepositApplication` applies it to the order (optionally to a specific service-order line).
-- A held deposit can be partially applied, refunded or forfeited. Every disposition is an employee-authorized, auditable operation. A forfeiture or use of a security deposit should support a separate supervisor-approval policy.
+- A held deposit can be partially applied, refunded or forfeited. Every disposition is an employee-authorized, auditable operation. A forfeiture requires one fresh Manager authorization with documented reason, accepted terms and evidence/cost; no second Manager approval is required.
 - Deposit received, applied, refunded and forfeited amounts must reconcile; the same amount cannot be applied/refunded/forfeited more than once.
 - Receiving a deposit does not consume service parts or stock. The service-order reservation rule remains tied to `FIXED`; stock consumption occurs at full settlement, independently of later `PICKED`/collection.
 
@@ -221,7 +230,7 @@ The Central Bank of Ireland confirms that cash rounding is voluntary, applies on
 - Refund tender allocations record the channel used to return money. Default policy should prefer the original tender, but an authorized alternative channel may be allowed by Shop policy and must be audited.
 - An optional `PaymentRefundLine` links refunded amounts/quantities to the relevant SaleItem or ServiceOrderItem. An order-level refund without a line allocation is also possible when its reason is documented.
 - Financial refunds do not automatically restock products. Physical stock return continues through selected `StockReturnLine` records only.
-- Refund approval is configurable by Shop/action/amount. No approval threshold or role is hard-coded; thresholds and approver requirements must be configured before production.
+- v1 refunds require one fresh Manager authorization at every amount and default to the original tender. Alternative tender and second-approver flows are disabled; the approval rule is not configurable by Shop or amount.
 
 ## Decision register
 
@@ -238,7 +247,7 @@ The Central Bank of Ireland confirms that cash rounding is voluntary, applies on
 | ADR-009 | Ireland monetary baseline | EUR, Europe/Dublin, decimal currency, optional cash-only €0.05 rounding | DECIDED |
 | ADR-010 | Service deposits | Record at booking; purpose and held/applied/refunded/forfeited lifecycle | DECIDED |
 | ADR-011 | Refurbished-sale instalments | Weekly schedule; layaway default; credit-sale handover gated by Irish compliance review | DECIDED WITH LEGAL GATE |
-| ADR-012 | Refunds | Partial or total, linked to original transaction, capped by refundable balance | DECIDED; approval policy values OPEN |
+| ADR-012 | Refunds | Partial or total, linked to original transaction, capped by refundable balance; Manager-only, original tender by default, no amount threshold or second approver | DECIDED |
 
 ## Non-decisions — must not be inferred
 

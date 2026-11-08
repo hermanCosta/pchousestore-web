@@ -82,7 +82,9 @@
 - On receipt, the receiving Shop records actual received quantities and destination stock increases through an inbound movement.
 - Partial receipt is supported. A transfer cannot be cancelled without stock effect after dispatch; a reverse/corrective transfer is required.
 - Transfer of a serialized refurbished unit identifies that exact `RefurbishedUnit` and has quantity one.
+- Receive only verified acceptable quantities, not more than dispatched. Log short/damaged/overage discrepancies with reason, employee and authorization; unaccepted quantities do not enter destination stock. Short/damaged quantities remain outstanding and the transfer stays open. No automatic loss write-off; overages require a separate transfer/document.
 - Initial scope has one stock pool per Shop. Multiple shelves/warehouses inside a Shop remain out of scope pending a decision.
+- A service order may also be sent to another Shop, separate from `StockTransfer`. The destination Shop assumes operational and financial responsibility; all transactions from transfer onward run through it. Previously settled transactions stay attributed to the source; open balance and held/unapplied deposit liability move to the destination through an audited internal event, not a cash receipt. Device custody, product-part inventory attribution, transfer authorization and event fields still need definition before implementation.
 
 ### Refurbished physical units
 

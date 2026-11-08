@@ -136,7 +136,7 @@ Each feature owns its screens, API functions, schemas, hooks and feature-specifi
 - Hosting and deployment provider.
 - Report generation library.
 - All image bytes are stored in MySQL `MEDIUMBLOB` with compact `BLOB` thumbnails. No external object storage or filesystem is used. See [MySQL Image Storage Architecture](mysql-image-storage.md). Exact GDPR retention/purge schedule remains pending.
-- Reservation expiry automation and multiple stock locations are intentionally out of initial scope. One stock pool per Shop is the baseline. Refurbished grades A/B/C, inspection and complaint workflow are specified; serial uniqueness, acquisition/source details and guarantee coverage/exclusions still need review.
+- Reservation expiry automation and multiple stock locations are intentionally out of initial scope. One stock pool per Shop is the baseline. Refurbished grades A/B/C, inspection workflow and asset/serial identity are specified; acquisition/source details and customer-facing guarantee coverage/exclusions still need review. Product transfer discrepancy rules are approved; cross-Shop ServiceOrder transfers have a separate pending SPEC.
 - VAT rates, legal VAT registration/status, tax-inclusive/exclusive prices and accountant-approved configuration; the Company VAT feature flag is part of the model.
 - v1 tender methods are CASH and CARD only; card is recorded after external-terminal approval with no processor API integration. Refunds and deposit forfeitures are Manager-only, with original-tender refund and deposit rules in [Financial Model](financial-model.md). Accounting/bookkeeper reconciliation is deferred.
 

@@ -1,6 +1,6 @@
 # Product-owner Decisions and Remaining Questions — pcHouseStore Web
 
-**Revision:** v19 · 8 November 2026
+**Revision:** v23 · 8 November 2026
 **Status:** Confirmed product decisions are incorporated. A small set of commercial/legal details remains explicitly proposed or deferred; the model is not a production-approved DDL.
 
 ## Confirmed decisions
@@ -14,6 +14,8 @@
 | Roles | `MANAGER` has full access across every Shop. `TECHNICIAN` has partial technical/operational access under the matrix in `employee-access-and-roles.md`; the proposed baseline is ready for implementation subject to owner review. |
 | Inventory | Only Product catalogue items have stock. Product quantities are whole units. Quantity-tracked stock may become negative; reservations cannot. One stock pool per Shop; no reservation-expiry automation or multiple internal locations in v1. |
 | Physical stock returns | Receive selected returned goods as `PENDING_INSPECTION`, outside sellable stock. Only an explicit inspection disposition `RESTOCK` creates an inbound movement; `QUARANTINE` and `DISPOSE` do not increase sellable stock. A serialized refurbished return remains `QUARANTINED` until inspection passes and it is explicitly restocked. |
+| Inter-Shop transfer scope | Transfers support physical Product stock and service orders sent to another Shop. On service-order transfer, the destination Shop assumes operational and financial responsibility; all transactions from the transfer onward run through that destination. Product movement remains dispatch/in-transit/receipt. Previously settled transactions remain attributed to the source; outstanding balance and held/unapplied deposit liability transfer to the destination through an audited internal event. |
+| Product transfer discrepancies | Receive only verified, acceptable quantities up to the dispatched quantity. Short/damaged units remain outstanding and keep the transfer open; overage is excluded from stock and needs a separate transfer/document. Log discrepancies with reason and authorization. No automatic loss write-off or closure. |
 | Stock deduction | Sale and ServiceOrder product stock is consumed when the outstanding balance reaches zero through settled payments and explicitly applied service deposits. Partial payment does not consume stock. Service parts stay reserved at `FIXED` until full settlement; payment consumes them before `PICKED`. |
 | Payment transaction | One `PaymentTransaction` may have multiple `PaymentAllocation` records; mixed cash/card is one financial transaction, not duplicate gross sales. |
 | Tender methods | Initial release supports `CASH` and `CARD` only. Card is recorded after approval on an external card terminal; no payment-processor integration is selected or required for v1. |
@@ -29,7 +31,7 @@
 | Complaints | `CustomerComplaintCase` tracks product/service claims, evidence, inspection, manager resolution and remedy history. The 12-month commercial guarantee must not auto-reject statutory-rights claims. |
 | Supplier procurement | Separate service-part purchase request queue linked to a ServiceOrder, multiple request rounds, line-level reference images, purchase links, ETA/tracking and partial receipts. Supplier purchase creation/update/receipt does not require second approval. |
 | Images | Multiple images are uploaded and stored inside the same MySQL database. No external object storage, file share or filesystem path is used. Binary storage uses `MEDIUMBLOB`; thumbnails use bounded `BLOB`. Initial image limits remain 10 MiB/file, 10 images and 100 MiB aggregate per target. |
-| Cash closing | One `DailyClosing` per Shop/business date. Opening float, cash receipts/change, cash-in/out, cash refunds, deposit refunds, safe drops, denomination count and variance are recorded. Close is immutable; corrections are separate Manager-authorized records. |
+| Cash closing | One `DailyClosing` per Shop/business date. Expected cash is opening float + settled cash receipts net of change + cash-in − cash-out − cash refunds − cash deposit refunds − safe drops. Non-zero variance requires a reason; close is immutable, cannot be reopened, and is corrected only through separate Manager-authorized records. |
 
 ## Financial policies incorporated as recommended v1 defaults
 
@@ -88,6 +90,7 @@ Image retention is tied to the business record. Deletion is initially soft/audit
 7. **TECHNICIAN permission matrix:** partial access is confirmed; the proposed action-level matrix is in `employee-access-and-roles.md` and still needs owner sign-off before fine-grained API policies are frozen.
 8. **Complete Sale/ServiceOrder status transition matrix and executable production DDL/EF Core migration review.**
 9. **Shop and employee authentication operations:** Shop credential provisioning/recovery remains open. ShopSession timeout values and multi-device/sign-out policy must remain configurable and be decided before production. Employee password/recovery policy, final MANAGER/TECHNICIAN action matrix and multi-role assignment remain open.
+10. **Service-order transfer details:** Device custody, service-part inventory attribution, transfer authorization and final audit fields remain to define. The financial handling is decided: preserve already-settled transactions against the source Shop; transfer the outstanding balance and held/unapplied deposit liability to the destination through an auditable internal event; all post-transfer transactions use the destination.
 
 **Deferred by owner instruction:** installment delinquency treatment beyond `OVERDUE`, renegotiation/late fees, and accounting/bookkeeper reconciliation mapping. These are not v1 implementation blockers.
 
@@ -106,7 +109,7 @@ No processor must be selected for v1. `CASH` and `CARD` are the payment methods.
 ## Current approval status after website review
 
 - **Confirmed:** CASH/CARD only; no processor integration in v1; MySQL-only image storage; the current website's publicly listed categories/contact/branch data are captured as a reference snapshot.
-- **Recommended defaults (not yet approved contract terms):** 90-day deposit inactivity review reminder; no automatic expiry/forfeiture; Manager-only original-tender refunds; TECHNICIAN permissions matrix; proposed refurbished guarantee coverage/exclusion wording.
+- **Recommended terms still pending approval:** final customer-facing deposit cancellation/non-refundable-cost wording and the detailed refurbished guarantee coverage/exclusions. The 90-day deposit review reminder, no automatic expiry/forfeiture, Manager-only original-tender refunds and immutable cash-close policy are approved operational rules. The TECHNICIAN action matrix still needs owner sign-off.
 - **Owner/accountant confirmation still needed:** VAT registration/tax codes/rates and price display; exact legal Company name; final ILAC address/display name; final warranty policy wording; official logo and exact brand colours; GDPR retention period; final action-level TECHNICIAN permissions.
 
 ## External references used

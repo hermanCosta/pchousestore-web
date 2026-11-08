@@ -1,6 +1,6 @@
 # Refurbished Condition Grades and Customer Complaint Workflow
 
-**Status:** DRAFT — baseline classification and workflow proposed for pcHouseStore Web. Irish consumer remedies must be reviewed against the facts of each case; the application records evidence and decisions but does not make legal determinations automatically.
+**Status:** Condition-grade and inspection baseline approved; customer-facing commercial guarantee coverage/exclusions remain proposed and require owner/legal review. Irish consumer remedies must be reviewed against the facts of each case; the application records evidence and decisions but does not make legal determinations automatically.
 
 ## 1. Refurbished condition grades
 
@@ -12,7 +12,7 @@ Condition grade describes cosmetic condition. Functional quality is recorded sep
 | `B` | Very Good | Fully tested and functional; light signs of normal use, such as small surface marks; no material cosmetic damage. |
 | `C` | Good | Fully tested and functional; visible scratches, scuffs or cosmetic wear; every material mark must be photographed and disclosed to the buyer. |
 
-These grades are the Company's proposed commercial vocabulary, not an official Irish/EU legal grading standard. Grade A/B/C cannot be used to conceal a functional defect. A unit that fails a required functional test is `QUARANTINED` or sent for repair and cannot enter `AVAILABLE` refurbished stock until it passes inspection. A separate “for parts/as-is” sales workflow is not included in this initial baseline.
+These grades are the Company's approved commercial vocabulary, not an official Irish/EU legal grading standard. Grade A/B/C cannot be used to conceal a functional defect. A unit that fails a required functional test is `QUARANTINED` or sent for repair and cannot enter `AVAILABLE` refurbished stock until it passes inspection. A separate “for parts/as-is” sales workflow is not included in this initial baseline.
 
 ### Inspection fields
 

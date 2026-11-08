@@ -107,7 +107,7 @@ These are target-design rules, not legacy behavior. The original deposit settlem
 
 The target decision is one independent closing for each `(ShopId, BusinessDate)`. A closing includes only that Shop’s sales, payment allocations, refunds and cash movements for its business date. Different Shops may close the same date independently; a Shop may not close the same date twice. The responsible employee is the person who executed the close and authenticated for that action, and both the employee and authorization must belong to the Shop being closed. Company-level reporting may aggregate completed Shop closings, but the close itself is never consolidated across branches.
 
-The actual reconciliation formula is still OPEN. In particular, opening cash, treatment of change, cash movements, refund allocations, pending transactions and the business-day time zone must be defined and covered by examples before implementation.
+The reconciliation formula and opening-float, change, cash-movement, refund-allocation, transaction-state and business-day rules were resolved in DATA-04. See [Cash Closing Policy](../02-architecture/cash-closing-policy.md); finance/accounting mappings and electronic-settlement reconciliation remain deferred.
 
 ## Stock decisions affecting finance and operations (target redesign)
 

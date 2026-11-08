@@ -1,6 +1,6 @@
 # Cash Closing Policy — one daily close per Shop
 
-**Status:** DRAFT — recommended operational rule set for owner review. This policy defines register reconciliation, not a statutory accounting ledger or tax opinion.
+**Status:** Approved v1 operational cash-reconciliation baseline. This policy defines register reconciliation, not a statutory accounting ledger or tax opinion; accounting/tax mappings and processor settlement reconciliation remain deferred for finance review.
 
 ## 1. Operating model
 
@@ -118,6 +118,6 @@ Card receipts of €300.00 and bank transfers of €80.00 are listed in electron
 8. Closing one Shop does not include transactions or cash movements from another Shop.
 9. A closed snapshot cannot be edited; a manager correction is appended and remains separately visible.
 
-## 10. Remaining finance decisions
+## 10. Deferred finance work
 
-The above formula and opening-float model are the recommended baseline. Still requiring owner/accountant/payment-provider decisions: enabled payment methods, provider fees/settlement and chargeback handling, refund approval thresholds and alternative-tender policy, deposit forfeiture/expiry terms, accounting chart/VAT posting, cash-rounding posting account and whether any future Shop needs more than one physical till. No numeric approval thresholds are invented here.
+The formula, opening-float model, immutable close and correction-only recovery are approved v1 operational rules. Refunds are Manager-only and return to original tender; there is no amount threshold or second Manager approver. Deposits do not expire or forfeit automatically; 90 days without customer response triggers review/contact only. Final customer-facing deposit wording requires Irish consumer-law review. Provider fees/settlement and chargebacks, accounting chart/VAT posting, cash-rounding posting account and future multi-till support remain outside this approval. No drawer may be reopened or overwritten after close; use an append-only correction with reason and authorization.
