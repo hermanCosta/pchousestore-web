@@ -93,7 +93,7 @@ The final expiry/idle values require a security/operations acceptance test; the 
 - Apply a default authorization policy to all `/api/v1/**` endpoints. Public exceptions are limited to health/readiness and OIDC protocol endpoints as required.
 - Require the `shop.api` scope for application API calls, then apply action-specific authorization policies.
 - Derive `CompanyId` and `ShopId` from the verified token and active ShopSession record. Reject or ignore client-supplied Shop identifiers as authorization context.
-- Apply rate limits to authorization, token and employee challenge endpoints; use account-level lockout without terminating the Shop session for other employees.
+- Apply request-rate limits to authorization, token and employee challenge endpoints by source/network and endpoint. Failed attempts never lock or disable credentials or create credential-specific rejection windows; do not invalidate the shared ShopSession.
 - Use HTTPS only, exact registered redirect URIs, strict allowed CORS origins, secure token signing-key storage, short token lifetimes, security headers/CSP and redacted logs.
 - React keeps access tokens in memory only; never write access/refresh/ID tokens to `localStorage`, `sessionStorage`, IndexedDB, analytics or browser logs. Never send ID tokens to the API.
 - Since API calls use an explicit Authorization header, do not add cookie-based authentication as an implicit fallback for `/api/v1/**`. The authorization server's own HttpOnly cookie is only for its Shop sign-in session.

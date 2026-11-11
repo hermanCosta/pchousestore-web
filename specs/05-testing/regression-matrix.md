@@ -56,7 +56,7 @@
 | Closing | Service-order payments included | Reconciliation includes service payments |
 | Closing | Same business date across multiple Shops | Each Shop can close independently for that date; closing Shop A does not block Shop B |
 | Reports | Daily closing | Totals reconcile with transaction ledger and cash movements |
-| Security | Login failure/credential stuffing | Rate limit and lockout policy enforced |
+| Security | Login failure/credential stuffing | Source/network endpoint rate limits enforced; repeated failures never lock/disable credentials or create credential-specific rejection windows |
 | Security | Sensitive operation | Actor and audit trail are recorded |
 
 - **OAuth/OIDC Shop API security:** React completes Authorization Code + PKCE S256 using a registered redirect URI; wrong verifier, replayed code, wrong issuer/audience/signature, expired/not-yet-valid token or missing `shop.api` scope is rejected.

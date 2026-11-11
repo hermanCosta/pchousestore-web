@@ -1,6 +1,6 @@
 # Product-owner Decisions and Remaining Questions — pcHouseStore Web
 
-**Revision:** v23 · 8 November 2026
+**Revision:** v24 · 10 November 2026
 **Status:** Confirmed product decisions are incorporated. A small set of commercial/legal details remains explicitly proposed or deferred; the model is not a production-approved DDL.
 
 ## Confirmed decisions
@@ -11,7 +11,10 @@
 | Shop access | Persistent session represents the active Shop only; it has no Employee identity. |
 | Shop sign-in identifier | Stable Shop code + Shop credential password. |
 | Employee identity | One Company-wide employee identity; employee code + individual password works in every Shop. Every protected operation requires a fresh, one-use employee authorization. |
-| Roles | `MANAGER` has full access across every Shop. `TECHNICIAN` has partial technical/operational access under the matrix in `employee-access-and-roles.md`; the proposed baseline is ready for implementation subject to owner review. |
+| Roles | `MANAGER` has full access across every Shop. The v1 `TECHNICIAN` action matrix in `employee-access-and-roles.md` is approved. Employees may hold both roles; effective permissions are the union, so MANAGER grants the full capability set. |
+| Authentication credential operations | Managers provision, disable and reset Shop/Employee credentials; Employee reset forces a change at next use. Initial Shop bootstrap and recovery when no Manager can authenticate use an audited, identity-verified deployment-controlled Company-owner/operator process. |
+| Password baseline and failed attempts | Minimum 12 characters; support at least 128 characters and password managers/paste; no arbitrary periodic expiry; rotate after compromise or authorized reset; use vetted adaptive hashing. Failed attempts never lock or disable an account or trigger credential-specific waiting/rejection windows. Limit authentication request rates by source/network and endpoint. |
+| Authentication request-rate limit | Maximum 10 requests per minute per source IP and authentication endpoint, counting successes and failures. Excess requests receive HTTP 429 through the end of that one-minute window; no credential lockout. |
 | Inventory | Only Product catalogue items have stock. Product quantities are whole units. Quantity-tracked stock may become negative; reservations cannot. One stock pool per Shop; no reservation-expiry automation or multiple internal locations in v1. |
 | Physical stock returns | Receive selected returned goods as `PENDING_INSPECTION`, outside sellable stock. Only an explicit inspection disposition `RESTOCK` creates an inbound movement; `QUARANTINE` and `DISPOSE` do not increase sellable stock. A serialized refurbished return remains `QUARANTINED` until inspection passes and it is explicitly restocked. |
 | Inter-Shop transfer scope | Transfers support physical Product stock and service orders sent to another Shop. On service-order transfer, the destination Shop assumes operational and financial responsibility; all transactions from the transfer onward run through that destination. Product movement remains dispatch/in-transit/receipt. Previously settled transactions remain attributed to the source; outstanding balance and held/unapplied deposit liability transfer to the destination through an audited internal event. |
@@ -87,9 +90,9 @@ Image retention is tied to the business record. Deletion is initially soft/audit
 4. **Deposit contract wording:** operational default is defined above, but the final written terms/non-refundable special-order wording must be reviewed for fairness and Irish consumer-law compliance.
 5. **Refurbished commercial guarantee:** 12 months is confirmed; the detailed coverage/exclusions below are a proposed default and require owner/legal review before publishing to customers.
 6. **Customer data/image retention:** image storage is MySQL-only, but exact business-record retention period and lawful purge schedule remain to be approved. Soft delete is used in v1.
-7. **TECHNICIAN permission matrix:** partial access is confirmed; the proposed action-level matrix is in `employee-access-and-roles.md` and still needs owner sign-off before fine-grained API policies are frozen.
+7. **TECHNICIAN permission matrix:** v1 action-level matrix and dual-role precedence approved 2026-11-10; see `employee-access-and-roles.md`.
 8. **Complete Sale/ServiceOrder status transition matrix and executable production DDL/EF Core migration review.**
-9. **Shop and employee authentication operations:** Shop credential provisioning/recovery remains open. ShopSession timeout values and multi-device/sign-out policy must remain configurable and be decided before production. Employee password/recovery policy, final MANAGER/TECHNICIAN action matrix and multi-role assignment remain open.
+9. **Shop and employee authentication operations:** credential administration/recovery baseline, employee password policy, failed-attempt throttling without account lockout, action matrix and dual-role precedence approved 2026-11-10. ShopSession timeout values and multi-device/sign-out policy remain configurable and must be decided before production.
 10. **Service-order transfer details:** Device custody, service-part inventory attribution, transfer authorization and final audit fields remain to define. The financial handling is decided: preserve already-settled transactions against the source Shop; transfer the outstanding balance and held/unapplied deposit liability to the destination through an auditable internal event; all post-transfer transactions use the destination.
 
 **Deferred by owner instruction:** installment delinquency treatment beyond `OVERDUE`, renegotiation/late fees, and accounting/bookkeeper reconciliation mapping. These are not v1 implementation blockers.
@@ -109,8 +112,8 @@ No processor must be selected for v1. `CASH` and `CARD` are the payment methods.
 ## Current approval status after website review
 
 - **Confirmed:** CASH/CARD only; no processor integration in v1; MySQL-only image storage; the current website's publicly listed categories/contact/branch data are captured as a reference snapshot.
-- **Recommended terms still pending approval:** final customer-facing deposit cancellation/non-refundable-cost wording and the detailed refurbished guarantee coverage/exclusions. The 90-day deposit review reminder, no automatic expiry/forfeiture, Manager-only original-tender refunds and immutable cash-close policy are approved operational rules. The TECHNICIAN action matrix still needs owner sign-off.
-- **Owner/accountant confirmation still needed:** VAT registration/tax codes/rates and price display; exact legal Company name; final ILAC address/display name; final warranty policy wording; official logo and exact brand colours; GDPR retention period; final action-level TECHNICIAN permissions.
+- **Recommended terms still pending approval:** final customer-facing deposit cancellation/non-refundable-cost wording and the detailed refurbished guarantee coverage/exclusions. The 90-day deposit review reminder, no automatic expiry/forfeiture, Manager-only original-tender refunds, immutable cash-close policy and v1 TECHNICIAN action matrix are approved operational rules.
+- **Owner/accountant confirmation still needed:** VAT registration/tax codes/rates and price display; exact legal Company name; final ILAC address/display name; final warranty policy wording; official logo and exact brand colours; GDPR retention period.
 
 ## External references used
 

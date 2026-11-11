@@ -34,7 +34,7 @@
 - A shop credential authenticates the shop context only. It does not authorize employee-level business actions.
 - Employee credentials are never stored in the shop session or returned to the browser as reusable authentication state.
 - Store password hashes and employee credential hashes using a vetted password-hashing algorithm; never store plaintext, Base64-encoded passwords or reversible secrets.
-- Rate-limit and audit failed employee credential challenges. Apply lockout/protection without allowing one employee's failed attempts to invalidate the shared shop session for everyone.
+- Limit authentication request rates by source/network and endpoint and audit failed employee credential challenges. Failed attempts never lock or disable credentials or create credential-specific rejection windows; shared ShopSession remains usable.
 - An `EmployeeActionAuthorization` is one-use, short-lived and action-scoped. It is consumed server-side in the same database transaction as the business operation. Employee password credentials are the selected challenge mechanism; the ShopSession remains employee-free.
 - The employee actor on the resulting record is derived from or constrained to the consumed authorization. Do not trust an `EmployeeId` submitted by React. The same employee password is accepted in every Shop belonging to the Company.
 
@@ -314,13 +314,15 @@ Image limits are specified in [Image Upload Policy](image-upload-policy.md). MAN
 
 ## ADR-015 — Company-wide employee password and role names across all Shops
 
-**Decision:** Each employee has one Company-wide account authenticated by employee code + password. The same employee credentials work in every Shop belonging to the Company. The persistent ShopSession still identifies only the active Shop; each protected operation requires a fresh password challenge from the acting employee. `MANAGER` has full access across all Shops. `TECHNICIAN` has partial access; the detailed first-release action matrix in [Employee Access and Roles](employee-access-and-roles.md) is a proposal pending owner review.
+**Decision:** Each employee has one Company-wide account authenticated by employee code + password. The same employee credentials work in every Shop belonging to the Company. The persistent ShopSession still identifies only the active Shop; each protected operation requires a fresh password challenge from the acting employee. `MANAGER` has full access across all Shops. `TECHNICIAN` has partial access under the product-owner-approved v1 action matrix in [Employee Access and Roles](employee-access-and-roles.md).
 
 ### Roles
 
 - `MANAGER`: full operational, commercial, financial, staff, Shop and Company configuration access across all Shops.
-- `TECHNICIAN` (proposed first-release scope): service-order creation/update and technical workflow, diagnosis/notes, part requirements, procurement requests/images and operational supplier-purchase/receipt capture for service parts, Shop stock availability/reservations, refurbished inspection/condition and complaint technical evidence. Excluded in this proposal: sales, prices/discounts, payment/deposit/refund, cash, stock adjustment/transfer, staff administration, configuration, approval or complaint closure.
+- `TECHNICIAN` (approved first-release scope): service-order creation/update and technical workflow, diagnosis/notes, part requirements, procurement requests/images and operational supplier-purchase/receipt capture for service parts, Shop stock availability/reservations, refurbished inspection/condition and complaint technical evidence. Excluded: sales, prices/discounts, payment/deposit/refund, cash, stock adjustment/transfer, staff administration, configuration, approval or complaint closure.
 - Roles are Company-wide, not duplicated per Shop. The role/action permission matrix is enforced server-side and never trusted from React.
+- An employee may hold both roles. Effective permissions are the union of role capabilities; MANAGER therefore takes precedence and grants full access. No deny-overrides rule applies.
+- Managers administer Shop and Employee credentials. Failed attempts do not lock or disable credentials; authentication requests are rate-limited by source/network and endpoint. See the consolidated product-owner decision register for the credential lifecycle and password baseline.
 
 ### Consequences
 
@@ -392,7 +394,7 @@ Image limits are specified in [Image Upload Policy](image-upload-policy.md). MAN
 
 The owner has now confirmed the following implementation choices in addition to the previous ADRs:
 
-- Employee challenge is by password; one Company-wide Employee account/password and Company-wide `MANAGER` / `TECHNICIAN` roles work across all Shops. The exact permission matrix remains a separate review item.
+- Employee challenge is by password; one Company-wide Employee account/password and Company-wide `MANAGER` / `TECHNICIAN` roles work across all Shops. The v1 permission matrix and dual-role precedence are approved in the decision register and `employee-access-and-roles.md`.
 - Quantity-tracked Product stock may become negative. Sale and ServiceOrder stock is consumed when the respective balance reaches zero through settled payments; partial payments do not consume stock. A later `PICKED`/collection event does not trigger a second deduction.
 - VAT has a preimplemented Company-level enable/disable feature flag, defaulting to disabled with `setup_status=NOT_REVIEWED`. The flag is not a VAT registration/exemption decision and cannot replace Irish tax review.
 - Refurbished units carry a 12-month commercial guarantee from customer handover, additional to Irish statutory consumer rights.
@@ -422,9 +424,9 @@ See the [consolidated product-owner decision register](product-owner-decisions.m
 
 ## ADR-021 — MANAGER full access and TECHNICIAN partial access
 
-**Decision:** `MANAGER` has full access across all Shops. The product owner specified that `TECHNICIAN` has partial access. The detailed first-release allow/deny matrix is a proposed interpretation of that requirement and must be reviewed before coding fine-grained authorization policies.
+**Decision:** `MANAGER` has full access across all Shops. The product owner specified that `TECHNICIAN` has partial access and approved the detailed first-release allow/deny matrix on 2026-11-10. An employee may hold both roles; effective permissions are the union, so MANAGER grants full access.
 
-The proposed matrix and employee-code + password challenge are specified in [Employee Access and Roles](employee-access-and-roles.md). A supplier purchase for service parts does not require a second manager approval, but the acting role and employee authorization are still checked.
+The approved matrix and employee-code + password challenge are specified in [Employee Access and Roles](employee-access-and-roles.md). A supplier purchase for service parts does not require a second manager approval, but the acting role and employee authorization are still checked.
 
 ## ADR-022 — Daily cash close formula and immutable close
 
@@ -526,6 +528,7 @@ See [Image Upload Policy](image-upload-policy.md). Limits are configurable and c
 - React stores tokens in memory only. No localStorage/sessionStorage/IndexedDB, browser logs or analytics. Never send an ID token to the API.
 - No Implicit grant, Resource Owner Password Credentials grant, browser client secret or home-grown JWT implementation.
 - Shop password is entered at the interactive authorization endpoint, not at the OAuth token endpoint.
+- Authentication endpoints are limited to 10 requests per minute per source IP and endpoint, counting successful and failed requests. Excess requests receive HTTP 429 through the end of the window. Failed attempts never lock or disable credentials; trust forwarded client IP headers only from explicitly configured proxies.
 
 ### Consequences
 
@@ -586,6 +589,15 @@ pchousestore-web/
 - **Infrastructure** owns EF Core persistence and external adapters; it depends on Application and Domain.
 - **API** owns HTTP endpoints/contracts, authentication and dependency composition; it depends on Application and Infrastructure and is the composition root.
 - The frontend calls the backend through versioned HTTP API contracts and does not reference backend projects.
+
+
+## ADR-035 — OIDC signing-key registry in `system_services`
+
+**Status:** APPROVED FOR DATA-05 IMPLEMENTATION — Product Owner validated the `system_services` design on 2026-11-10; deployment-provider integration remains.
+
+**Decision proposal (REDESIGN):** Add one `system_services` row per OIDC signing-certificate version. Store the public X.509 certificate and envelope-encrypted PKCS#8 private-key bytes; never store an unencrypted private key or KEK in MySQL. Keep the KEK in a deployment secret manager/KMS or protected host certificate store. Expose only public signing keys through the OIDC discovery/JWKS endpoint. Use overlapping key versions during rotation, retaining an old public key until issued access tokens expire plus clock skew.
+
+The detailed schema, rotation states and audit rows are in [Authentication and Signing-Key Persistence](authentication-persistence.md), with the DATA-05 SQL draft at [`infrastructure/database/authentication-foundation.draft.sql`](../../infrastructure/database/authentication-foundation.draft.sql). Runtime provider choice, least-privilege access and recovery runbook remain production deployment tasks.
 
 ### Module communication and persistence
 

@@ -1,6 +1,6 @@
 # Employee Access and Roles — pcHouseStore Web
 
-**Status:** DRAFT v15 — MANAGER full access is confirmed. The TECHNICIAN matrix below is the recommended first-release interpretation of partial access; it is ready for owner review before fine-grained policy freeze. All operations remain scoped to the active Shop and individually attributed.
+**Status:** PRODUCT-APPROVED v1 baseline (2026-11-10) — MANAGER full access and the TECHNICIAN matrix below are approved. An employee may hold both roles; effective permissions are the union of assigned roles, so MANAGER grants the full capability set. All operations remain scoped to the active Shop and individually attributed.
 
 ## 1. Identity and cross-Shop access
 
@@ -10,9 +10,11 @@
 - The server verifies the employee password, active status, Company membership and role permission for the requested action. It issues a short-lived, action-scoped, single-use `EmployeeActionAuthorization`.
 - The authorization is consumed atomically with the command. A later operation requires another employee challenge; the previous employee is never reused implicitly.
 
-## 2. Roles and proposed first-release permission matrix
+## 2. Approved v1 permission matrix
 
-Roles are Company-wide and work across all Shops. MANAGER full access is a confirmed requirement. The TECHNICIAN scope is a recommended first-release baseline derived from the service/technical workflows. Permission checks are server-side. The React client may hide unavailable actions for usability, but API authorization is authoritative.
+Roles are Company-wide and work across all Shops. MANAGER full access is a confirmed requirement. The TECHNICIAN scope is the approved first-release baseline derived from the service/technical workflows. Permission checks are server-side. The React client may hide unavailable actions for usability, but API authorization is authoritative.
+
+The Product Owner approved this action matrix for v1 on 2026-11-10. An employee may hold both `MANAGER` and `TECHNICIAN`; effective permissions are the union of assigned roles. Since MANAGER grants full access, it takes precedence wherever the TECHNICIAN column says No. There is no deny-overrides rule.
 
 | Capability | `MANAGER` | `TECHNICIAN` |
 |---|---:|---:|
@@ -41,7 +43,7 @@ Roles are Company-wide and work across all Shops. MANAGER full access is a confi
 | Approve complaint remedy, refund, replacement or price reduction | Yes | No |
 | Close/reopen complaint cases | Yes | Add technical findings; cannot close the case |
 
-`MANAGER` is the full-access role across all Shops. The v1 proposed `TECHNICIAN` profile is intentionally a technical/operational role: the technician may diagnose and repair, reserve or request parts, capture purchase/receipt details for service parts, and inspect equipment, but cannot perform financial, commercial-pricing, staff-administration or company-configuration actions.
+`MANAGER` is the full-access role across all Shops. The v1 approved `TECHNICIAN` profile is intentionally a technical/operational role: the technician may diagnose and repair, reserve or request parts, capture purchase/receipt details for service parts, and inspect equipment, but cannot perform financial, commercial-pricing, staff-administration or company-configuration actions unless the employee also holds MANAGER.
 
 ### No second purchase approval
 
@@ -53,12 +55,15 @@ Creating, linking, updating or receiving a supplier purchase for service parts d
 - Every such action requires the Manager's own fresh employee password challenge and one-use authorization. There is no amount threshold and no second Manager approval in v1.
 - `TECHNICIAN` can record technical findings and request manager review but cannot commit a refund, cash operation or deposit forfeiture.
 
-## 3. Employee password challenge
+## 3. Employee password challenge and credential operations
 
 - UI collects `employee_code` + password. Employee code is unique within the Company.
 - Store only a vetted password hash (Argon2id, bcrypt or the established ASP.NET Core Identity hasher); never plaintext or reversible encryption.
 - Transmit the password only over TLS. Do not retain it in browser storage, logs, analytics or audit payloads.
-- Rate-limit failed challenges and apply account-level lockout/protection without invalidating the shared ShopSession for all employees.
+- Do not lock, disable or suspend a Shop or Employee credential because of failed password attempts. Apply request-rate limits at authentication endpoints by source/network and endpoint, with generic authentication errors. Credential-specific failures may be recorded for security monitoring but must not cause a credential-specific waiting period, rejection window or disabled state. Throttling must not persist an account lock state or invalidate a shared ShopSession.
+- A Manager may provision, disable and reset a Shop credential, and may provision, disable and reset an Employee credential. Employee reset requires the Manager's fresh action authorization and forces a password change on next use. An employee may change their own password after providing the current password.
+- The initial Shop credential and recovery when no Manager can authenticate use a deployment-controlled, identity-verified Company-owner/operator bootstrap procedure outside the public Shop sign-in endpoint. Record and audit each bootstrap/recovery, then require credential rotation before normal use.
+- Use a minimum password length of 12 characters, accept at least 128 characters, allow password managers/paste, and do not require arbitrary periodic changes. Rotate promptly after suspected compromise or an authorized reset. Hash using ASP.NET Core Identity's established hasher (or an approved equivalent) and support rehash-on-success when parameters are upgraded.
 - The authorization binds `ShopSessionId`, `ShopId`, `EmployeeId`, action code, operation-context hash, authentication time, expiry and consumed time.
 - Use a one-use compare-and-set/transaction to prevent replay and concurrent double-consumption.
 
@@ -67,9 +72,10 @@ Creating, linking, updating or receiving a supplier purchase for service parts d
 1. The same employee code/password works in any Shop belonging to the Company.
 2. A `ShopSession` never contains `EmployeeId` or an employee role.
 3. Each protected operation records the person who entered the credential for that exact action.
-4. Under the proposed first-release matrix, a technician can perform permitted service/technical/procurement actions but is denied payments, refunds, deposit forfeitures, cash operations, sales, price edits, staff administration, settings, stock adjustments and Shop transfers.
+4. Under the approved first-release matrix, a technician can perform permitted service/technical/procurement actions but is denied payments, refunds, deposit forfeitures, cash operations, sales, price edits, staff administration, settings, stock adjustments and Shop transfers unless that employee also has MANAGER, in which case MANAGER permissions apply.
 5. A manager can perform all application actions in every Shop.
 6. A previous employee authorization cannot be reused for another action or operation context.
 7. A supplier purchase or receipt does not wait for a second manager approval, but still checks the acting role and employee authorization.
+8. Repeated failed attempts do not lock or disable a credential; authentication endpoints apply request throttling without account lock state.
 
 See [the consolidated decision register](product-owner-decisions.md).

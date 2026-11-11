@@ -110,7 +110,7 @@ Initial limits are 10 MiB per image, 10 images and 100 MiB aggregate per target.
 
 Supplier purchase creation, linking, updates and receipt do not require a second manager approval. This does not bypass the executing employee's role permission or per-operation password challenge. The persistent session identifies only the Shop. Every write action requires fresh employee authentication and a single-use action authorization, including create/edit/cancel request, upload/delete image, assignment, purchase linkage and receipt. The employee who created a request is not assumed to be the buyer or the employee who later receives the part.
 
-Action codes use the proposed v1 matrix in `employee-access-and-roles.md`: `PROCUREMENT_REQUEST_CREATE`, `PROCUREMENT_REQUEST_UPDATE`, `PROCUREMENT_REQUEST_CANCEL`, `PROCUREMENT_IMAGE_UPLOAD`, `PROCUREMENT_IMAGE_DELETE`, `PROCUREMENT_ASSIGN`, `SUPPLIER_PURCHASE_LINK`, `SUPPLIER_PURCHASE_RECEIVE`.
+Action codes use the approved v1 matrix in `employee-access-and-roles.md`: `PROCUREMENT_REQUEST_CREATE`, `PROCUREMENT_REQUEST_UPDATE`, `PROCUREMENT_REQUEST_CANCEL`, `PROCUREMENT_IMAGE_UPLOAD`, `PROCUREMENT_IMAGE_DELETE`, `PROCUREMENT_ASSIGN`, `SUPPLIER_PURCHASE_LINK`, `SUPPLIER_PURCHASE_RECEIVE`.
 
 ## 8. Status behavior
 

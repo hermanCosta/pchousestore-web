@@ -50,7 +50,7 @@ The employee challenge mechanism is a password. The same Company-wide employee a
 5. Verify active Company-wide Employee role assignment and action permission on every employee challenge; no per-Shop employee assignment is required.
 6. Enforce one-time consumption and short expiry of `EmployeeActionAuthorization` server-side, under concurrency.
 7. Record employee actor, Shop, action, timestamp and target on every protected operation. Do not infer actor from workstation or session history.
-8. Rate-limit Shop login and employee challenges. Apply employee-specific lockout/protection without terminating the shared Shop session for all other employees.
+8. **Target policy updated 2026-11-10:** limit authentication request rates by source/network and endpoint. Failed attempts must not lock/disable credentials or create credential-specific rejection windows. The earlier lockout suggestion is superseded by the product-owner decision in `product-owner-decisions.md`.
 9. Use OAuth 2.0/OIDC Authorization Code + PKCE, API JWT Bearer validation, strict redirect/CORS policy, ShopSession revocation and least-privilege database accounts. Protect cookie-based authorization-server state with Secure/HttpOnly/SameSite settings and CSRF controls where applicable.
 10. Audit security-relevant events including Shop sign-in/out, employee challenge success/failure, authorization consumption and privileged actions.
 
