@@ -99,12 +99,12 @@ The detail view contains:
 - Allow capture from a mobile device camera as well as file selection from desktop/mobile storage.
 - Allow multiple images per request line. Suggested roles: `PART_OVERVIEW`, `MODEL_OR_SERIAL_LABEL`, `CONNECTOR`, `DAMAGE`, `OTHER`.
 - Images should help identify compatibility: the removed/old part, printed part number, model label, connectors, dimensions and visible damage are common useful references.
-- Store image bytes in the same MySQL database using the shared `stored_image.content MEDIUMBLOB` table and a bounded `thumbnail_content BLOB`. No object storage, filesystem or external file service is used.
+- Store image bytes in the same PostgreSQL database using the shared `stored_image.content BYTEA` and `thumbnail_content BYTEA` columns. No object storage, filesystem or external file service is used.
 - Validate content by file signature/MIME, enforce the 10 MiB limit and image-count limits, re-encode accepted images, strip EXIF/GPS and store a SHA-256 digest.
-- Do not expose public URLs or storage keys. The client requests an opaque image ID through an authorization-checked ASP.NET Core endpoint. The endpoint verifies the attachment parent and active Shop before streaming thumbnail/full BLOB bytes.
+- Do not expose public URLs or storage keys. The client requests an opaque image ID through an authorization-checked ASP.NET Core endpoint. The endpoint verifies the attachment parent and active Shop before streaming thumbnail/full binary content.
 - Deleting an image is a soft-delete/audited action recorded in `ServiceProcurementRequestEvent`; preserve history where the image was previously used for a purchase decision. A replacement image can be added without erasing the old one.
 
-Initial limits are 10 MiB per image, 10 images and 100 MiB aggregate per target. The image bytes are stored in MySQL; soft-delete is audited and no automatic physical purge runs in v1. Exact GDPR retention schedule remains pending.
+Initial limits are 10 MiB per image, 10 images and 100 MiB aggregate per target. The image bytes are stored in PostgreSQL; soft-delete is audited and no automatic physical purge runs in v1. Exact GDPR retention schedule remains pending.
 
 ## 7. Actions and employee authentication
 

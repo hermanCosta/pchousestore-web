@@ -1,6 +1,6 @@
-# MySQL Image Storage Architecture
+# PostgreSQL Image Storage Architecture
 
-**Decision:** Uploaded images are stored in the same MySQL 8.x database as the pcHouseStore operational data. No external object store, NAS/file share, local filesystem path or separately managed file service is part of the initial architecture.
+**Decision:** Uploaded images are stored in the same PostgreSQL 16 database as the pcHouseStore operational data. No external object store, NAS/file share, local filesystem path or separately managed file service is part of the initial architecture.
 
 ## Schema
 
@@ -8,15 +8,15 @@
 
 - `id BIGINT` primary key
 - `company_id BIGINT` and `shop_id BIGINT` tenant/context ownership
-- `content MEDIUMBLOB NOT NULL` — normalized full-size image bytes (max application payload 10 MiB)
-- `thumbnail_content BLOB NULL` — thumbnail <=60 KiB
+- `content BYTEA NOT NULL` — normalized full-size image bytes (max application payload 10 MiB)
+- `thumbnail_content BYTEA NULL` — thumbnail <=60 KiB
 - `content_type VARCHAR(40)` — normalized MIME type
-- `size_bytes INT UNSIGNED`, `width_px SMALLINT UNSIGNED`, `height_px SMALLINT UNSIGNED`
-- `sha256 BINARY(32)`
+- `size_bytes INTEGER`, `width_px SMALLINT`, `height_px SMALLINT` with positive-value checks
+- `sha256 BYTEA` with a 32-byte length check
 - `uploaded_by_employee_id BIGINT`, `authorization_id BIGINT`
-- `uploaded_at DATETIME(6)`, `deleted_at DATETIME(6) NULL`, `deleted_by_employee_id BIGINT NULL`, `delete_authorization_id BIGINT NULL`
+- `uploaded_at TIMESTAMPTZ`, `deleted_at TIMESTAMPTZ NULL`, `deleted_by_employee_id BIGINT NULL`, `delete_authorization_id BIGINT NULL`
 
-MySQL 8.0 defines `MEDIUMBLOB` with a maximum capacity of 16,777,215 bytes and `BLOB` with a maximum of 65,535 bytes. The product's 10 MiB per-image limit therefore fits within `MEDIUMBLOB`; the thumbnail limit is enforced at 60 KiB to fit in `BLOB`. See [MySQL Reference Manual — BLOB and TEXT types](https://dev.mysql.com/doc/refman/8.0/en/blob.html).
+The 10 MiB full-image and 60 KiB thumbnail limits are application-level constraints. Database and backup capacity must be tested with representative image volume before production.
 
 ### Owner-specific attachment tables
 
@@ -52,6 +52,6 @@ Database backups include the image BLOB data. Capacity planning and restore-time
 
 ## Trade-offs accepted by the owner
 
-- MySQL backup size and database storage increase as images grow.
+- PostgreSQL backup size and database storage increase as images grow.
 - Image reads are isolated behind streaming endpoints and thumbnail queries to avoid loading binary columns into ordinary API responses.
 - This keeps image ownership, Shop authorization, backups and lifecycle in one system, avoiding a second storage provider or manual file administration.

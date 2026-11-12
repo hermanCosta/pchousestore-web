@@ -12,12 +12,11 @@ public static class DependencyInjection
         IConfiguration configuration)
     {
         var connectionString = configuration.GetConnectionString("PcHouseStore");
-        if (!string.IsNullOrWhiteSpace(connectionString))
-        {
-            services.AddDbContext<PcHouseStoreDbContext>(options =>
-                options.UseMySQL(connectionString));
-        }
+        if (string.IsNullOrWhiteSpace(connectionString))
+            throw new InvalidOperationException("ConnectionStrings:PcHouseStore is required.");
 
+        services.AddDbContext<PcHouseStoreDbContext>(options =>
+            options.UseNpgsql(connectionString).UseOpenIddict());
         return services;
     }
 }

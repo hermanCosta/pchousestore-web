@@ -6,7 +6,7 @@
 
 - Unit tests for domain invariants, calculations, validation and state transitions.
 - Application tests for use-case orchestration and authorization decisions.
-- Integration tests against a disposable MySQL instance or equivalent CI-managed database.
+- Integration tests against a disposable PostgreSQL instance or equivalent CI-managed database.
 - API tests for HTTP contracts, validation errors, pagination, Shop isolation and employee action authorization.
 
 ## Frontend

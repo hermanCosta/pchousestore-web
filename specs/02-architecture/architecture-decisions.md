@@ -186,7 +186,7 @@ Acquisition/source details, commercial guarantee coverage/exclusions and claim p
 
 ### Consequences
 
-- Monetary values use C# `decimal` and MySQL `DECIMAL(19,2)` for euro amounts. Percentages/rates use a separate higher-precision decimal type. Binary floating point (`double`/`float`) is prohibited for money.
+- Monetary values use C# `decimal` and PostgreSQL `NUMERIC(19,2)` for euro amounts. Percentages/rates use a separate higher-precision numeric type. Binary floating point (`double`/`float`) is prohibited for money.
 - Each document and financial transaction snapshots its currency code. Multi-currency settlement is out of initial scope; FX conversion must not be inferred.
 - Each Shop may opt into Irish cash rounding. It is voluntary, applies only to the final cash-paid bill total, and rounds to the nearest €0.05. Exact-change payment remains possible. Card and other electronic payments are never rounded; individual line prices and the VAT calculation base remain unrounded.
 - Persist the signed cash-rounding adjustment separately from invoice value, VAT and actual cash tender. A cash-rounding adjustment is not a price/discount/tax change.
@@ -489,6 +489,8 @@ See [Image Upload Policy](image-upload-policy.md). Limits are configurable and c
 
 ## ADR-029 — MySQL-only binary image storage
 
+**Status:** SUPERSEDED BY ADR-036 — retained as a historical record of the earlier storage choice.
+
 **Decision:** All service procurement, refurbished-unit and complaint images are stored in MySQL. `stored_image.content` uses `MEDIUMBLOB`; a compact thumbnail uses `BLOB`; owner-specific attachment tables reference the common record. No external object storage or filesystem path is used.
 
 ### Consequences
@@ -497,7 +499,7 @@ See [Image Upload Policy](image-upload-policy.md). Limits are configurable and c
 - Default EF Core list projections exclude binary columns; authorized endpoints stream thumbnails/full-size content.
 - Soft deletion is audited. No automatic physical purge runs in v1; exact GDPR retention schedule remains open.
 - MySQL backups/restores include all image data; capacity and restore times must be load-tested.
-- See [MySQL Image Storage Architecture](mysql-image-storage.md) and [Image Upload Policy](image-upload-policy.md).
+- See [PostgreSQL Image Storage Architecture](postgresql-image-storage.md) for the current storage design and [Image Upload Policy](image-upload-policy.md) for upload handling.
 
 ## ADR-030 — Refurbished-unit internal asset code and manufacturer serial
 
@@ -595,15 +597,23 @@ pchousestore-web/
 
 **Status:** APPROVED FOR DATA-05 IMPLEMENTATION — Product Owner validated the `system_services` design on 2026-11-10; deployment-provider integration remains.
 
-**Decision proposal (REDESIGN):** Add one `system_services` row per OIDC signing-certificate version. Store the public X.509 certificate and envelope-encrypted PKCS#8 private-key bytes; never store an unencrypted private key or KEK in MySQL. Keep the KEK in a deployment secret manager/KMS or protected host certificate store. Expose only public signing keys through the OIDC discovery/JWKS endpoint. Use overlapping key versions during rotation, retaining an old public key until issued access tokens expire plus clock skew.
+**Decision proposal (REDESIGN):** Add one `system_services` row per OIDC signing-certificate version. Store the public X.509 certificate and envelope-encrypted PKCS#8 private-key bytes; never store an unencrypted private key or KEK in the application database. Keep the KEK in a deployment secret manager/KMS or protected host certificate store. Expose only public signing keys through the OIDC discovery/JWKS endpoint. Use overlapping key versions during rotation, retaining an old public key until issued access tokens expire plus clock skew.
 
-The detailed schema, rotation states and audit rows are in [Authentication and Signing-Key Persistence](authentication-persistence.md), with the DATA-05 SQL draft at [`infrastructure/database/authentication-foundation.draft.sql`](../../infrastructure/database/authentication-foundation.draft.sql). Runtime provider choice, least-privilege access and recovery runbook remain production deployment tasks.
+The detailed schema, rotation states and audit rows are in [Authentication and Signing-Key Persistence](authentication-persistence.md), with the DATA-05 SQL draft at [`infrastructure/database/authentication-foundation.draft.sql`](../../infrastructure/database/authentication-foundation.draft.sql). PostgreSQL is now the selected provider; least-privilege access, migration validation and the recovery runbook remain production deployment tasks.
+
+## ADR-036 — PostgreSQL as the relational database
+
+**Status:** DECIDED by the product owner on 2026-11-11; PostgreSQL 16 is installed locally and Npgsql conversion is in progress.
+
+**Decision:** Use PostgreSQL for the application database and Npgsql for EF Core. This supersedes the earlier MySQL selection. Store monetary values as `NUMERIC`, UTC timestamps as `TIMESTAMPTZ`, and image/key binary data as `BYTEA`. PostgreSQL owns OpenIddict persistence through its EF Core integration.
+
+DATA-05 must review provider-specific migrations, generated columns, byte-array length constraints, identity columns, OpenIddict schema compatibility and concurrency behavior before applying the schema beyond an isolated development database. Do not use the superseded MySQL DDL; the current PostgreSQL SQL remains review-only.
 
 ### Module communication and persistence
 
 - Modules call another module only through its published Application contract, synchronously in-process.
 - A use case spanning modules is orchestrated by Application. If it must be atomic, it runs in one database transaction.
-- The initial release uses one MySQL database and one EF Core DbContext, with entity configuration grouped by owning module.
+- The initial release uses one PostgreSQL database and one EF Core DbContext, with entity configuration grouped by owning module.
 - Do not introduce a message broker, distributed transaction coordinator or cross-module event framework in the initial release.
 
 ### Minimum development practices

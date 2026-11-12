@@ -14,7 +14,7 @@ Modular monolith with explicit module boundaries.
 - Application — use cases, orchestration, validation and authorization policies.
 - Domain — entities, value objects, invariants and domain services.
 - Infrastructure — EF Core mappings, persistence, file/report generation and external adapters.
-- MySQL — relational persistence.
+- PostgreSQL — relational persistence.
 
 ## 3. Approved repository layout
 
@@ -61,12 +61,12 @@ Feature-oriented Application organization:
 
 - The feature areas above are the first-release modules. Each module owns its use cases, domain rules and tables; another module must not read or change those tables directly.
 - A module exposes only the application operations other modules need. Cross-module work uses those in-process contracts synchronously. The Application layer orchestrates a use case that spans modules.
-- Use one MySQL database and one EF Core `DbContext` in the initial release, with entity configurations grouped by owning module. A multi-module use case that must be atomic uses one database transaction.
+- Use one PostgreSQL database and one EF Core `DbContext` in the initial release, with entity configurations grouped by owning module. A multi-module use case that must be atomic uses one database transaction.
 - Do not add message brokers, distributed transactions or cross-module domain-event infrastructure in the initial release.
 - Dependencies point inward: Domain has no project dependencies; Application depends on Domain; Infrastructure depends on Application and Domain; API depends on Application and Infrastructure and is the composition root. Frontend communicates with backend only through versioned HTTP API contracts.
 - Domain contains business entities, value objects and invariants. Application contains use cases, cross-module orchestration, input validation and authorization. Infrastructure contains EF Core, database configuration and external adapters. API contains HTTP endpoints, DTO mapping, authentication/token validation and dependency composition.
 - Keep persistence entities out of API contracts. Use asynchronous I/O and propagate `CancellationToken`. Return consistent Problem Details errors and centralize exception handling.
-- Backend uses xUnit; frontend uses Vitest and React Testing Library. Unit tests cover domain/application behavior; integration tests cover API, persistence and module boundaries. Use MySQL-compatible integration coverage for persistence behavior.
+- Backend uses xUnit; frontend uses Vitest and React Testing Library. Unit tests cover domain/application behavior; integration tests cover API, persistence and module boundaries. Use PostgreSQL integration coverage for persistence behavior.
 - Apply the repository's .NET formatting and frontend lint/format checks in CI. Do not introduce additional architecture tooling before it solves a concrete problem.
 
 ## 4. Frontend organization
@@ -135,7 +135,7 @@ Each feature owns its screens, API functions, schemas, hooks and feature-specifi
 - MANAGER full-access / TECHNICIAN restricted service-and-technical permission baseline is defined in [Employee Access and Roles](employee-access-and-roles.md); visibility within service context remains to be refined.
 - Hosting and deployment provider.
 - Report generation library.
-- All image bytes are stored in MySQL `MEDIUMBLOB` with compact `BLOB` thumbnails. No external object storage or filesystem is used. See [MySQL Image Storage Architecture](mysql-image-storage.md). Exact GDPR retention/purge schedule remains pending.
+- All image bytes are stored in PostgreSQL `BYTEA` with compact `BYTEA` thumbnails. No external object storage or filesystem is used. See [PostgreSQL Image Storage Architecture](postgresql-image-storage.md). Exact GDPR retention/purge schedule remains pending.
 - Reservation expiry automation and multiple stock locations are intentionally out of initial scope. One stock pool per Shop is the baseline. Refurbished grades A/B/C, inspection workflow and asset/serial identity are specified; acquisition/source details and customer-facing guarantee coverage/exclusions still need review. Product transfer discrepancy rules are approved; cross-Shop ServiceOrder transfers have a separate pending SPEC.
 - VAT rates, legal VAT registration/status, tax-inclusive/exclusive prices and accountant-approved configuration; the Company VAT feature flag is part of the model.
 - v1 tender methods are CASH and CARD only; card is recorded after external-terminal approval with no processor API integration. Refunds and deposit forfeitures are Manager-only, with original-tender refund and deposit rules in [Financial Model](financial-model.md). Accounting/bookkeeper reconciliation is deferred.

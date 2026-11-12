@@ -23,8 +23,8 @@
 | [Financial model — Ireland](02-architecture/financial-model.md) | Service deposits, weekly refurbished instalments, partial/total refunds, tender configuration, EUR and cash rounding |
 | [Cash closing policy](02-architecture/cash-closing-policy.md) | Opening float, daily Shop cash formula, physical count, electronic tender separation, variance and immutable corrections |
 | [Refurbished condition and complaints](02-architecture/refurbished-condition-and-complaints.md) | A/B/C cosmetic grades, functional inspection, 12-month commercial guarantee and Irish customer complaint/remedy workflow |
-| [Image upload policy](02-architecture/image-upload-policy.md) | File-size/count limits, allowed formats, secure processing and MySQL-only BLOB storage |
-| [MySQL image storage architecture](02-architecture/mysql-image-storage.md) | Shared stored_image table, MEDIUMBLOB content, bounded BLOB thumbnails, Shop-scoped streaming and DB backup/retention |
+| [Image upload policy](02-architecture/image-upload-policy.md) | File-size/count limits, allowed formats, secure processing and PostgreSQL BYTEA storage |
+| [PostgreSQL image storage architecture](02-architecture/postgresql-image-storage.md) | Shared stored_image table, BYTEA content, Shop-scoped streaming and DB backup/retention |
 | [Stock and refurbished equipment](02-architecture/stock-and-refurbishment.md) | Whole-unit stock, reservations, settlement, selected returns, Shop transfers and serialized refurbished products |
 | [Service parts procurement](02-architecture/service-parts-procurement.md) | Supplier/source links, Shop-wide purchase queue, multiple request rounds per service, reference images, ETA/tracking, partial receipts, allocations and AWAITING_PARTS state |
 | [Service parts purchase queue screen](02-architecture/service-procurement-queue.md) | Queue screen, ServiceOrder ID search, create/manage requests, reference-image upload, buyer assignment and acceptance criteria |
@@ -97,7 +97,7 @@ The decision register is recorded in [Architecture Decision Records](02-architec
 ## v15 product-owner updates
 
 - [Payment methods/refunds/deposits](02-architecture/financial-model.md) now defines CASH/CARD-only, external-terminal manual card capture, Manager-only original-tender refunds and the no-auto-expiry deposit policy.
-- [MySQL image storage](02-architecture/mysql-image-storage.md) stores image bytes directly in MySQL using MEDIUMBLOB/BLOB; no external file/object storage.
+- [PostgreSQL image storage](02-architecture/postgresql-image-storage.md) stores image bytes directly in PostgreSQL using BYTEA; no external file/object storage.
 - Refurbished asset codes/serial numbers and proposed commercial-guarantee exclusions are documented.
 - Installment arrears beyond `OVERDUE`, late fees and renegotiation are deferred; accounting reconciliation is not a v1 blocker.
 

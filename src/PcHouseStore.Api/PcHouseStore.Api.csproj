@@ -7,14 +7,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="OpenIddict.AspNetCore" Version="7.8.0" />
+    <PackageReference Include="OpenIddict.Validation.AspNetCore" Version="7.8.0" />
     <ProjectReference Include="..\PcHouseStore.Application\PcHouseStore.Application.csproj" />
     <ProjectReference Include="..\PcHouseStore.Infrastructure\PcHouseStore.Infrastructure.csproj" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.14" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\PcHouseStore.Application\PcHouseStore.Application.csproj" />
-    <ProjectReference Include="..\PcHouseStore.Infrastructure\PcHouseStore.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

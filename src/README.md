@@ -7,4 +7,4 @@ The solution starts as a modular monolith. Business modules will be introduced o
 - `PcHouseStore.Infrastructure` depends on Application and Domain and owns EF Core, module entity configurations and external adapters.
 - `PcHouseStore.Api` depends on Application and Infrastructure and is the HTTP/composition root.
 
-Each capability module owns its use cases, domain rules and tables. Cross-module calls go through published Application contracts; modules do not access another module's tables directly. The initial persistence boundary is one MySQL database and one `PcHouseStoreDbContext`.
+Each capability module owns its use cases, domain rules and tables. Cross-module calls go through published Application contracts; modules do not access another module's tables directly. The initial persistence boundary is one PostgreSQL database and one `PcHouseStoreDbContext`.

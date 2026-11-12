@@ -4,7 +4,7 @@
 
 - Target .NET 10 and current supported C# language version.
 - ASP.NET Core Web API.
-- EF Core with MySQL provider selected after compatibility verification.
+- EF Core with Npgsql provider for PostgreSQL; validate generated migrations and concurrency behavior before production use.
 - Use dependency injection and options pattern.
 - Keep controllers/endpoints thin.
 - Put orchestration in Application and invariants in Domain.

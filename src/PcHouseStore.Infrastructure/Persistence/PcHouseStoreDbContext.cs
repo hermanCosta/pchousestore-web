@@ -8,6 +8,7 @@ public sealed class PcHouseStoreDbContext(DbContextOptions<PcHouseStoreDbContext
 {
     public DbSet<CompanyRecord> Companies => Set<CompanyRecord>();
     public DbSet<ShopRecord> Shops => Set<ShopRecord>();
+    public DbSet<PersonRecord> People => Set<PersonRecord>();
     public DbSet<EmployeeRecord> Employees => Set<EmployeeRecord>();
     public DbSet<EmployeeRoleAssignmentRecord> EmployeeRoleAssignments => Set<EmployeeRoleAssignmentRecord>();
     public DbSet<ShopAccessCredentialRecord> ShopAccessCredentials => Set<ShopAccessCredentialRecord>();
@@ -20,6 +21,7 @@ public sealed class PcHouseStoreDbContext(DbContextOptions<PcHouseStoreDbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(PcHouseStoreDbContext).Assembly);
+        modelBuilder.UseOpenIddict();
         base.OnModelCreating(modelBuilder);
     }
 }

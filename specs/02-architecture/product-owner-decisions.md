@@ -1,6 +1,6 @@
 # Product-owner Decisions and Remaining Questions — pcHouseStore Web
 
-**Revision:** v24 · 10 November 2026
+**Revision:** v26 · 11 November 2026
 **Status:** Confirmed product decisions are incorporated. A small set of commercial/legal details remains explicitly proposed or deferred; the model is not a production-approved DDL.
 
 ## Confirmed decisions
@@ -8,6 +8,8 @@
 | Area | Confirmed rule |
 |---|---|
 | Organization | One legal Company with multiple operational Shops/branches. |
+| Database platform | PostgreSQL is selected; use EF Core with the Npgsql provider. This supersedes the earlier MySQL decision. |
+| Shop printable identity | Each Shop has optional branch-specific address and phone fields for print reports/documents. Snapshot their values when a document is issued; populate only after the owner confirms the authoritative branch details. |
 | Shop access | Persistent session represents the active Shop only; it has no Employee identity. |
 | Shop sign-in identifier | Stable Shop code + Shop credential password. |
 | Employee identity | One Company-wide employee identity; employee code + individual password works in every Shop. Every protected operation requires a fresh, one-use employee authorization. |
@@ -33,7 +35,7 @@
 | Refurbished guarantee | 12-month commercial guarantee begins at actual documented customer handover. Proposed coverage/exclusions are documented separately and remain subject to owner/legal review; statutory rights are not limited. |
 | Complaints | `CustomerComplaintCase` tracks product/service claims, evidence, inspection, manager resolution and remedy history. The 12-month commercial guarantee must not auto-reject statutory-rights claims. |
 | Supplier procurement | Separate service-part purchase request queue linked to a ServiceOrder, multiple request rounds, line-level reference images, purchase links, ETA/tracking and partial receipts. Supplier purchase creation/update/receipt does not require second approval. |
-| Images | Multiple images are uploaded and stored inside the same MySQL database. No external object storage, file share or filesystem path is used. Binary storage uses `MEDIUMBLOB`; thumbnails use bounded `BLOB`. Initial image limits remain 10 MiB/file, 10 images and 100 MiB aggregate per target. |
+| Images | Multiple images are uploaded and stored inside the same PostgreSQL database. No external object storage, file share or filesystem path is used. Binary storage uses `BYTEA`. Initial image limits remain 10 MiB/file, 10 images and 100 MiB aggregate per target. |
 | Cash closing | One `DailyClosing` per Shop/business date. Expected cash is opening float + settled cash receipts net of change + cash-in − cash-out − cash refunds − cash deposit refunds − safe drops. Non-zero variance requires a reason; close is immutable, cannot be reopened, and is corrected only through separate Manager-authorized records. |
 
 ## Financial policies incorporated as recommended v1 defaults
@@ -76,9 +78,9 @@ These policies turn the owner's request to use a standard, controlled approach i
 
 The Company tax tables and `vat_enabled` switch are implemented in the model and default OFF. The Company has not yet confirmed its VAT registration/status or tax treatments. Those details remain pending the owner's later discussion with an Irish accountant. Do not issue VAT invoices or infer a 0%/exempt treatment from the OFF switch. Keep `setup_status=NOT_REVIEWED`; no VAT rate is hard-coded.
 
-## MySQL image storage decision
+## PostgreSQL image storage decision
 
-All uploaded image bytes stay in MySQL. A shared `stored_image` table contains the normalized binary image in `MEDIUMBLOB` and an optional compact thumbnail in `BLOB`; business-specific tables (`service_procurement_request_image`, `refurbished_unit_image`, `customer_complaint_case_attachment`) reference the image through `stored_image_id`. There is no S3/object-storage provider, local filesystem path or external storage workflow. The 10 MiB per-image cap is below MySQL `MEDIUMBLOB` capacity (16,777,215 bytes). See the [MySQL 8.0 BLOB/TEXT type reference](https://dev.mysql.com/doc/refman/8.0/en/blob.html).
+All uploaded image bytes stay in PostgreSQL. A shared `stored_image` table contains normalized binary image content in `BYTEA`; business-specific tables (`service_procurement_request_image`, `refurbished_unit_image`, `customer_complaint_case_attachment`) reference the image through `stored_image_id`. There is no S3/object-storage provider, local filesystem path or external storage workflow. Enforce existing per-file and per-target limits in application validation and database capacity planning.
 
 Image retention is tied to the business record. Deletion is initially soft/audited; automated physical purge is not enabled in v1. The Company still needs a documented GDPR/data-retention schedule before production, but it will be implemented as database-controlled retention/purge jobs, not as manual external file management.
 
@@ -89,7 +91,7 @@ Image retention is tied to the business record. Deletion is initially soft/audit
 3. **Refund exception policy:** v1 uses Manager-only and original-tender refund. Alternative tender is disabled; exceptional out-of-band case handling may be defined later.
 4. **Deposit contract wording:** operational default is defined above, but the final written terms/non-refundable special-order wording must be reviewed for fairness and Irish consumer-law compliance.
 5. **Refurbished commercial guarantee:** 12 months is confirmed; the detailed coverage/exclusions below are a proposed default and require owner/legal review before publishing to customers.
-6. **Customer data/image retention:** image storage is MySQL-only, but exact business-record retention period and lawful purge schedule remain to be approved. Soft delete is used in v1.
+6. **Customer data/image retention:** image storage is PostgreSQL-only, but exact business-record retention period and lawful purge schedule remain to be approved. Soft delete is used in v1.
 7. **TECHNICIAN permission matrix:** v1 action-level matrix and dual-role precedence approved 2026-11-10; see `employee-access-and-roles.md`.
 8. **Complete Sale/ServiceOrder status transition matrix and executable production DDL/EF Core migration review.**
 9. **Shop and employee authentication operations:** credential administration/recovery baseline, employee password policy, failed-attempt throttling without account lockout, action matrix and dual-role precedence approved 2026-11-10. ShopSession timeout values and multi-device/sign-out policy remain configurable and must be decided before production.
@@ -98,6 +100,8 @@ Image retention is tied to the business record. Deletion is initially soft/audit
 **Deferred by owner instruction:** installment delinquency treatment beyond `OVERDUE`, renegotiation/late fees, and accounting/bookkeeper reconciliation mapping. These are not v1 implementation blockers.
 
 ## Website-derived brand and operating profile
+
+- On 2026-11-11 the owner requested branch-specific address and phone fields on `shop` for printed reports. The fields are optional; the ILAC address discrepancy remains open and must not be resolved by inference.
 
 - PC House identity is blue-led, with a deep-blue header/nav, blue/cyan wordmark and orange promotional `SALE` badges. The proposed CSS palette is explicitly approximate pending comparison with master artwork.
 - The official logo reference is linked from the ILAC retailer directory; a local binary logo could not be bundled because the image host did not allow reliable retrieval. The source link and instructions are in `specs/03-design/brand-assets/README.md`.
@@ -111,7 +115,7 @@ No processor must be selected for v1. `CASH` and `CARD` are the payment methods.
 
 ## Current approval status after website review
 
-- **Confirmed:** CASH/CARD only; no processor integration in v1; MySQL-only image storage; the current website's publicly listed categories/contact/branch data are captured as a reference snapshot.
+- **Confirmed:** CASH/CARD only; no processor integration in v1; PostgreSQL-only image storage; the current website's publicly listed categories/contact/branch data are captured as a reference snapshot.
 - **Recommended terms still pending approval:** final customer-facing deposit cancellation/non-refundable-cost wording and the detailed refurbished guarantee coverage/exclusions. The 90-day deposit review reminder, no automatic expiry/forfeiture, Manager-only original-tender refunds, immutable cash-close policy and v1 TECHNICIAN action matrix are approved operational rules.
 - **Owner/accountant confirmation still needed:** VAT registration/tax codes/rates and price display; exact legal Company name; final ILAC address/display name; final warranty policy wording; official logo and exact brand colours; GDPR retention period.
 
@@ -120,5 +124,4 @@ No processor must be selected for v1. `CASH` and `CARD` are the payment methods.
 - CCPC, [Deposits](https://www.ccpc.ie/consumer-advice/consumer-rights/buying-goods/deposits/) — deposit contract terms, cancellation/refund conditions and written disclosure.
 - CCPC, [Your rights when buying goods](https://www.ccpc.ie/consumer-advice/consumer-rights/buying-goods/your-rights-when-buying-goods/) — consumer rights also apply to second-hand goods.
 - CCPC, [Repairs and replacements](https://www.ccpc.ie/consumer-advice/faulty-products-and-goods/repairs-and-replacements) — remedies and reasonable-time principles.
-- MySQL 8.0, [BLOB and TEXT types](https://dev.mysql.com/doc/refman/8.0/en/blob.html) — BLOB family capacities and behavior.
 - OWASP, [File Upload Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html) — secure upload validation, re-encoding and controlled access.

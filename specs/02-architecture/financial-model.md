@@ -21,7 +21,7 @@ The model supports one Company with multiple Shops, a persistent Shop session an
 ## 2. Ireland localization and monetary precision
 
 - Company defaults: `country_code = 'IE'`, `default_currency_code = 'EUR'`, `time_zone = 'Europe/Dublin'`.
-- Use C# `decimal` and MySQL `DECIMAL(19,2)` for transaction amounts in EUR. Never use binary floating point for amounts.
+- Use C# `decimal` and PostgreSQL `NUMERIC(19,2)` for transaction amounts in EUR. Never use binary floating point for amounts.
 - Store `currency_code` on sales, service orders, deposits, payment transactions, refunds and instalment plans so historical documents remain self-describing. Multi-currency settlement is out of the initial scope.
 - Initial product-owner instruction: no VAT is to be added/charged by the application while the Company-level `CompanyTaxConfiguration.vat_enabled` flag is `false`. The configuration defaults to `false` and `setup_status = NOT_REVIEWED`. This describes current software behavior only; it does not establish that the business is legally outside VAT or exempt. Before production tax documents are finalized, an Irish accountant must confirm the Company's position and either document the lawful disabled state or configure and enable the applicable VAT setup.
 - Before production tax-document finalization is enabled, the Company tax setup must be reviewed and marked READY by an authorized administrator based on Irish accountant advice. If VAT is enabled, tax codes, effective-dated rates, registration details and price display mode must be populated. If VAT is disabled, the reason/legal basis must be recorded after review.

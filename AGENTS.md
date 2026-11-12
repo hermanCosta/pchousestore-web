@@ -25,10 +25,10 @@ For every feature:
 
 ## Technical constraints
 
-- Backend: .NET 10, ASP.NET Core Web API, EF Core, MySQL.
+- Backend: .NET 10, ASP.NET Core Web API, EF Core, PostgreSQL.
 - Frontend: React, TypeScript strict mode, Vite.
 - Architecture: modular monolith; avoid premature microservices.
-- Monetary values: C# `decimal` and MySQL `DECIMAL`, never binary floating point.
+- Monetary values: C# `decimal` and PostgreSQL `NUMERIC`, never binary floating point.
 - Use DTOs for API contracts; do not expose persistence entities.
 - Use asynchronous I/O and propagate CancellationToken.
 - Centralize validation and exception handling.

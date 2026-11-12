@@ -15,7 +15,7 @@ The authorization principal is the **Shop access context**, not an employee. Thi
 - JWT access tokens in the `Authorization: Bearer <access_token>` header for `/api/v1/**` endpoints.
 - A public React SPA client; no client secret is shipped to the browser.
 - A self-hosted authorization server implemented with OpenIddict in the ASP.NET Core solution is the default implementation choice. Keep the protocol standards-based so a compatible external OIDC provider can replace it later without changing business rules.
-- OpenIddict token/authorization persistence uses its EF Core integration and the same MySQL deployment, subject to provider/migration compatibility tests.
+- OpenIddict token/authorization persistence uses its EF Core integration and the same PostgreSQL deployment, subject to provider/migration compatibility tests.
 
 Do not treat ASP.NET Core Identity API's proprietary bearer tokens as OAuth/OIDC access tokens. Use an actual OAuth/OIDC authorization server and standard JWT Bearer validation in the API.
 
@@ -80,7 +80,7 @@ No employee claim or employee role is allowed in this token. `MANAGER`/`TECHNICI
 Initial token policy proposal:
 
 - Access token lifetime: 10 minutes (configurable, keep short).
-- Refresh token: optional for v1; if enabled for the public client, use rotation, family tracking, replay/reuse detection and revocation. Never store a raw refresh token in MySQL application tables or logs.
+- Refresh token: optional for v1; if enabled for the public client, use rotation, family tracking, replay/reuse detection and revocation. Never store a raw refresh token in PostgreSQL application tables or logs.
 - Shop session idle/absolute lifetime: configurable and remains a separate operational policy; do not silently derive it from JWT expiry.
 - Validate ShopSession active/revoked status at API authorization time (directly or through a short-lived server-side cache) so a logged-out/revoked Shop cannot continue using otherwise unexpired tokens.
 

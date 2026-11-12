@@ -202,7 +202,7 @@
 - Whether supplier AP/settlement, supplier returns or marketplace integrations should be added beyond the initial operational purchase tracker.
 - Whether any future Shop requires more than one physical till. Initial baseline is one cash register per Shop/day.
 - Credit-sale handover before full instalment settlement remains disabled pending Irish legal/regulatory review; initial mode is LAYAWAY.
-- Complete Sale/ServiceOrder transition matrix and production DDL/migrations remain to be reviewed. Images are stored only in MySQL; exact GDPR retention/purge schedule remains pending.
+- Complete Sale/ServiceOrder transition matrix and production DDL/migrations remain to be reviewed. Images are stored only in PostgreSQL; exact GDPR retention/purge schedule remains pending.
 
 **Out of initial scope by product-owner instruction:** multiple stockrooms/locations within a Shop and reservation-expiry automation. Initial design uses one stock pool per Shop and reservations remain until explicitly consumed or released. Partial sourcing/reservation remains supported where service requirements are fulfilled in batches.
 

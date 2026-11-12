@@ -5,6 +5,13 @@ public sealed class CompanyRecord
 {
     public long Id { get; set; }
     public string Name { get; set; } = string.Empty;
+    public string Address { get; set; } = string.Empty;
+    public string ContactOne { get; set; } = string.Empty;
+    public string? ContactTwo { get; set; }
+    public string? Email { get; set; }
+    public string CountryCode { get; set; } = "IE";
+    public string DefaultCurrencyCode { get; set; } = "EUR";
+    public string TimeZone { get; set; } = "Europe/Dublin";
     public bool IsActive { get; set; }
 }
 
@@ -14,13 +21,27 @@ public sealed class ShopRecord
     public long CompanyId { get; set; }
     public string Code { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
+    public string? Address { get; set; }
+    public string? Phone { get; set; }
+    public string TimeZone { get; set; } = "Europe/Dublin";
     public bool IsActive { get; set; }
+}
+
+public sealed class PersonRecord
+{
+    public long Id { get; set; }
+    public long CompanyId { get; set; }
+    public string FirstName { get; set; } = string.Empty;
+    public string LastName { get; set; } = string.Empty;
+    public string ContactNo { get; set; } = string.Empty;
+    public string? Email { get; set; }
 }
 
 public sealed class EmployeeRecord
 {
     public long Id { get; set; }
     public long CompanyId { get; set; }
+    public long? PersonId { get; set; }
     public string EmployeeCode { get; set; } = string.Empty;
     public string PasswordHash { get; set; } = string.Empty;
     public bool IsActive { get; set; }

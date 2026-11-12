@@ -1,6 +1,6 @@
 # Feature: Shop authentication and API access
 
-**Status:** APPROVED — product and technical design validated 2026-11-10; implementation pending
+**Status:** APPROVED — product and technical design validated 2026-11-10; authentication foundation implemented; production and integration validation pending
 **Owner:** Product owner / technical lead  
 **Decision basis:** ADR-002, ADR-032, ADR-034 and [API Authentication and Token Security](../02-architecture/api-authentication-and-token-security.md)
 
@@ -16,11 +16,13 @@ This SPEC covers the cross-cutting authentication contract and foundation only. 
 |---|---|---|---|
 | Swing view | `src/main/java/com/pchouse/pchousestoremvn/views/LoginView.java` | `initialize`, `onSignIn` | CONFIRMED — asks for username/password, uppercases the username, calls `CompanyController.getCompany`; logs username, password length and encoded password. |
 | Controller | `src/main/java/com/pchouse/pchousestoremvn/controllers/CompanyController.java` | `getCompany` | CONFIRMED — delegates company sign-in to `CompanyDAO.getCompanyDAO`. |
-| DAO | `src/main/java/com/pchouse/pchousestoremvn/dao/CompanyDAO.java` | `getCompanyDAO` | CONFIRMED — queries `Company` by matching `name` and `password`. |
-| Model / persistence mapping | `src/main/java/com/pchouse/pchousestoremvn/models/Company.java` | `Company.password`, `@Column(name = "PASSWORD")` | CONFIRMED — stores a Company password field. |
+| DAO | `src/main/java/com/pchouse/pchousestoremvn/dao/CompanyDAO.java` | `getAllCompaniesDAO`, `getCompanyDAO` | CONFIRMED — reads Company records; `getCompanyDAO` matches Company name and legacy password. |
+| Model / persistence mapping | `src/main/java/com/pchouse/pchousestoremvn/models/Company.java` | `name`, `address`, `contactOne`, `contactTwo`, `email`, `password`, `@Column` mappings | CONFIRMED — name/address/contactOne/password required; contactTwo/email optional. Company email has a JPA unique annotation that conflicts with the inspected DDL. The target does not retain the Company password. |
 | Shared authentication helper | `src/main/java/com/pchouse/pchousestoremvn/common/CommonExtension.java` | `encryptPassword`, `requestUserPassword` | CONFIRMED — Base64-encodes UTF-8 password bytes; `requestUserPassword` prompts for a password. Base64 is reversible encoding and is not a password hash. |
 | DAO | `src/main/java/com/pchouse/pchousestoremvn/dao/EmployeeDAO.java` | `getEmployeeByPasswordDAO` | CONFIRMED — finds an Employee by password alone. |
 | Model / persistence mapping | `src/main/java/com/pchouse/pchousestoremvn/models/Employee.java` | `password`, `accessLevel` | CONFIRMED — has password and access-level fields; the meaning of each access level is not established by this mapping. |
+| Model / persistence mapping | `src/main/java/com/pchouse/pchousestoremvn/models/Person.java` | `firstName`, `lastName`, `contactNo`, `email` | CONFIRMED — first name, last name and contact number are required; email is optional. The JPA email uniqueness annotation conflicts with the inspected legacy DDL. |
+| DAO | `src/main/java/com/pchouse/pchousestoremvn/dao/EmployeeDAO.java` | `addEmployeeDAO`, `updateEmployeeDAO`, `getEmployeeDAO(Person)`, `getEmployeeByPasswordDAO` | CONFIRMED — Employee is linked to Person for lookup/update; the legacy password-only lookup is insecure and will not be reproduced. |
 | Enum/configuration | Authentication-specific | — | CONFIRMED — no legacy OIDC/API token configuration or authentication enum was identified in the inspected sources; `Employee.accessLevel` is a `String`. |
 
 Source paths refer to the legacy repository `hermanCosta/pchousestoremvn`, branch `main`.
@@ -75,6 +77,8 @@ Logical records required by the approved architecture:
 - `EmployeeActionAuthorization`, scoped to ShopSession, Shop and action code, short-lived, single-use, and consumed atomically with the protected business transaction.
 
 Logical ShopSession and employee-action relationships are approved by DATA-02. Physical keys, indexes, concurrency strategy, session uniqueness and full EF mappings must be implemented/reviewed under DATA-05. Do not generate production migrations from this SPEC draft.
+
+Authentication persistence uses Company, Shop, Person and Employee identity/profile rows. Company and Person retain the confirmed legacy name/contact fields while omitting reversible legacy passwords; Shop sign-in and employee challenges use their separate modern credential records. `Employee.person_id` is optional because the legacy `@ManyToOne` does not require a Person. See [Authentication and Signing-Key Persistence](../02-architecture/authentication-persistence.md) for the PostgreSQL column-level mapping and remaining open profile details.
 
 ## 7. API and protocol contracts
 
@@ -173,7 +177,17 @@ Approved request-rate limit: at most 10 requests per minute per source IP and au
 - Frontend tests: memory-only token handling, redirect/callback failures, logout and ensuring an ID token is not attached to API requests.
 - Credential tests: manager provisioning/reset, forced change after reset, employee self-change with current password, bootstrap/recovery audit, generic errors and source/network rate limiting without credential lockout.
 - Contract tests: one-use authorization bind/consume/replay, canonical operation-context mismatch, cross-Company target rejection, Shop credential rotate/disable version conflict, session revocation on credential change and RFC 9457 error body shape.
-- Use MySQL-compatible persistence integration coverage for OpenIddict and session state before declaring the feature complete.
+- Use PostgreSQL persistence integration coverage for OpenIddict and session state before declaring the feature complete.
+
+## 10.1 Implementation record
+
+- **IMPLEMENTED:** OpenIddict authorization-code server with S256-only PKCE, asymmetric development signing, unencrypted JWS access tokens, local token validation, public SPA client registration, OIDC login form, antiforgery validation, HttpOnly/Secure OIDC cookie, vetted ASP.NET Core password hashing verification, ShopSession issuance/revocation, IP-and-endpoint-partitioned 10/minute authentication rate limiting, and a bearer-protected session DTO endpoint.
+- **IMPLEMENTED:** React OIDC client uses Authorization Code + PKCE; user tokens are held in memory, while short-lived protocol state is retained in session storage across the full-page redirect. It sends only the access token to `/api/v1/session`.
+- **IMPLEMENTED:** API fallback authorization requires bearer authentication and `shop.api`; `/api/v1/**` checks the active ShopSession, Shop and Company on each request.
+- **PARTIAL:** Logout revokes the ShopSession, which immediately blocks API use. The session is not yet linked to a specific OpenIddict authorization record, so revocation of that related authorization grant remains outstanding.
+- **NOT IMPLEMENTED:** Shop credential bootstrap/management and employee action authorization remain separate approved work items. One clearly named `TEST-001` Company/Shop fixture now exists only in the local `pchousestore_dev` database; no test data or credentials were added to source control.
+- **DEPLOYMENT BLOCKER:** Production requires separate signing/encryption PKCS#12 certificates and secret-store passwords; no production certificates are configured. Session timeout values remain unset per the approved pre-production deferral. The development issuer/client settings are local-only.
+- **VALIDATION PENDING:** OIDC/PostgreSQL integration and frontend tests listed above have not been run; a successful API/frontend build does not establish the acceptance criteria.
 
 ## 11. Open questions and blockers
 
@@ -183,7 +197,7 @@ Approved request-rate limit: at most 10 requests per minute per source IP and au
 - **DECIDED — Fine-grained authorization:** Product Owner approved the MANAGER/TECHNICIAN matrix and dual-role union semantics on 2026-11-10; MANAGER grants full access.
 - **DECIDED BASELINE — Signing-key storage:** use `system_services` for certificate metadata and envelope-encrypted PKCS#8 private material; keep the KEK in an external KMS/secret manager or protected host certificate store. Confirm the actual provider, access policy and recovery runbook before production.
 - **PENDING — DATA-05:** Implement and review physical keys, indexes, concurrency strategy and EF mappings for ShopSession and EmployeeActionAuthorization before persistent implementation/migrations.
-- **APPROVED — Technical review:** Product Owner validated the API contracts, persistence design, `system_services` key registry baseline and request-rate limit on 2026-11-10. MySQL provider/concurrency validation remains an implementation gate.
+- **APPROVED — Technical review:** Product Owner validated the API contracts, persistence design, `system_services` key registry baseline and request-rate limit on 2026-11-10. PostgreSQL/Npgsql provider and concurrency validation remains an implementation gate.
 
 ## 12. Approval
 

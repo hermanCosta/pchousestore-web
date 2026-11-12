@@ -16,7 +16,7 @@ Modernizar a aplicação como uma solução web com React + TypeScript e ASP.NET
 - Frontend: React + TypeScript + Vite
 - Backend: ASP.NET Core / .NET 10
 - Persistência: Entity Framework Core
-- Banco: MySQL
+- Banco: PostgreSQL
 - Arquitetura: monólito modular
 - Testes: xUnit, testes de integração, Vitest e React Testing Library
 
@@ -35,7 +35,7 @@ A Fase 1 de descoberta e decisões arquiteturais foi concluída e o PR #1 foi me
 3. Não alterar o repositório Java de origem.
 4. Não reutilizar segredos ou credenciais do legado.
 5. Aprovar as especificações antes da implementação de cada funcionalidade.
-6. Usar `decimal` para valores monetários no backend e `DECIMAL` no MySQL.
+6. Usar `decimal` para valores monetários no backend e `NUMERIC` no PostgreSQL.
 
 ## Stock and refurbished equipment
 
@@ -72,7 +72,7 @@ See [cash closing policy](specs/02-architecture/cash-closing-policy.md), [refurb
 - v1 payment methods are CASH and CARD only; card is recorded after approval on an external terminal, with processor integration deferred.
 - Refunds are partial/total and Manager-only, with original-tender default and cumulative cap.
 - Service deposits have no automatic expiry/forfeiture; 90-day inactivity prompts Manager review/contact only.
-- Images are stored in MySQL (`MEDIUMBLOB` full content + bounded `BLOB` thumbnail), not in external storage.
+- Images are stored in PostgreSQL (`BYTEA` full content and thumbnail), not in external storage.
 - Refurbished units require a Company-unique internal asset code; manufacturer serial is captured when available.
 - See [v15 changelog](CHANGELOG-v15.md), [v16 changelog](CHANGELOG-v16.md) and [product-owner decisions](specs/02-architecture/product-owner-decisions.md).
 
@@ -99,7 +99,7 @@ The owner supplied three PNG assets. The 248 × 273 transparent-background mark 
 - [Legacy report inventory](specs/01-discovery/legacy-report-inventory.md) maps the five connected legacy JasperReports workflows and the refurbished-unit label to their Java methods and UI callers.
 - [Document generation lifecycle](specs/02-architecture/document-generation-lifecycle.mmd)
 - [Document history ERD (SVG)](specs/02-architecture/er-diagram-documents.svg)
-- The legacy templates have been inventoried; the web renderer and React print UI are specified but not implemented. PDF binaries are not stored in MySQL in v1; snapshots and metadata are.
+- The legacy templates have been inventoried; the web renderer and React print UI are specified but not implemented. PDF binaries are not stored in PostgreSQL in v1; snapshots and metadata are.
 
 See [v18 changelog](CHANGELOG-v18.md).
 
