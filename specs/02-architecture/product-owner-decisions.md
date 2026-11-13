@@ -1,6 +1,6 @@
 # Product-owner Decisions and Remaining Questions — pcHouseStore Web
 
-**Revision:** v31 · 12 November 2026
+**Revision:** v32 · 13 November 2026
 **Status:** Confirmed product decisions are incorporated. A small set of commercial/legal details remains explicitly proposed or deferred; the model is not a production-approved DDL.
 
 ## Confirmed decisions
@@ -13,12 +13,12 @@
 | Shop access | Persistent session represents the active Shop only; it has no Employee identity. |
 | Active profile display | The persistent profile/header always represents the authenticated Shop and displays that Shop's name, address and phone. Employee registration details remain staff-administration data only; an Employee is identified by code and supplies their password only for a requested protected action. |
 | Employee registration profile | Employee registration requires first name, last name and phone number; email is optional. These fields are retained for registration/admin purposes and never replace the active Shop profile shown in the persistent UI. |
-| Employee administration | Managers may read employee registration records. Employees are never hard-deleted through staff administration; Managers deactivate them. Creating an employee requires a unique Company-level employee code and individual credentials; the new employee must change the initial password before any protected operation. Phone/email may repeat and are not automatically matched to existing People. |
+| Employee administration | Any authenticated Shop session may search the employee directory within its Company without an employee credential challenge. Individual employee profile reads and mutations require Manager authorization. Employees are never hard-deleted through staff administration; Managers deactivate them. Creating an employee requires a unique Company-level employee code and individual credentials; the new employee must change the initial password before any protected operation. Phone/email may repeat and are not automatically matched to existing People. |
 | Shop sign-in identifier | Stable Shop code + Shop credential password. |
 | Employee identity | One Company-wide employee identity; employee code + individual password works in every Shop. Every protected operation requires a fresh, one-use employee authorization. |
 | Roles | `MANAGER` has full access across every Shop. The v1 `TECHNICIAN` action matrix in `employee-access-and-roles.md` is approved. Employees may hold both roles; effective permissions are the union, so MANAGER grants the full capability set. |
 | Authentication credential operations | Managers provision, disable and reset Shop/Employee credentials; Employee reset forces a change at next use. Initial Shop bootstrap and recovery when no Manager can authenticate use an audited, identity-verified deployment-controlled Company-owner/operator process. |
-| Employee initial credential | The Product Owner selected the initial temporary employee password for bootstrap only. Its literal is a secret and must be delivered only through local secret configuration, never committed or stored as plaintext. The bootstrap Manager must change it before any other protected action. New employees receive individual credentials through the Manager provisioning flow and must change them before any other protected action. |
+| Employee initial credential | The Product Owner selected the initial temporary employee password for bootstrap only. Its literal is a secret and must be delivered only through local secret configuration, never committed or stored as plaintext. The bootstrap Manager must change it before any other protected action. For Manager-created employees, the UI defaults the temporary password to normalized employee code + `@pchouse`, allows the Manager to edit it, and still requires at least 12 characters; every new employee must change it before any other protected action. |
 | Employee password policy | Employee passwords do not expire based on time. Bootstrap, newly provisioned and reset credentials must be changed before any other protected action. Employee password changes/resets are audited with actor, target and timestamp but no reason. The password/hash itself is never written to audit data. |
 | Employee administration audit | Manager employee profile, role, status and credential changes record actor, target and timestamp. No operation requires a reason. Passwords/hashes are never stored in audit data. |
 | Last active Manager | Managers may remove the final `MANAGER` assignment or disable the final Manager account. If this leaves the Company without a Manager, use the identity-verified deployment-controlled owner/operator recovery process; do not add a public recovery endpoint. |
@@ -109,13 +109,13 @@ Image retention is tied to the business record. Deletion is initially soft/audit
 
 ## Website-derived brand and operating profile
 
-- On 2026-11-11 the owner requested branch-specific address and phone fields on `shop` for printed reports. The fields are optional; the ILAC address discrepancy remains open and must not be resolved by inference.
+- On 2026-11-11 the owner requested branch-specific address and phone fields on `shop` for printed reports. On 2026-11-13 the owner approved local seed data from the official PC House homepage, selecting its ILAC address over the conflicting directory listing. The legal Company identity/registered address remain unconfirmed; this approval applies to local operational display data only.
 
 - PC House identity is blue-led, with a deep-blue header/nav, blue/cyan wordmark and orange promotional `SALE` badges. The proposed CSS palette is explicitly approximate pending comparison with master artwork.
 - The official logo reference is linked from the ILAC retailer directory; a local binary logo could not be bundled because the image host did not allow reliable retrieval. The source link and instructions are in `specs/03-design/brand-assets/README.md`.
 - Product category seed candidates: MacBook, Laptop, TV, iMac, All-in-one, Desktop, Monitor, Console, Accessories; Phone appears in a secondary browse/filter view.
 - Public business profile, candidate Shop records, contact details, opening hours, warranty marketing statement and repair description are documented in `specs/01-discovery/business-profile-from-website.md`.
-- The ILAC branch address differs between the PC House homepage and the ILAC directory; do not seed the final postal address until owner confirmation.
+- The ILAC branch address differs between the PC House homepage and the ILAC directory. The owner selected the homepage value for the local development seed; production/legal postal address confirmation remains open.
 
 ## Processor terminology — owner clarification
 
@@ -125,7 +125,7 @@ No processor must be selected for v1. `CASH` and `CARD` are the payment methods.
 
 - **Confirmed:** CASH/CARD only; no processor integration in v1; PostgreSQL-only image storage; the current website's publicly listed categories/contact/branch data are captured as a reference snapshot.
 - **Recommended terms still pending approval:** final customer-facing deposit cancellation/non-refundable-cost wording and the detailed refurbished guarantee coverage/exclusions. The 90-day deposit review reminder, no automatic expiry/forfeiture, Manager-only original-tender refunds, immutable cash-close policy and v1 TECHNICIAN action matrix are approved operational rules.
-- **Owner/accountant confirmation still needed:** VAT registration/tax codes/rates and price display; exact legal Company name; final ILAC address/display name; final warranty policy wording; official logo and exact brand colours; GDPR retention period.
+- **Owner/accountant confirmation still needed:** VAT registration/tax codes/rates and price display; exact legal Company name and registered address; final ILAC legal/postal address; final warranty policy wording; official logo and exact brand colours; GDPR retention period.
 
 ## External references used
 

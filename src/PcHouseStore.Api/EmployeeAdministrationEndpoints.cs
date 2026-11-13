@@ -14,7 +14,7 @@ public static class EmployeeAdministrationEndpoints
     private const string AuthorizationHeader = "X-Employee-Action-Authorization";
     private static readonly string[] ManagerActions =
     [
-        "EMPLOYEE_DIRECTORY_READ", "EMPLOYEE_READ", "EMPLOYEE_CREATE", "EMPLOYEE_PROFILE_UPDATE",
+        "EMPLOYEE_READ", "EMPLOYEE_CREATE", "EMPLOYEE_PROFILE_UPDATE",
         "EMPLOYEE_STATUS_CHANGE", "EMPLOYEE_ROLE_CHANGE", "EMPLOYEE_CREDENTIAL_RESET"
     ];
 
@@ -42,12 +42,17 @@ public static class EmployeeAdministrationEndpoints
         if (request.Search?.Length > 200)
             return Problem(context, 400, "invalid_request", "Search text cannot exceed 200 characters.");
 
-        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        var result = await ConsumeAuthorizationAsync(principal, db, context, cancellationToken,
-            "EMPLOYEE_DIRECTORY_READ", "Company", GetCompanyId(principal).ToString(CultureInfo.InvariantCulture), managerOnly: true);
-        if (result.Error is not null) return result.Error;
+        if (!TryReadShopContext(principal, out var sessionId, out var shopId, out var companyId))
+            return Problem(context, 401, "invalid_shop_token", "Shop authentication is required.");
 
-        var companyId = result.Authorization!.CompanyId;
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        var now = DateTime.UtcNow;
+        var session = await db.ShopSessions.SingleOrDefaultAsync(x => x.Id == sessionId, cancellationToken);
+        if (!IsSessionActive(session, companyId, shopId, now) ||
+            !await db.Shops.AnyAsync(x => x.Id == shopId && x.CompanyId == companyId && x.IsActive, cancellationToken) ||
+            !await db.Companies.AnyAsync(x => x.Id == companyId && x.IsActive, cancellationToken))
+            return Problem(context, 401, "shop_session_revoked", "The Shop session is no longer active.");
+
         var query = db.Employees.AsNoTracking().Where(x => x.CompanyId == companyId);
         var term = request.Search?.Trim().ToLowerInvariant();
         if (!string.IsNullOrWhiteSpace(term))
@@ -57,7 +62,14 @@ public static class EmployeeAdministrationEndpoints
                      person.ContactNo.ToLower().Contains(term) || (person.Email != null && person.Email.ToLower().Contains(term)))));
         var employees = await query.OrderBy(x => x.EmployeeCode).ToListAsync(cancellationToken);
         var dtos = await ToDtosAsync(db, employees, cancellationToken);
-        db.EmployeeAdministrationEvents.Add(NewEvent(companyId, result.Authorization.EmployeeId, null, "EMPLOYEE_DIRECTORY_READ"));
+        db.EmployeeAdministrationEvents.Add(new EmployeeAdministrationEventRecord
+        {
+            CompanyId = companyId,
+            ActorType = "SHOP_SESSION",
+            ActorIdentifier = sessionId.ToString(CultureInfo.InvariantCulture),
+            ActionCode = "EMPLOYEE_DIRECTORY_READ",
+            OccurredAt = now
+        });
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return Results.Ok(new EmployeeDirectoryResponse(dtos));

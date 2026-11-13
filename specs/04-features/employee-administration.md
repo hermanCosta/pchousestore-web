@@ -27,9 +27,10 @@ Implementation follows the approved contracts below. Audit-retention duration re
 - Phone number and email are registration fields, not identity keys. They are not unique, and the system does not automatically link an Employee to an existing Person by contact details.
 - Managers may provision, disable and reset employee credentials. A reset forces a password change at next use. An employee may change their own password after entering the current password.
 - The Product Owner selected the initial temporary employee password for bootstrap only. Its literal must be supplied through local secret configuration and must never be committed or stored in plaintext; the bootstrap Manager must change it before any protected operation. Newly provisioned employees receive individual credentials through the Manager flow and must change them before any protected operation.
+- In the Manager employee-create form, default the temporary password to the normalized employee code followed by `@pchouse`. The Manager may replace this value; the 12-character minimum remains enforced. Every newly created employee must change the initial password before any other protected operation.
 - The last active Manager may be disabled or lose the final `MANAGER` role assignment. If this leaves the Company without a Manager, the identity-verified deployment-controlled owner/operator recovery process applies; no public recovery endpoint is allowed.
 - Employee records cannot be hard-deleted through staff administration. A Manager deactivates an employee; historical employee references remain intact.
-- The Manager may read employee registration records. Each read or committed administration operation requests the acting employee code/password for that operation; employee identity is never cached as the persistent session.
+- Any authenticated Shop session may load/search employee registration records within its Company without an employee credential challenge. Individual employee profile reads and employee mutations remain Manager-authorized; employee identity is never cached as the persistent session.
 - Employee account passwords have no time-based expiry. Bootstrap and newly provisioned/reset credentials require a change before any other protected operation; other password changes/resets do not require a reason.
 - Employee administration changes are audited with actor EmployeeId, target EmployeeId, action and timestamp. No employee administration action requires a reason. Passwords and password hashes are never stored in audit events.
 - Employee roles are Company-wide `MANAGER` and `TECHNICIAN`; an employee may hold both and receives the union of permissions. `MANAGER` grants full access.
@@ -44,15 +45,17 @@ See [Employee Access and Roles](../02-architecture/employee-access-and-roles.md)
 
 Manager screen, scoped to the Company resolved from the active ShopSession. The persistent profile/context header always shows the authenticated Shop's name, address and phone. Employee name/contact data is maintained for staff registration only; employees never sign in to establish a persistent profile. The acting employee is identified by employee code and password only when a protected operation is requested, such as committing a sale or service order.
 
+The hamburger navigation opens one administration page at a time: Shop profile, Shop access credential, Change my employee password, Load employees, Create employee, or Employee directory. The Shop identity/session header and navigation remain available across pages.
+
 - Search and list employees with profile name, employee code, contact, email, active state and assigned roles; never return or display password hashes or reset credentials.
-- Create an Employee with a required Person profile (first name, last name and phone; email optional), assign one or both approved roles, and set an individual initial password. Require that employee to change the password before any other protected operation.
+- Create an Employee with a required Person profile (first name, last name and phone; email optional), assign one or both approved roles, and default its temporary password to normalized employee code plus `@pchouse` (editable; minimum 12 characters). Require that employee to change the password before any other protected operation.
 - Edit profile fields and Company-wide roles.
 - Disable/reactivate an employee and reset an employee credential. A reset requires a fresh Manager challenge and sets a mandatory next-use password-change flag.
 - Employee self-service password change verifies the current password and applies the approved password baseline, without time-based expiry or a reason field.
 - Use soft deactivation for the target rather than reproducing the legacy hard delete. Preserve Employee references in historical records.
 - Candidate versioned routes: `POST /api/v1/employees/queries` (read/search), `POST /api/v1/employees` (create), `GET/PUT /api/v1/employees/{employeeId}` (read/update), `PATCH /api/v1/employees/{employeeId}/status`, `PUT /api/v1/employees/{employeeId}/roles`, `POST /api/v1/employees/{employeeId}/credential-reset`, and `PUT /api/v1/employees/me/credential`.
-- Manager authorization is required for employee directory/profile reads, create/update, deactivation/reactivation, role changes and credential reset. The API validates a fresh employee code/password for the requested action; self-password change verifies the current employee credentials. The UI does not persist Employee identity.
-- Bind each action authorization to the Company for directory/create actions, or the target Employee for employee-specific actions. Do not include passwords in operation-context hashes. Reads do not modify employee records; they use a per-request Manager credential challenge and create a read audit event. Writes consume a single-use authorization in the same transaction as persistence.
+- Any active Shop session may search the Company employee directory. Manager authorization is required for individual employee profile reads, create/update, deactivation/reactivation, role changes and credential reset. The API validates a fresh employee code/password for Manager actions; self-password change verifies the current employee credentials. The UI does not persist Employee identity.
+- Bind each action authorization to the Company for create actions or the target Employee for employee-specific actions. Do not include passwords in operation-context hashes. Directory reads require the Shop session and create an audit event attributed to that session; Manager-authorized reads create an employee-attributed audit event. Writes consume a single-use authorization in the same transaction as persistence.
 - Preserve an immutable employee administration event with CompanyId, actor EmployeeId, target EmployeeId, action code and timestamp. No reason is required. Password hashes and plaintext passwords are excluded. Audit retention follows the Company data-retention policy (retention period remains a go-live decision).
 - Bootstrap remains deployment-controlled with the configured initial secret, stored only as an adaptive hash; the bootstrap Manager must change it before any other protected command. Newly provisioned employees receive individual passwords from their Manager and must change them before any other protected command.
 
@@ -60,11 +63,11 @@ The bootstrap secret value is supplied through local secret configuration and is
 
 ## 5. API contracts
 
-Every request below is bearer-authenticated as the active Shop and is additionally authorized by a fresh employee action authorization. The UI obtains this authorization by posting the acting employee code/password and requested action to `POST /api/v1/employee-action-authorizations`; write/read endpoints consume the returned token from `X-Employee-Action-Authorization`. Employee list/detail reads also create audit events. All requests are Company-scoped from ShopSession.
+Every request below is bearer-authenticated as the active Shop. Individual employee profile reads and mutations are additionally authorized by a fresh employee action authorization. Directory query requires only the active Shop session and does not request employee credentials. All requests are Company-scoped from ShopSession; directory queries create audit events attributed to the ShopSession.
 
 | Endpoint | Action code/resource | Request DTO |
 |---|---|---|
-| `POST /api/v1/employees/queries` | `EMPLOYEE_DIRECTORY_READ` / Company | `{ "search": "optional text" }` |
+| `POST /api/v1/employees/queries` | Shop session / Company | `{ "search": "optional text" }` |
 | `POST /api/v1/employees` | `EMPLOYEE_CREATE` / Company | `{ "employeeCode", "firstName", "lastName", "phone", "email": null, "initialPassword", "roles": ["MANAGER"] }` |
 | `GET /api/v1/employees/{employeeId}` | `EMPLOYEE_READ` / Employee | No body |
 | `PUT /api/v1/employees/{employeeId}` | `EMPLOYEE_PROFILE_UPDATE` / Employee | `{ "firstName", "lastName", "phone", "email": null }` |
@@ -80,7 +83,7 @@ Audit retention duration follows the Company data-retention policy and remains a
 ## 6. Acceptance criteria (draft)
 
 - All employee list/search/read/write operations are restricted to the Company in the active ShopSession.
-- Only an active employee with effective `MANAGER` permission can read or administer employee records.
+- Any active Shop session may load/search the employee directory within its Company. Only an active employee with effective `MANAGER` permission may read an individual employee profile or administer employee records.
 - Each committed Manager operation consumes one fresh authorization bound to the action and target Employee; cross-Company targets and replay are rejected.
 - Employee credentials are hashed, never returned, logged or included in audit payloads.
 - Reset forces password change according to the approved first-use flow; self-service change requires the current password.
@@ -94,7 +97,7 @@ Audit retention duration follows the Company data-retention policy and remains a
 - Implemented Company-scoped employee directory/search and detail reads, employee creation/profile updates, role assignment, deactivate/reactivate, credential reset, and self-service password change API routes.
 - Manager operations use fresh one-use employee challenges; authorization consumption, audit event, and protected mutation are committed atomically. Directory/detail reads also create audit events.
 - Newly created/reset employees must change their credential before any protected operation. Employee identity is not stored in the Shop session.
-- Added the English Manager administration UI and employee password-change form. The persistent profile continues to display the active Shop identity.
+- Added the English Manager administration UI with one hamburger destination shown at a time, and a default employee temporary password derived from the employee code. The persistent profile continues to display the active Shop identity.
 - Added and applied `20261113004053_EmployeeAdministration` to the local `pchousestore_dev` database.
 - Deployment-controlled Manager provisioning/recovery and explicit operator credential reset are implemented by the local `PcHouseStore.Bootstrap` command; it has no HTTP endpoint. Production use still depends on restricted deployment-host access and operator identity logs. Audit-retention duration remains a go-live decision.
 - Build validation is recorded in the implementation handoff; automated tests and end-to-end PostgreSQL authorization validation remain pending.

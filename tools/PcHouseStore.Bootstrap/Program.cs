@@ -5,32 +5,41 @@ using PcHouseStore.Infrastructure.Persistence;
 using PcHouseStore.Infrastructure.Persistence.Entities;
 
 const string prefix = "EmployeeBootstrap";
+const string shopPrefix = "ShopCredentialProvisioning";
 var configuration = new ConfigurationBuilder().AddEnvironmentVariables().Build();
 var operation = configuration[$"{prefix}:Operation"] ?? "BootstrapManager";
 var connectionString = configuration.GetConnectionString("PcHouseStore");
 var companyId = configuration.GetValue<long?>($"{prefix}:CompanyId");
 var employeeCode = configuration[$"{prefix}:EmployeeCode"]?.Trim().ToUpperInvariant();
+var currentShopCode = configuration[$"{shopPrefix}:CurrentCode"]?.Trim().ToUpperInvariant();
+var newShopCode = configuration[$"{shopPrefix}:Code"]?.Trim().ToUpperInvariant();
 var firstName = configuration[$"{prefix}:FirstName"]?.Trim();
 var lastName = configuration[$"{prefix}:LastName"]?.Trim();
 var phone = configuration[$"{prefix}:Phone"]?.Trim();
-var initialPassword = configuration[$"{prefix}:InitialPassword"];
+var initialPassword = operation == "ProvisionShopCredential"
+    ? configuration[$"{shopPrefix}:InitialPassword"]
+    : configuration[$"{prefix}:InitialPassword"];
+var needsEmployeeCode = operation is "BootstrapManager" or "ResetEmployeeCredential";
 
 if (string.IsNullOrWhiteSpace(connectionString) || companyId is null or <= 0 ||
-    string.IsNullOrWhiteSpace(employeeCode) || string.IsNullOrEmpty(initialPassword) ||
+    (needsEmployeeCode && string.IsNullOrWhiteSpace(employeeCode)) || string.IsNullOrEmpty(initialPassword) ||
     (operation == "BootstrapManager" && (string.IsNullOrWhiteSpace(firstName) ||
-        string.IsNullOrWhiteSpace(lastName) || string.IsNullOrWhiteSpace(phone))))
+        string.IsNullOrWhiteSpace(lastName) || string.IsNullOrWhiteSpace(phone))) ||
+    (operation == "ProvisionShopCredential" &&
+        (string.IsNullOrWhiteSpace(currentShopCode) || string.IsNullOrWhiteSpace(newShopCode))))
 {
-    Console.Error.WriteLine("Operator configuration is incomplete. Set ConnectionStrings__PcHouseStore, EmployeeBootstrap__CompanyId, EmployeeCode, InitialPassword, and the profile fields for BootstrapManager.");
+    Console.Error.WriteLine("Operator configuration is incomplete. Check the operation-specific Company, employee or Shop fields, and initial password settings.");
     return 2;
 }
 
-if (initialPassword.Length is < 12 or > 128 || employeeCode.Length > 40)
+if (initialPassword.Length is < 12 or > 128 ||
+    (employeeCode?.Length > 40) || currentShopCode?.Length > 40 || newShopCode?.Length > 40)
 {
     Console.Error.WriteLine("Bootstrap configuration contains a value outside the supported limits.");
     return 2;
 }
 
-if (operation is not ("BootstrapManager" or "ResetEmployeeCredential"))
+if (operation is not ("BootstrapManager" or "ResetEmployeeCredential" or "ProvisionShopCredential"))
 {
     Console.Error.WriteLine("Unsupported operator operation.");
     return 2;
@@ -53,6 +62,71 @@ if (company is null || !company.IsActive)
 }
 
 var hasher = new PasswordHasher<EmployeeRecord>();
+if (operation == "ProvisionShopCredential")
+{
+    var shop = await db.Shops.FromSqlInterpolated(
+            $"SELECT * FROM shop WHERE company_id = {companyId} AND code = {currentShopCode} FOR UPDATE")
+        .SingleOrDefaultAsync();
+    if (shop is null || !shop.IsActive)
+    {
+        Console.Error.WriteLine("The target Shop does not exist or is inactive.");
+        return 3;
+    }
+
+    var codeInUse = await db.Shops.AnyAsync(x => x.CompanyId == companyId && x.Code == newShopCode && x.Id != shop.Id);
+    if (codeInUse)
+    {
+        Console.Error.WriteLine("The requested Shop code is already in use in this Company.");
+        return 4;
+    }
+
+    var provisionedAt = DateTime.UtcNow;
+    var credential = await db.ShopAccessCredentials.SingleOrDefaultAsync(x => x.ShopId == shop.Id && x.CompanyId == companyId);
+    var isProvisioning = credential is null;
+    if (credential is null)
+    {
+        credential = new ShopAccessCredentialRecord
+        {
+            ShopId = shop.Id,
+            CompanyId = shop.CompanyId,
+            CredentialVersion = 1,
+            IsActive = true,
+            CreatedAt = provisionedAt,
+            UpdatedAt = provisionedAt
+        };
+        db.ShopAccessCredentials.Add(credential);
+    }
+    else
+    {
+        credential.CredentialVersion++;
+        credential.IsActive = true;
+        credential.RotatedAt = provisionedAt;
+        credential.UpdatedAt = provisionedAt;
+    }
+
+    credential.PasswordHash = new PasswordHasher<ShopAccessCredentialRecord>().HashPassword(credential, initialPassword);
+    shop.Code = newShopCode!;
+    db.ShopAccessCredentialEvents.Add(new ShopAccessCredentialEventRecord
+    {
+        ShopId = shop.Id,
+        CompanyId = shop.CompanyId,
+        EventType = isProvisioning ? "PROVISIONED" : "RESET",
+        CredentialVersion = credential.CredentialVersion,
+        OccurredAt = provisionedAt,
+        ActorType = "DEPLOYMENT_OPERATOR",
+        Reason = $"Credential set by local deployment operator {Environment.UserDomainName}\\{Environment.UserName}@{Environment.MachineName}."
+    });
+    await db.ShopSessions.Where(x => x.ShopId == shop.Id && x.CompanyId == companyId && x.RevokedAt == null)
+        .ExecuteUpdateAsync(update => update
+            .SetProperty(x => x.RevokedAt, provisionedAt)
+            .SetProperty(x => x.RevocationReason, "SHOP_CREDENTIAL_PROVISIONED")
+            .SetProperty(x => x.RowVersion, x => x.RowVersion + 1));
+    await db.SaveChangesAsync();
+    await transaction.CommitAsync();
+    Console.WriteLine($"Shop {newShopCode} credential was {(isProvisioning ? "provisioned" : "reset")}.");
+    return 0;
+}
+
 if (operation == "ResetEmployeeCredential")
 {
     var target = await db.Employees.FromSqlInterpolated(
@@ -109,7 +183,7 @@ var employee = new EmployeeRecord
 {
     CompanyId = companyIdValue,
     PersonId = person.Id,
-    EmployeeCode = employeeCode,
+    EmployeeCode = employeeCode!,
     IsActive = true,
     MustChangePasswordAtNextUse = true,
     CredentialVersion = 1,

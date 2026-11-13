@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import EmployeeAdministration from "./EmployeeAdministration";
+import EmployeeAdministration, { type EmployeeAdminPage } from "./EmployeeAdministration";
+import ManagerCredentialsDialog, { type ManagerCredentials } from "./ManagerCredentialsDialog";
 import { apiBaseUrl, getShopAccessToken, userManager } from "../auth/oidc";
 
 let callbackProcessing: Promise<void> | undefined;
@@ -12,6 +13,25 @@ type ShopSession = {
   shopName: string;
   shopAddress: string | null;
   shopPhone: string | null;
+  companyEmail: string | null;
+};
+type AdminPage = "shop-profile" | "shop-access-credential" | EmployeeAdminPage;
+
+const adminPageTitles: Record<AdminPage, string> = {
+  "shop-profile": "Shop profile",
+  "shop-access-credential": "Shop access credential",
+  "employee-password-change": "Change my employee password",
+  "employee-directory-search": "Load employees",
+  "create-employee": "Create employee",
+  "employee-directory": "Employee directory",
+};
+const adminPageDescriptions: Record<AdminPage, string> = {
+  "shop-profile": "Your active Shop details.",
+  "shop-access-credential": "Manage this Shop's sign-in credential.",
+  "employee-password-change": "Change your employee credential. This is separate from the Shop sign-in password.",
+  "employee-directory-search": "Search and load employee records for this Company.",
+  "create-employee": "Register an employee and assign their Company-wide role.",
+  "employee-directory": "Review and administer employee registration records.",
 };
 
 export default function App() {
@@ -19,13 +39,14 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [shop, setShop] = useState<ShopSession | null>(null);
   const [action, setAction] = useState<"rotate" | "status">("rotate");
-  const [employeeCode, setEmployeeCode] = useState("");
-  const [employeePassword, setEmployeePassword] = useState("");
+  const [managerDialogOpen, setManagerDialogOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [activePage, setActivePage] = useState<AdminPage>("shop-profile");
   const [credentialVersion, setCredentialVersion] = useState("1");
   const [newShopPassword, setNewShopPassword] = useState("");
-  const [reason, setReason] = useState("");
   const [isActive, setIsActive] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
@@ -34,6 +55,11 @@ export default function App() {
       try {
         if (window.location.pathname === "/auth/callback") {
           callbackProcessing ??= userManager.signinRedirectCallback().then(() => {
+            window.history.replaceState({}, document.title, "/");
+          });
+          await callbackProcessing;
+        } else if (window.location.pathname === "/auth/logout-callback") {
+          callbackProcessing ??= userManager.signoutRedirectCallback().then(() => {
             window.history.replaceState({}, document.title, "/");
           });
           await callbackProcessing;
@@ -69,6 +95,13 @@ export default function App() {
   async function handleCredentialSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!shop || saving) return;
+    setError(null);
+    setNotice(null);
+    setManagerDialogOpen(true);
+  }
+
+  async function confirmShopChange(credentials: ManagerCredentials): Promise<boolean> {
+    if (!shop || saving) return false;
     setSaving(true);
     setError(null);
     setNotice(null);
@@ -83,8 +116,8 @@ export default function App() {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          employeeCode,
-          password: employeePassword,
+          employeeCode: credentials.employeeCode,
+          password: credentials.password,
           actionCode,
           resourceType: "Shop",
           resourceId: shop.shopId,
@@ -103,40 +136,58 @@ export default function App() {
         },
         body: JSON.stringify(action === "rotate"
           ? { newPassword: newShopPassword, expectedCredentialVersion: version }
-          : { isActive, expectedCredentialVersion: version, reason }),
+          : { isActive, expectedCredentialVersion: version }),
       });
       if (!response.ok) throw await apiError(response);
 
       window.sessionStorage.setItem(`pc-house-credential-version.${shop.shopId}`, String(version + 1));
       setCredentialVersion(String(version + 1));
-      setEmployeePassword("");
       setNewShopPassword("");
-      setReason("");
       setNotice("Credential updated. All sessions for this Shop were signed out; sign in again to continue.");
       await userManager.removeUser();
       setShop(null);
       setStatus("Shop credential updated");
+      setManagerDialogOpen(false);
+      return true;
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "The credential could not be updated.");
+      return false;
     } finally {
-      setEmployeePassword("");
       setNewShopPassword("");
       setSaving(false);
     }
   }
 
-  if (window.location.pathname === "/auth/callback") {
+  function navigateAdmin(page: AdminPage) {
+    setMenuOpen(false);
+    setActivePage(page);
+    setError(null);
+    setNotice(null);
+  }
+
+  async function handleSignOut() {
+    setError(null);
+    setSigningOut(true);
+    try {
+      await userManager.signoutRedirect();
+    } catch (cause) {
+      setSigningOut(false);
+      setError(cause instanceof Error ? cause.message : "Sign out could not be started.");
+    }
+  }
+
+  if (window.location.pathname === "/auth/callback" || window.location.pathname === "/auth/logout-callback") {
     return (
       <main className="auth-shell">
         <section className="auth-card" aria-live="polite">
           <Brand />
           <div className="auth-content">
-            <h1>Completing sign-in</h1>
-            <p className="auth-description">Please wait while your Shop session is verified.</p>
+            <h1>{window.location.pathname === "/auth/callback" ? "Completing sign-in" : "Completing sign out"}</h1>
+            <p className="auth-description">{window.location.pathname === "/auth/callback" ? "Please wait while your Shop session is verified." : "Please wait while your Shop session is cleared."}</p>
             {error && (
               <div className="auth-error" role="alert">
                 <p>{error}</p>
-                <button onClick={() => void userManager.signinRedirect()}>Restart sign-in</button>
+                <button onClick={() => window.location.assign("/")}>{window.location.pathname === "/auth/callback" ? "Restart sign-in" : "Return to Shop access"}</button>
               </div>
             )}
           </div>
@@ -148,28 +199,36 @@ export default function App() {
   return (
     <main className="auth-shell">
       <section className={shop ? "auth-card auth-card-wide" : "auth-card"}>
-        <Brand />
+        <div className="app-header"><Brand />{shop && <div className="admin-menu">
+          <button className="admin-menu-trigger" aria-label="Open administration menu" aria-expanded={menuOpen} onClick={() => setMenuOpen(value => !value)}><span/><span/><span/></button>
+          {menuOpen && <nav className="admin-menu-panel" aria-label="Administration">
+            <p>SHOP</p><button className="admin-menu-item" aria-current={activePage === "shop-profile" ? "page" : undefined} onClick={() => navigateAdmin("shop-profile")}>Shop profile</button><button className="admin-menu-item" aria-current={activePage === "shop-access-credential" ? "page" : undefined} onClick={() => navigateAdmin("shop-access-credential")}>Shop access credential</button>
+            <p>EMPLOYEES</p><button className="admin-menu-item" aria-current={activePage === "employee-password-change" ? "page" : undefined} onClick={() => navigateAdmin("employee-password-change")}>Change my password</button><button className="admin-menu-item" aria-current={activePage === "employee-directory-search" ? "page" : undefined} onClick={() => navigateAdmin("employee-directory-search")}>Load employees</button><button className="admin-menu-item" aria-current={activePage === "create-employee" ? "page" : undefined} onClick={() => navigateAdmin("create-employee")}>Create employee</button><button className="admin-menu-item" aria-current={activePage === "employee-directory" ? "page" : undefined} onClick={() => navigateAdmin("employee-directory")}>Employee directory</button>
+            <p>SESSION</p><button className="admin-menu-item" disabled={signingOut} onClick={() => { setMenuOpen(false); void handleSignOut(); }}>{signingOut ? "Signing out…" : "Sign out"}</button>
+          </nav>}
+        </div>}</div>
         <div className="auth-content">
-          <h1>Shop access</h1>
+          <h1>{shop ? adminPageTitles[activePage] : "Shop access"}</h1>
           <p className="auth-description">
             {shop
-              ? "Your Shop session is active. Manage this Shop's access credential below."
+              ? adminPageDescriptions[activePage]
               : "Sign in to access your Shop workspace."}
           </p>
           <p className="auth-status" aria-live="polite">
             {shop ? `Signed in to ${shop.shopName} (${shop.shopCode})` : status}
           </p>
-          {shop && (
-            <dl className="shop-profile" aria-label="Active Shop profile">
+          {shop && activePage === "shop-profile" && (
+            <dl id="shop-profile" className="shop-profile" aria-label="Active Shop profile">
               <div><dt>Shop</dt><dd>{shop.shopName}</dd></div>
               <div><dt>Address</dt><dd>{shop.shopAddress || "Not set"}</dd></div>
               <div><dt>Phone</dt><dd>{shop.shopPhone || "Not set"}</dd></div>
+              <div><dt>Email</dt><dd>{shop.companyEmail || "Not set"}</dd></div>
             </dl>
           )}
           {error && <p className="auth-error" role="alert">{error}</p>}
           {notice && <p className="auth-notice" role="status">{notice}</p>}
-          {shop && (
-            <form className="auth-form credential-form" onSubmit={handleCredentialSubmit}>
+          {shop && activePage === "shop-access-credential" && (
+            <form id="shop-access-credential" className="auth-form credential-form" onSubmit={handleCredentialSubmit}>
               <h2>Shop access credential</h2>
               <p className="form-help">Changes apply to {shop.shopName}. You will need to sign in again after saving.</p>
               <label className="auth-field">
@@ -198,31 +257,17 @@ export default function App() {
                       <option value="disabled">Disabled</option>
                     </select>
                   </label>
-                  <label className="auth-field">
-                    Reason
-                    <input required maxLength={500} value={reason} onChange={event => setReason(event.target.value)} />
-                  </label>
                 </>
               )}
-              <hr />
-              <h2>Manager verification</h2>
-              <p className="form-help">Enter your employee credentials for this operation. The password is used once and cleared after submission.</p>
-              <label className="auth-field">
-                Employee code
-                <input autoComplete="username" required maxLength={40} value={employeeCode} onChange={event => setEmployeeCode(event.target.value)} />
-              </label>
-              <label className="auth-field">
-                Employee password
-                <input type="password" autoComplete="current-password" required maxLength={128} value={employeePassword} onChange={event => setEmployeePassword(event.target.value)} />
-              </label>
               <button className="auth-submit" disabled={saving}>{saving ? "Saving…" : "Save credential"}</button>
             </form>
           )}
-          {shop && <EmployeeAdministration companyId={shop.companyId} getShopAccessToken={getShopAccessToken} />}
+          {shop && activePage !== "shop-profile" && activePage !== "shop-access-credential" &&
+            <EmployeeAdministration page={activePage} companyId={shop.companyId} getShopAccessToken={getShopAccessToken} />}
           <div className="auth-actions">
             {!shop && <button onClick={() => void userManager.signinRedirect()}>Sign in</button>}
-            {shop && <button className="secondary" onClick={() => void userManager.signoutRedirect()}>Sign out</button>}
           </div>
+          <ManagerCredentialsDialog open={managerDialogOpen} busy={saving} error={error} onCancel={() => { setManagerDialogOpen(false); setError(null); }} onSubmit={confirmShopChange} />
         </div>
       </section>
     </main>

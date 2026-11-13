@@ -92,9 +92,52 @@ select:focus-visible {
   object-fit: contain;
 }
 
+.app-header {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  background: var(--app-navigation-bg);
+}
+
+.app-header .auth-brand { flex: 1; }
+.admin-menu { position: relative; display: flex; align-items: center; padding: 0 1.35rem; }
+.admin-menu-trigger {
+  display: grid;
+  width: 2.8rem;
+  min-height: 2.8rem;
+  align-content: center;
+  justify-items: center;
+  gap: 0.3rem;
+  padding: 0.55rem;
+  border: 1px solid rgb(255 255 255 / 38%);
+  background: transparent;
+}
+.admin-menu-trigger:hover { background: rgb(255 255 255 / 12%); }
+.admin-menu-trigger span { width: 1.15rem; height: 2px; border-radius: 2px; background: white; }
+.admin-menu-panel {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% - 0.25rem);
+  right: 0.75rem;
+  display: grid;
+  width: min(19rem, calc(100vw - 2rem));
+  padding: 0.65rem;
+  border: 1px solid var(--app-border);
+  border-radius: 0.75rem;
+  background: var(--app-card);
+  box-shadow: 0 1rem 2.5rem rgb(15 35 60 / 22%);
+}
+.admin-menu-panel p { margin: 0.5rem 0.35rem 0.2rem; color: var(--app-text-muted); font-size: 0.7rem; font-weight: 800; letter-spacing: 0.1em; }
+.admin-menu-item { min-height: 2.6rem; padding: 0.6rem 0.75rem; border-radius: 0.4rem; background: transparent; color: var(--app-text); text-align: left; font-weight: 600; }
+.admin-menu-item:hover { background: var(--pc-surface-50); color: var(--pc-navy-900); }
+
 .auth-content {
   padding: 2rem 1.75rem 1.75rem;
 }
+
+#shop-profile, #shop-access-credential, #employee-admin, #employee-password-change,
+#employee-directory-search, #create-employee, #employee-directory { scroll-margin-top: 1.5rem; }
 
 .auth-content h1 {
   margin: 0;
@@ -157,6 +200,9 @@ select:focus-visible {
   padding-top: 1.4rem;
   border-top: 1px solid var(--app-border);
 }
+
+.shop-profile { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.shop-profile > div { grid-template-columns: 5rem minmax(0, 1fr); }
 
 .credential-form h2 {
   margin: 0;
@@ -222,6 +268,8 @@ select:focus-visible {
   border-radius: 0.75rem;
   background: var(--app-card);
 }
+
+.employee-action-form > button, .employee-create-form > button, .employee-password-change > button { justify-self: start; min-width: 12rem; }
 
 .employee-form-grid {
   display: grid;
@@ -415,6 +463,17 @@ button:disabled {
   background: var(--pc-surface-50);
 }
 
+.dialog-backdrop { position: fixed; z-index: 20; inset: 0; display: grid; place-items: center; padding: 1rem; background: rgb(12 27 45 / 58%); }
+.credential-dialog { width: min(100%, 29rem); padding: 1.4rem; border: 1px solid var(--app-border); border-radius: 0.9rem; background: var(--app-card); box-shadow: 0 1.5rem 4rem rgb(0 0 0 / 28%); }
+.credential-dialog-heading { display: flex; align-items: flex-start; gap: 0.85rem; margin-bottom: 1.25rem; }
+.credential-dialog-heading h2 { margin: 0; color: var(--pc-navy-900); font-size: 1.2rem; }
+.credential-dialog-heading p { margin: 0.35rem 0 0; color: var(--app-text-muted); line-height: 1.45; }
+.dialog-lock-icon { display: grid; width: 2.4rem; height: 2.4rem; flex: none; place-items: center; border-radius: 50%; background: var(--pc-surface-50); color: var(--app-primary); font-weight: 800; }
+.dialog-error { margin: 0 0 1rem; }
+.dialog-actions { display: flex; justify-content: flex-end; gap: 0.65rem; margin-top: 0.2rem; }
+.dialog-actions .secondary { border: 1px solid var(--app-border); background: var(--pc-surface-0); color: var(--pc-navy-900); }
+.dialog-actions .secondary:hover { background: var(--pc-surface-50); }
+
 @media (max-width: 480px) {
   .auth-content {
     padding: 1.5rem 1.25rem 1.25rem;
@@ -426,4 +485,7 @@ button:disabled {
 
   .employee-card summary { flex-wrap: wrap; }
   .employee-card-identity { flex-basis: 100%; }
+  .shop-profile { grid-template-columns: 1fr; }
+  .admin-menu { padding: 0 0.8rem; }
+  .dialog-actions > button { flex: 1; }
 }

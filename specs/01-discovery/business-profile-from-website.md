@@ -1,7 +1,7 @@
 # PC House — business profile extracted from public website
 
 **Reviewed:** 5 November 2026  
-**Status:** Website snapshot for owner validation; not approved as final seed data.
+**Status:** Owner-approved for local Company/Shop seed values on 13 November 2026; legal Company identity/address remain unverified.
 
 ## Public identity and offering
 
@@ -29,14 +29,16 @@ A product browsing/filter view also exposes **Phone**. Recommended seed taxonomy
 
 ## Branch candidates from the website
 
-The PC House homepage lists a `SHOP` and an `ILAC` / `KIOSK`. These should be modelled as two `Shop` records under the single legal `Company`, subject to the owner confirming the address of the ILAC branch.
+The PC House homepage lists a `SHOP` and an `ILAC` / `KIOSK`. The owner directed that local seed records use the official homepage values, including the homepage's ILAC address rather than the conflicting directory address. This confirms local operational display data only; it does not establish the registered Company name/address.
 
 | Proposed Shop | Address as listed on pchouse.ie | Public phone | Published opening hours |
 |---|---|---|---|
 | `FREDERICK_ST_SHOP` | 12A Frederick St. North, Dublin 1, Ireland | 01 563 9520; 083 012 8190 | Monday–Saturday, 10:00–18:00 |
 | `ILAC_KIOSK` | Kiosk 24, iLAC Centre, Henry St., Dublin 1, Ireland | 01 547 1536; 083 055 5506 | Monday–Saturday, 10:00–19:00; Sunday, 12:00–18:00 |
 
-**Address discrepancy to verify:** the ILAC Shopping Centre directory currently lists PC House at **Moore Mall, Moore Street, D01 E6P5**, whereas the PC House homepage calls it **Kiosk 24, iLAC Centre, Henry St.** The public phone number `083 055 5506` matches. Confirm the authoritative postal address and branch display name with the owner before seeding or printing receipts.
+**Address discrepancy:** the ILAC Shopping Centre directory lists PC House at **Moore Mall, Moore Street, D01 E6P5**, whereas the PC House homepage calls it **Kiosk 24, iLAC Centre, Henry St.** The owner selected the PC House homepage value for the local seed; verify the legal/postal address before production documents.
+
+For the local Company seed, use the public trading name **Pc House Dublin**, the homepage's main SHOP address as the operational contact address, the shared public email below, and the main SHOP phone as Company contact. This is not represented as a registered-office address or legal entity name.
 
 The ILAC directory page lists opening hours of 10:00–19:00 on weekdays and Saturday, 12:00–18:00 on Sunday. The PC House homepage lists the same hours for the ILAC location. Hours may change and must be stored as Shop configuration, not hard-coded into frontend components.
 

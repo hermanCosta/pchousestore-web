@@ -65,6 +65,8 @@ Source paths refer to the legacy repository `hermanCosta/pchousestoremvn`, branc
 7. Managers administer Shop and Employee credentials. Employee resets require a Manager challenge and force a password change at next use. Initial Shop setup and recovery when no Manager can authenticate are performed through an identity-verified deployment-controlled owner/operator procedure, never a public password-reset endpoint.
 8. Authentication endpoints limit request rates by source/network and endpoint. Repeated failures never create credential-specific lockout, waiting or rejection windows, disable a credential or invalidate the shared Shop session.
 
+For Shop and Employee administration, the UI requests Manager credentials in a modal when the user submits a protected change. It clears the credentials after the one operation. Loading/searching the employee directory requires the active Shop session but no employee credential challenge. Changing one's own employee password continues to request that employee's current password.
+
 The authorization server's cookie is confined to the OIDC sign-in session. It is not an implicit authentication fallback for `/api/v1/**`.
 
 ## 6. Data requirements
@@ -129,7 +131,7 @@ Protected mutation DTOs carry the token in `X-Employee-Action-Authorization`. Th
 ### Shop access credential management
 
 - `PUT /api/v1/shops/{shopId}/access-credential` rotates the target Shop password. Request DTO: `{ "newPassword": "...", "expectedCredentialVersion": 3 }`. It requires `X-Employee-Action-Authorization` bound to `SHOP_ACCESS_CREDENTIAL_ROTATE` and that Shop resource. The target Shop must belong to the Company in the active ShopSession and the employee must have effective MANAGER permission.
-- `PATCH /api/v1/shops/{shopId}/access-credential` enables/disables the credential. Request DTO: `{ "isActive": false, "expectedCredentialVersion": 4, "reason": "..." }`. It requires a fresh MANAGER authorization bound to `SHOP_ACCESS_CREDENTIAL_CHANGE_STATUS` and target Shop. Disabling the Shop currently in use is rejected; emergency recovery uses the separate audited bootstrap process.
+- `PATCH /api/v1/shops/{shopId}/access-credential` enables/disables the credential. Request DTO: `{ "isActive": false, "expectedCredentialVersion": 4 }`; `reason` is optional and the audit record receives a system description when omitted. It requires a fresh MANAGER authorization bound to `SHOP_ACCESS_CREDENTIAL_CHANGE_STATUS` and target Shop. Disabling the Shop currently in use is rejected; emergency recovery uses the separate audited bootstrap process.
 - Both commands use an optimistic `expectedCredentialVersion`; stale versions return `409 credential_version_conflict`. A successful credential change increments the version and revokes all active sessions for the target Shop in the same transaction. Responses are `204 No Content`.
 - Initial provisioning and no-Manager recovery have no public HTTP endpoint. They use the deployment-controlled, identity-verified bootstrap procedure recorded in the decision register.
 
@@ -152,7 +154,7 @@ Approved request-rate limit: at most 10 requests per minute per source IP and au
 ## 8. UI flows and states
 
 - Shop sign-in redirects to the authorization server; React does not collect a password to exchange it at the OAuth token endpoint.
-- Shop logout clears in-memory SPA tokens and requests server-side ShopSession/OpenIddict revocation.
+- Shop logout clears in-memory SPA tokens, revokes the ShopSession and server cookie, and returns through the registered OIDC post-logout callback with its state restored.
 - A protected business action will request the individual employee credential for that action. No employee identity remains cached for the next action.
 - Login failure, expired/revoked session, denied authorization, loading and retry states must be specified and tested with the first approved authentication UI implementation.
 

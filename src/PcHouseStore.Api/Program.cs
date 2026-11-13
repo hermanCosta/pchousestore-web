@@ -273,12 +273,19 @@ app.MapGet("/api/v1/session", async (ClaimsPrincipal principal, PcHouseStoreDbCo
         x.RevokedAt == null && (x.IdleExpiresAt == null || x.IdleExpiresAt > now) &&
         (x.AbsoluteExpiresAt == null || x.AbsoluteExpiresAt > now), cancellationToken);
     if (!active) return Results.Unauthorized();
-    var shop = await db.Shops.AsNoTracking()
-        .Where(x => x.Id == shopId)
-        .Select(x => new { x.Code, x.Name, x.Address, x.Phone })
-        .SingleAsync(cancellationToken);
+    var shop = await (from currentShop in db.Shops.AsNoTracking()
+                      join company in db.Companies.AsNoTracking() on currentShop.CompanyId equals company.Id
+                      where currentShop.Id == shopId
+                      select new
+                      {
+                          currentShop.Code,
+                          currentShop.Name,
+                          currentShop.Address,
+                          currentShop.Phone,
+                          CompanyEmail = company.Email
+                      }).SingleAsync(cancellationToken);
     return Results.Ok(new ShopSessionDto(principal.FindFirstValue("company_id")!,
-        shopId.ToString(), sessionId.ToString(), shop.Code, shop.Name, shop.Address, shop.Phone));
+        shopId.ToString(), sessionId.ToString(), shop.Code, shop.Name, shop.Address, shop.Phone, shop.CompanyEmail));
 }).RequireAuthorization("ShopApi");
 
 app.MapPost("/api/v1/employee-action-authorizations", async (
@@ -303,7 +310,7 @@ app.MapPost("/api/v1/employee-action-authorizations", async (
         return ApiProblem(context, StatusCodes.Status400BadRequest, "invalid_request", "The employee challenge request is invalid.");
 
     var shopCredentialAction = request.ActionCode is "SHOP_ACCESS_CREDENTIAL_ROTATE" or "SHOP_ACCESS_CREDENTIAL_CHANGE_STATUS";
-    var employeeManagerAction = request.ActionCode is "EMPLOYEE_DIRECTORY_READ" or "EMPLOYEE_READ" or
+    var employeeManagerAction = request.ActionCode is "EMPLOYEE_READ" or
         "EMPLOYEE_CREATE" or "EMPLOYEE_PROFILE_UPDATE" or "EMPLOYEE_STATUS_CHANGE" or
         "EMPLOYEE_ROLE_CHANGE" or "EMPLOYEE_CREDENTIAL_RESET";
     var employeeSelfPasswordChange = request.ActionCode == "EMPLOYEE_SELF_PASSWORD_CHANGE";
@@ -321,7 +328,7 @@ app.MapPost("/api/v1/employee-action-authorizations", async (
             return ApiProblem(context, StatusCodes.Status400BadRequest, "invalid_request", "A matching Shop resource and targetShopId are required.");
         targetShopId = requestedShopId;
     }
-    else if (employeeManagerAction && (request.ActionCode is "EMPLOYEE_DIRECTORY_READ" or "EMPLOYEE_CREATE"))
+    else if (employeeManagerAction && request.ActionCode == "EMPLOYEE_CREATE")
     {
         if (request.TargetShopId is not null || request.ResourceType != "Company" || request.ResourceId != companyId.ToString(System.Globalization.CultureInfo.InvariantCulture))
             return ApiProblem(context, StatusCodes.Status400BadRequest, "invalid_request", "The employee action must be bound to the active Company.");
@@ -547,8 +554,8 @@ app.MapPatch("/api/v1/shops/{shopId:long}/access-credential", async (
         !long.TryParse(shopPrincipal.FindFirstValue("company_id"), out var companyId))
         return ApiProblem(context, StatusCodes.Status401Unauthorized, "invalid_shop_token", "Shop authentication is required.");
 
-    if (request.ExpectedCredentialVersion <= 0 || string.IsNullOrWhiteSpace(request.Reason))
-        return ApiProblem(context, StatusCodes.Status400BadRequest, "invalid_request", "A positive expected credential version and reason are required.");
+    if (request.ExpectedCredentialVersion <= 0)
+        return ApiProblem(context, StatusCodes.Status400BadRequest, "invalid_request", "A positive expected credential version is required.");
     if (!request.IsActive && shopId == activeShopId)
         return ApiProblem(context, StatusCodes.Status409Conflict, "cannot_disable_active_shop", "The active Shop credential cannot be disabled from its own session.");
     if (!TryDecodeAuthorizationToken(context.Request.Headers["X-Employee-Action-Authorization"].ToString(), out var authorizationToken))
@@ -632,7 +639,7 @@ app.MapPatch("/api/v1/shops/{shopId:long}/access-credential", async (
         OccurredAt = now,
         ActorType = "EMPLOYEE",
         ActorEmployeeId = authorization.EmployeeId,
-        Reason = request.Reason.Trim()
+        Reason = string.IsNullOrWhiteSpace(request.Reason) ? "Status changed by Manager." : request.Reason.Trim()
     });
     await db.ShopSessions.Where(x => x.ShopId == shopId && x.CompanyId == companyId && x.RevokedAt == null)
         .ExecuteUpdateAsync(update => update
@@ -663,7 +670,10 @@ app.MapGet("/connect/logout", async (HttpContext context, PcHouseStoreDbContext 
     await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
     var request = context.GetOpenIddictServerRequest();
     var redirect = request?.PostLogoutRedirectUri;
-    return Results.Redirect(string.IsNullOrWhiteSpace(redirect) ? "/" : redirect);
+    if (string.IsNullOrWhiteSpace(redirect)) return Results.Redirect("/");
+    if (!string.IsNullOrWhiteSpace(request?.State))
+        redirect = Microsoft.AspNetCore.WebUtilities.QueryHelpers.AddQueryString(redirect, "state", request.State);
+    return Results.Redirect(redirect);
 }).AllowAnonymous();
 
 app.Run();
@@ -922,7 +932,8 @@ public sealed record ShopSessionDto(
     string ShopCode,
     string ShopName,
     string? ShopAddress,
-    string? ShopPhone);
+    string? ShopPhone,
+    string? CompanyEmail);
 public sealed record EmployeeActionAuthorizationRequest(
     string EmployeeCode,
     string Password,
@@ -938,7 +949,7 @@ public sealed record EmployeeActionAuthorizationResponse(
     string? ResourceId,
     DateTime ExpiresAt);
 public sealed record RotateShopCredentialRequest(string NewPassword, long ExpectedCredentialVersion);
-public sealed record ChangeShopCredentialStatusRequest(bool IsActive, long ExpectedCredentialVersion, string Reason);
+public sealed record ChangeShopCredentialStatusRequest(bool IsActive, long ExpectedCredentialVersion, string? Reason = null);
 public partial class Program { }
 
 public sealed class OidcClientRegistration(IServiceScopeFactory scopeFactory, IConfiguration configuration) : IHostedService
@@ -968,7 +979,7 @@ public sealed class OidcClientRegistration(IServiceScopeFactory scopeFactory, IC
             Requirements = { Requirements.Features.ProofKeyForCodeExchange }
         };
         descriptor.RedirectUris.Add(new Uri(origin.TrimEnd('/') + "/auth/callback"));
-        descriptor.PostLogoutRedirectUris.Add(new Uri(origin.TrimEnd('/') + "/"));
+        descriptor.PostLogoutRedirectUris.Add(new Uri(origin.TrimEnd('/') + "/auth/logout-callback"));
         var application = await manager.FindByClientIdAsync(clientId, cancellationToken);
         if (application is null) await manager.CreateAsync(descriptor, cancellationToken);
         else await manager.UpdateAsync(application, descriptor, cancellationToken);
