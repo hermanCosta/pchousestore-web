@@ -396,6 +396,63 @@ namespace PcHouseStore.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("PcHouseStore.Infrastructure.Persistence.Entities.EmployeeAdministrationEventRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("ActionCode")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("action_code");
+
+                    b.Property<long?>("ActorEmployeeId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("actor_employee_id");
+
+                    b.Property<string>("ActorIdentifier")
+                        .HasMaxLength(240)
+                        .HasColumnType("character varying(240)")
+                        .HasColumnName("actor_identifier");
+
+                    b.Property<string>("ActorType")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("actor_type");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<DateTime>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<long?>("TargetEmployeeId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("target_employee_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ActorEmployeeId", "CompanyId");
+
+                    b.HasIndex("CompanyId", "OccurredAt")
+                        .HasDatabaseName("ix_employee_administration_event_company_time");
+
+                    b.HasIndex("TargetEmployeeId", "CompanyId");
+
+                    b.HasIndex("TargetEmployeeId", "OccurredAt")
+                        .HasDatabaseName("ix_employee_administration_event_target_time");
+
+                    b.ToTable("employee_administration_event", (string)null);
+                });
+
             modelBuilder.Entity("PcHouseStore.Infrastructure.Persistence.Entities.EmployeeRecord", b =>
                 {
                     b.Property<long>("Id")
@@ -409,6 +466,17 @@ namespace PcHouseStore.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("company_id");
 
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<long>("CredentialVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(1L)
+                        .HasColumnName("credential_version");
+
                     b.Property<string>("EmployeeCode")
                         .IsRequired()
                         .HasMaxLength(40)
@@ -419,6 +487,12 @@ namespace PcHouseStore.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");
 
+                    b.Property<bool>("MustChangePasswordAtNextUse")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("must_change_password_at_next_use");
+
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasMaxLength(512)
@@ -428,6 +502,10 @@ namespace PcHouseStore.Infrastructure.Persistence.Migrations
                     b.Property<long?>("PersonId")
                         .HasColumnType("bigint")
                         .HasColumnName("person_id");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
 
                     b.HasKey("Id");
 
@@ -440,7 +518,10 @@ namespace PcHouseStore.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("PersonId", "CompanyId");
 
-                    b.ToTable("employee", (string)null);
+                    b.ToTable("employee", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_employee_credential_version", "credential_version > 0");
+                        });
                 });
 
             modelBuilder.Entity("PcHouseStore.Infrastructure.Persistence.Entities.EmployeeRoleAssignmentRecord", b =>
@@ -1015,6 +1096,27 @@ namespace PcHouseStore.Infrastructure.Persistence.Migrations
                     b.HasOne("PcHouseStore.Infrastructure.Persistence.Entities.ShopRecord", null)
                         .WithMany()
                         .HasForeignKey("TargetShopId", "CompanyId")
+                        .HasPrincipalKey("Id", "CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("PcHouseStore.Infrastructure.Persistence.Entities.EmployeeAdministrationEventRecord", b =>
+                {
+                    b.HasOne("PcHouseStore.Infrastructure.Persistence.Entities.CompanyRecord", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("PcHouseStore.Infrastructure.Persistence.Entities.EmployeeRecord", null)
+                        .WithMany()
+                        .HasForeignKey("ActorEmployeeId", "CompanyId")
+                        .HasPrincipalKey("Id", "CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("PcHouseStore.Infrastructure.Persistence.Entities.EmployeeRecord", null)
+                        .WithMany()
+                        .HasForeignKey("TargetEmployeeId", "CompanyId")
                         .HasPrincipalKey("Id", "CompanyId")
                         .OnDelete(DeleteBehavior.Restrict);
                 });

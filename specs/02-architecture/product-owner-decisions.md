@@ -1,6 +1,6 @@
 # Product-owner Decisions and Remaining Questions — pcHouseStore Web
 
-**Revision:** v26 · 11 November 2026
+**Revision:** v31 · 12 November 2026
 **Status:** Confirmed product decisions are incorporated. A small set of commercial/legal details remains explicitly proposed or deferred; the model is not a production-approved DDL.
 
 ## Confirmed decisions
@@ -11,10 +11,18 @@
 | Database platform | PostgreSQL is selected; use EF Core with the Npgsql provider. This supersedes the earlier MySQL decision. |
 | Shop printable identity | Each Shop has optional branch-specific address and phone fields for print reports/documents. Snapshot their values when a document is issued; populate only after the owner confirms the authoritative branch details. |
 | Shop access | Persistent session represents the active Shop only; it has no Employee identity. |
+| Active profile display | The persistent profile/header always represents the authenticated Shop and displays that Shop's name, address and phone. Employee registration details remain staff-administration data only; an Employee is identified by code and supplies their password only for a requested protected action. |
+| Employee registration profile | Employee registration requires first name, last name and phone number; email is optional. These fields are retained for registration/admin purposes and never replace the active Shop profile shown in the persistent UI. |
+| Employee administration | Managers may read employee registration records. Employees are never hard-deleted through staff administration; Managers deactivate them. Creating an employee requires a unique Company-level employee code and individual credentials; the new employee must change the initial password before any protected operation. Phone/email may repeat and are not automatically matched to existing People. |
 | Shop sign-in identifier | Stable Shop code + Shop credential password. |
 | Employee identity | One Company-wide employee identity; employee code + individual password works in every Shop. Every protected operation requires a fresh, one-use employee authorization. |
 | Roles | `MANAGER` has full access across every Shop. The v1 `TECHNICIAN` action matrix in `employee-access-and-roles.md` is approved. Employees may hold both roles; effective permissions are the union, so MANAGER grants the full capability set. |
 | Authentication credential operations | Managers provision, disable and reset Shop/Employee credentials; Employee reset forces a change at next use. Initial Shop bootstrap and recovery when no Manager can authenticate use an audited, identity-verified deployment-controlled Company-owner/operator process. |
+| Employee initial credential | The Product Owner selected the initial temporary employee password for bootstrap only. Its literal is a secret and must be delivered only through local secret configuration, never committed or stored as plaintext. The bootstrap Manager must change it before any other protected action. New employees receive individual credentials through the Manager provisioning flow and must change them before any other protected action. |
+| Employee password policy | Employee passwords do not expire based on time. Bootstrap, newly provisioned and reset credentials must be changed before any other protected action. Employee password changes/resets are audited with actor, target and timestamp but no reason. The password/hash itself is never written to audit data. |
+| Employee administration audit | Manager employee profile, role, status and credential changes record actor, target and timestamp. No operation requires a reason. Passwords/hashes are never stored in audit data. |
+| Last active Manager | Managers may remove the final `MANAGER` assignment or disable the final Manager account. If this leaves the Company without a Manager, use the identity-verified deployment-controlled owner/operator recovery process; do not add a public recovery endpoint. |
+| Employee removal | Employee records are never hard-deleted through staff administration; a Manager may deactivate an employee. Historical employee references remain intact. |
 | Password baseline and failed attempts | Minimum 12 characters; support at least 128 characters and password managers/paste; no arbitrary periodic expiry; rotate after compromise or authorized reset; use vetted adaptive hashing. Failed attempts never lock or disable an account or trigger credential-specific waiting/rejection windows. Limit authentication request rates by source/network and endpoint. |
 | Authentication request-rate limit | Maximum 10 requests per minute per source IP and authentication endpoint, counting successes and failures. Excess requests receive HTTP 429 through the end of that one-minute window; no credential lockout. |
 | Inventory | Only Product catalogue items have stock. Product quantities are whole units. Quantity-tracked stock may become negative; reservations cannot. One stock pool per Shop; no reservation-expiry automation or multiple internal locations in v1. |

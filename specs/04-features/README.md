@@ -1,5 +1,7 @@
 # Feature Specifications
 
+- [Employee administration](employee-administration.md) — approved and implemented as a local foundation 2026-11-12; bootstrap runbook and end-to-end validation remain.
+
 Feature folders are created only when the corresponding legacy behavior has been investigated.
 
 Each feature SPEC must contain:
@@ -35,7 +37,7 @@ Feature scopes must be approved after discovery. A Java class is not automatical
 
 ## Current drafts
 
-- [Shop authentication and API access](authentication-and-shop-context.md) — product and technical design approved 2026-11-10; implementation pending.
+- [Shop authentication and API access](authentication-and-shop-context.md) — approved and implemented foundation; session-grant revocation and end-to-end validation remain.
 - [Authentication and signing-key persistence](../02-architecture/authentication-persistence.md) — DATA-05 logical/physical design approved for implementation; PostgreSQL/Npgsql provider validation remains.
 - [Cross-Shop ServiceOrder transfer](service-order-shop-transfer.md) — DRAFT; custody, parts, eligibility and authorization rules remain OPEN.
 - [Shop printable identity fields](shop-print-identity.md) — data and print-snapshot requirements approved 2026-11-11; production branch contact values remain OPEN.

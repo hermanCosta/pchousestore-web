@@ -11,6 +11,7 @@ public sealed class PcHouseStoreDbContext(DbContextOptions<PcHouseStoreDbContext
     public DbSet<PersonRecord> People => Set<PersonRecord>();
     public DbSet<EmployeeRecord> Employees => Set<EmployeeRecord>();
     public DbSet<EmployeeRoleAssignmentRecord> EmployeeRoleAssignments => Set<EmployeeRoleAssignmentRecord>();
+    public DbSet<EmployeeAdministrationEventRecord> EmployeeAdministrationEvents => Set<EmployeeAdministrationEventRecord>();
     public DbSet<ShopAccessCredentialRecord> ShopAccessCredentials => Set<ShopAccessCredentialRecord>();
     public DbSet<ShopAccessCredentialEventRecord> ShopAccessCredentialEvents => Set<ShopAccessCredentialEventRecord>();
     public DbSet<ShopSessionRecord> ShopSessions => Set<ShopSessionRecord>();

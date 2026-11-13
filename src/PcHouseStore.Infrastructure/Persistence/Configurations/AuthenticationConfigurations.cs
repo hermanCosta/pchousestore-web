@@ -64,7 +64,7 @@ public sealed class EmployeeRecordConfiguration : IEntityTypeConfiguration<Emplo
 {
     public void Configure(EntityTypeBuilder<EmployeeRecord> builder)
     {
-        builder.ToTable("employee");
+        builder.ToTable("employee", table => table.HasCheckConstraint("ck_employee_credential_version", "credential_version > 0"));
         builder.HasKey(x => x.Id);
         builder.HasAlternateKey(x => new { x.Id, x.CompanyId }).HasName("ak_employee_id_company");
         builder.Property(x => x.Id).HasColumnName("id").ValueGeneratedOnAdd();
@@ -73,9 +73,37 @@ public sealed class EmployeeRecordConfiguration : IEntityTypeConfiguration<Emplo
         builder.Property(x => x.EmployeeCode).HasColumnName("employee_code").HasMaxLength(40).IsRequired();
         builder.Property(x => x.PasswordHash).HasColumnName("password_hash").HasMaxLength(512).IsRequired();
         builder.Property(x => x.IsActive).HasColumnName("is_active").IsRequired();
+        builder.Property(x => x.MustChangePasswordAtNextUse).HasColumnName("must_change_password_at_next_use").HasDefaultValue(false).IsRequired();
+        builder.Property(x => x.CredentialVersion).HasColumnName("credential_version").HasDefaultValue(1L).IsConcurrencyToken().IsRequired();
+        builder.Property(x => x.CreatedAt).HasColumnName("created_at").HasColumnType("timestamp with time zone").IsRequired();
+        builder.Property(x => x.UpdatedAt).HasColumnName("updated_at").HasColumnType("timestamp with time zone").IsRequired();
         builder.HasIndex(x => new { x.CompanyId, x.EmployeeCode }).IsUnique().HasDatabaseName("uq_employee_company_code");
         builder.HasOne<CompanyRecord>().WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<PersonRecord>().WithMany().HasForeignKey(x => new { x.PersonId, x.CompanyId })
+            .HasPrincipalKey(x => new { x.Id, x.CompanyId }).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+public sealed class EmployeeAdministrationEventRecordConfiguration : IEntityTypeConfiguration<EmployeeAdministrationEventRecord>
+{
+    public void Configure(EntityTypeBuilder<EmployeeAdministrationEventRecord> builder)
+    {
+        builder.ToTable("employee_administration_event");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.Id).HasColumnName("id").ValueGeneratedOnAdd();
+        builder.Property(x => x.CompanyId).HasColumnName("company_id").IsRequired();
+        builder.Property(x => x.ActorEmployeeId).HasColumnName("actor_employee_id");
+        builder.Property(x => x.ActorType).HasColumnName("actor_type").HasMaxLength(40).IsRequired();
+        builder.Property(x => x.ActorIdentifier).HasColumnName("actor_identifier").HasMaxLength(240);
+        builder.Property(x => x.TargetEmployeeId).HasColumnName("target_employee_id");
+        builder.Property(x => x.ActionCode).HasColumnName("action_code").HasMaxLength(80).IsRequired();
+        builder.Property(x => x.OccurredAt).HasColumnName("occurred_at").HasColumnType("timestamp with time zone").IsRequired();
+        builder.HasIndex(x => new { x.CompanyId, x.OccurredAt }).HasDatabaseName("ix_employee_administration_event_company_time");
+        builder.HasIndex(x => new { x.TargetEmployeeId, x.OccurredAt }).HasDatabaseName("ix_employee_administration_event_target_time");
+        builder.HasOne<CompanyRecord>().WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<EmployeeRecord>().WithMany().HasForeignKey(x => new { x.ActorEmployeeId, x.CompanyId })
+            .HasPrincipalKey(x => new { x.Id, x.CompanyId }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<EmployeeRecord>().WithMany().HasForeignKey(x => new { x.TargetEmployeeId, x.CompanyId })
             .HasPrincipalKey(x => new { x.Id, x.CompanyId }).OnDelete(DeleteBehavior.Restrict);
     }
 }

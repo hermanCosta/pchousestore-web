@@ -1,9 +1,15 @@
 :root {
   font-family: Inter, ui-sans-serif, system-ui, sans-serif;
-  color: #172554;
-  background: #f8fafc;
+  color: var(--app-text);
+  background: var(--app-canvas);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
 }
 
 body {
@@ -12,16 +18,412 @@ body {
   margin: 0;
 }
 
-.foundation-shell {
-  max-width: 48rem;
-  margin: 12vh auto;
-  padding: 2rem;
+button,
+input,
+select {
+  font: inherit;
 }
 
-.foundation-eyebrow {
-  color: #c2410c;
-  font-size: 0.8rem;
+button {
+  min-height: 2.75rem;
+  padding: 0.7rem 1.15rem;
+  border: 0;
+  border-radius: 0.5rem;
+  background: var(--app-primary);
+  color: var(--pc-surface-0);
   font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  cursor: pointer;
+  transition: background-color 140ms ease, transform 140ms ease;
+}
+
+button:hover {
+  background: var(--app-primary-hover);
+}
+
+button:active {
+  transform: translateY(1px);
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 3px solid var(--pc-cyan-400);
+  outline-offset: 2px;
+}
+
+.auth-shell {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 2rem 1.25rem;
+  background: var(--app-canvas);
+}
+
+.auth-card {
+  width: min(100%, 28rem);
+  overflow: hidden;
+  border: 1px solid var(--app-border);
+  border-radius: 1rem;
+  background: var(--app-card);
+  box-shadow: 0 1.25rem 3rem rgb(33 70 111 / 12%);
+}
+
+.auth-card-wide {
+  width: min(100%, 76rem);
+}
+
+.auth-brand {
+  display: flex;
+  min-height: 5rem;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1.25rem 1.75rem;
+  background: var(--app-navigation-bg);
+  color: var(--pc-surface-0);
+  font-size: 1rem;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+}
+
+.auth-brand img {
+  width: 2.75rem;
+  height: 3rem;
+  flex: none;
+  object-fit: contain;
+}
+
+.auth-content {
+  padding: 2rem 1.75rem 1.75rem;
+}
+
+.auth-content h1 {
+  margin: 0;
+  color: var(--pc-navy-900);
+  font-size: clamp(1.5rem, 4vw, 1.85rem);
+  line-height: 1.2;
+}
+
+.auth-description {
+  margin: 0.65rem 0 1.5rem;
+  color: var(--app-text-muted);
+  line-height: 1.55;
+}
+
+.auth-form {
+  display: grid;
+  gap: 1.1rem;
+}
+
+.auth-field {
+  display: grid;
+  gap: 0.45rem;
+  color: var(--app-text);
+  font-size: 0.92rem;
+  font-weight: 650;
+}
+
+.auth-field input {
+  width: 100%;
+  min-height: 2.8rem;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid var(--app-border);
+  border-radius: 0.5rem;
+  background: var(--pc-surface-0);
+  color: var(--app-text);
+}
+
+.auth-field select {
+  width: 100%;
+  min-height: 2.8rem;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid var(--app-border);
+  border-radius: 0.5rem;
+  background: var(--pc-surface-0);
+  color: var(--app-text);
+}
+
+.auth-field input::placeholder {
+  color: var(--app-text-muted);
+  opacity: 0.8;
+}
+
+.auth-submit {
+  width: 100%;
+  margin-top: 0.25rem;
+}
+
+.credential-form {
+  margin-top: 1.5rem;
+  padding-top: 1.4rem;
+  border-top: 1px solid var(--app-border);
+}
+
+.credential-form h2 {
+  margin: 0;
+  color: var(--pc-navy-900);
+  font-size: 1.1rem;
+}
+
+.form-help {
+  margin: -0.55rem 0 0;
+  color: var(--app-text-muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.credential-form hr {
+  width: 100%;
+  margin: 0.4rem 0;
+  border: 0;
+  border-top: 1px solid var(--app-border);
+}
+
+.auth-notice {
+  margin: 1rem 0 0;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid #9bc9ad;
+  border-radius: 0.5rem;
+  background: #f2fbf5;
+  color: #205b35;
+  line-height: 1.45;
+}
+
+.employee-admin {
+  display: grid;
+  gap: 1.35rem;
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--app-border);
+}
+
+.employee-admin h2,
+.employee-admin h3,
+.employee-admin h4 {
+  margin: 0;
+  color: var(--pc-navy-900);
+}
+
+.employee-admin h2 { font-size: 1.35rem; }
+.employee-admin h3 { font-size: 1.05rem; }
+.employee-admin h4 { font-size: 0.96rem; }
+
+.employee-admin-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: start;
+}
+
+.employee-action-form,
+.employee-create-form,
+.employee-password-change {
+  padding: 1.15rem;
+  border: 1px solid var(--app-border);
+  border-radius: 0.75rem;
+  background: var(--app-card);
+}
+
+.employee-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+  gap: 1rem;
+}
+
+.employee-verification-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+  gap: 0.8rem;
+  padding-top: 0.25rem;
+}
+
+.employee-roles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem 1.25rem;
+  margin: 0;
+  padding: 0.7rem 0.8rem 0.85rem;
+  border: 1px solid var(--app-border);
+  border-radius: 0.55rem;
+}
+
+.employee-roles legend {
+  padding: 0 0.3rem;
+  color: var(--app-text-muted);
+  font-size: 0.86rem;
+  font-weight: 650;
+}
+
+.employee-roles label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--app-text);
+  font-size: 0.9rem;
+  font-weight: 650;
+}
+
+.employee-roles input { accent-color: var(--app-primary); }
+
+.employee-directory { display: grid; gap: 0.8rem; }
+.employee-list { display: grid; gap: 0.65rem; }
+
+.employee-card {
+  overflow: hidden;
+  border: 1px solid var(--app-border);
+  border-radius: 0.7rem;
+  background: var(--app-card);
+}
+
+.employee-card summary {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 0.9rem 1rem;
+  cursor: pointer;
+  list-style-position: inside;
+}
+
+.employee-card-identity {
+  display: grid;
+  min-width: 10rem;
+  gap: 0.15rem;
+}
+
+.employee-card-identity span,
+.employee-card summary > span:not(.employee-card-identity) {
+  color: var(--app-text-muted);
+  font-size: 0.88rem;
+}
+
+.employee-card-body {
+  display: grid;
+  gap: 1rem;
+  padding: 1rem;
+  border-top: 1px solid var(--app-border);
+  background: var(--pc-surface-50);
+}
+
+.employee-card-body > form,
+.employee-status-action {
+  display: grid;
+  gap: 0.85rem;
+  padding: 1rem;
+  border: 1px solid var(--app-border);
+  border-radius: 0.6rem;
+  background: var(--app-card);
+}
+
+.employee-status-action p {
+  margin: 0;
+  color: var(--app-text-muted);
+  line-height: 1.45;
+}
+
+.employee-card .secondary {
+  justify-self: start;
+  border: 1px solid var(--app-border);
+  background: var(--pc-surface-0);
+  color: var(--pc-navy-900);
+}
+
+.employee-card .secondary:hover { background: var(--pc-surface-50); }
+
+.employee-state {
+  padding: 0.2rem 0.55rem;
+  border-radius: 99px;
+  background: #f1eeee;
+  color: #755050 !important;
+  font-weight: 700;
+}
+
+.employee-state.active {
+  background: #edf8f1;
+  color: #28613e !important;
+}
+
+.employee-password-state {
+  color: var(--pc-navy-700) !important;
+  font-weight: 650;
+}
+
+button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.auth-status {
+  margin: 1rem 0 0;
+  color: var(--app-text-muted);
+  line-height: 1.5;
+}
+
+.shop-profile {
+  display: grid;
+  gap: 0.75rem;
+  margin: 1rem 0 0;
+  padding: 1rem;
+  border: 1px solid var(--app-border);
+  border-radius: 0.65rem;
+  background: var(--pc-surface-50);
+}
+
+.shop-profile > div {
+  display: grid;
+  grid-template-columns: 5rem minmax(0, 1fr);
+  gap: 0.75rem;
+}
+
+.shop-profile dt {
+  color: var(--app-text-muted);
+  font-size: 0.88rem;
+  font-weight: 650;
+}
+
+.shop-profile dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.auth-error {
+  margin: 1rem 0 0;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid #d6a3a3;
+  border-radius: 0.5rem;
+  background: #fff7f7;
+  color: #8b2525;
+  line-height: 1.45;
+}
+
+.auth-error p {
+  margin: 0 0 0.75rem;
+}
+
+.auth-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+.auth-actions .secondary {
+  border: 1px solid var(--app-border);
+  background: var(--pc-surface-0);
+  color: var(--pc-navy-900);
+}
+
+.auth-actions .secondary:hover {
+  background: var(--pc-surface-50);
+}
+
+@media (max-width: 480px) {
+  .auth-content {
+    padding: 1.5rem 1.25rem 1.25rem;
+  }
+
+  .auth-actions > button {
+    flex: 1;
+  }
+
+  .employee-card summary { flex-wrap: wrap; }
+  .employee-card-identity { flex-basis: 100%; }
 }

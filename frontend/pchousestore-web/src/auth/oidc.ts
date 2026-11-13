@@ -3,6 +3,7 @@ import { InMemoryWebStorage, UserManager, WebStorageStateStore } from "oidc-clie
 const authority = import.meta.env.VITE_OIDC_AUTHORITY ?? "https://localhost:7267/";
 const clientId = import.meta.env.VITE_OIDC_CLIENT_ID ?? "pchousestore-spa";
 const redirectUri = `${window.location.origin}/auth/callback`;
+export const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "https://localhost:7267";
 
 export const userManager = new UserManager({
   authority,
@@ -12,6 +13,7 @@ export const userManager = new UserManager({
   response_type: "code",
   scope: "openid profile shop.api",
   userStore: new WebStorageStateStore({ store: new InMemoryWebStorage() }),
+  stateStore: new WebStorageStateStore({ store: window.sessionStorage, prefix: "pc-house-oidc." }),
   automaticSilentRenew: false,
   monitorSession: false,
 });
