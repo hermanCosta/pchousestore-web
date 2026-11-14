@@ -59,6 +59,13 @@ select:focus-visible {
   background: var(--app-canvas);
 }
 
+.auth-shell-full {
+  min-height: 100vh;
+  min-height: 100dvh;
+  place-items: stretch;
+  padding: 0;
+}
+
 .auth-card {
   width: min(100%, 28rem);
   overflow: hidden;
@@ -70,6 +77,16 @@ select:focus-visible {
 
 .auth-card-wide {
   width: min(100%, 76rem);
+}
+
+.auth-shell-full .auth-card-wide {
+  width: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .auth-brand {
@@ -94,6 +111,7 @@ select:focus-visible {
 
 .app-header {
   position: relative;
+  z-index: 10;
   display: flex;
   align-items: stretch;
   justify-content: space-between;
@@ -119,17 +137,24 @@ select:focus-visible {
   position: absolute;
   z-index: 5;
   top: calc(100% - 0.25rem);
-  right: 0.75rem;
+  right: 0.5rem;
   display: grid;
-  width: min(19rem, calc(100vw - 2rem));
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: 0.1rem;
+  width: min(20rem, calc(100vw - 1.5rem));
+  max-height: calc(100dvh - 6rem);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 0.65rem;
   border: 1px solid var(--app-border);
   border-radius: 0.75rem;
   background: var(--app-card);
   box-shadow: 0 1rem 2.5rem rgb(15 35 60 / 22%);
 }
-.admin-menu-panel p { margin: 0.5rem 0.35rem 0.2rem; color: var(--app-text-muted); font-size: 0.7rem; font-weight: 800; letter-spacing: 0.1em; }
-.admin-menu-item { min-height: 2.6rem; padding: 0.6rem 0.75rem; border-radius: 0.4rem; background: transparent; color: var(--app-text); text-align: left; font-weight: 600; }
+.admin-menu-panel p { margin: 0.7rem 0.35rem 0.25rem; color: var(--app-text-muted); font-size: 0.7rem; font-weight: 800; letter-spacing: 0.1em; }
+.admin-menu-item { display: block; width: 100%; min-width: 0; min-height: 2.8rem; padding: 0.7rem 0.8rem; border-radius: 0.4rem; background: transparent; color: var(--app-text); text-align: left; line-height: 1.35; white-space: normal; font-weight: 600; }
 .admin-menu-item:hover { background: var(--pc-surface-50); color: var(--pc-navy-900); }
 
 .auth-content {
@@ -314,6 +339,32 @@ select:focus-visible {
 
 .employee-directory { display: grid; gap: 0.8rem; }
 .employee-list { display: grid; gap: 0.65rem; }
+
+.catalogue-admin { display: grid; gap: 1.25rem; margin-top: 1.5rem; }
+.catalogue-toolbar { display: grid; grid-template-columns: minmax(12rem, 1fr) auto auto; align-items: end; gap: .75rem; }
+.catalogue-inactive-filter, .catalogue-checkbox { display: inline-flex; align-items: center; gap: .5rem; color: var(--app-text); font-weight: 600; }
+.catalogue-inactive-filter { min-height: 2.8rem; }
+.catalogue-checkbox { margin-top: .15rem; }
+.catalogue-inactive-filter input, .catalogue-checkbox input { accent-color: var(--app-primary); }
+.catalogue-form, .catalogue-results { display: grid; gap: 1rem; padding: 1.2rem; border: 1px solid var(--app-border); border-radius: .75rem; background: var(--app-card); }
+.catalogue-form h2, .catalogue-results h2 { margin: 0; color: var(--pc-navy-900); font-size: 1.2rem; }
+.catalogue-form-actions, .catalogue-card-actions { display: flex; flex-wrap: wrap; gap: .6rem; }
+.catalogue-form-actions button { min-width: 10rem; }
+.catalogue-card-actions button { min-height: 2.35rem; padding: .45rem .75rem; }
+.catalogue-card { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: .85rem 0; border-top: 1px solid var(--app-border); }
+.catalogue-card > div:first-child { display: grid; gap: .2rem; }
+.catalogue-card strong { color: var(--pc-navy-900); }
+.catalogue-card span, .catalogue-card em { color: var(--app-text-muted); font-size: .88rem; font-style: normal; }
+.catalogue-full-field { grid-column: 1 / -1; }
+.catalogue-full-field textarea, .catalogue-form textarea { width: 100%; min-height: 6rem; padding: .65rem .8rem; border: 1px solid var(--app-border); border-radius: .5rem; color: var(--app-text); background: var(--pc-surface-0); font: inherit; }
+.catalogue-form textarea:focus-visible { outline: 3px solid var(--pc-cyan-400); outline-offset: 2px; }
+
+@media (max-width: 640px) {
+  .catalogue-toolbar { grid-template-columns: 1fr; }
+  .catalogue-inactive-filter { min-height: 2rem; }
+  .catalogue-card { align-items: start; flex-direction: column; }
+  .catalogue-card-actions { width: 100%; }
+}
 
 .employee-card {
   overflow: hidden;

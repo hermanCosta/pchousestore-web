@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import EmployeeAdministration, { type EmployeeAdminPage } from "./EmployeeAdministration";
+import CatalogueAdministration, { type CatalogueAdminPage } from "./CatalogueAdministration";
 import ManagerCredentialsDialog, { type ManagerCredentials } from "./ManagerCredentialsDialog";
 import { apiBaseUrl, getShopAccessToken, userManager } from "../auth/oidc";
 
 let callbackProcessing: Promise<void> | undefined;
+let silentCallbackProcessing: Promise<void> | undefined;
 
 type ShopSession = {
   companyId: string;
@@ -15,7 +17,7 @@ type ShopSession = {
   shopPhone: string | null;
   companyEmail: string | null;
 };
-type AdminPage = "shop-profile" | "shop-access-credential" | EmployeeAdminPage;
+type AdminPage = "shop-profile" | "shop-access-credential" | EmployeeAdminPage | CatalogueAdminPage;
 
 const adminPageTitles: Record<AdminPage, string> = {
   "shop-profile": "Shop profile",
@@ -24,6 +26,10 @@ const adminPageTitles: Record<AdminPage, string> = {
   "employee-directory-search": "Load employees",
   "create-employee": "Create employee",
   "employee-directory": "Employee directory",
+  "customer-directory": "Customer directory",
+  "catalog-items": "Product and service catalogue",
+  "product-categories": "Product categories",
+  "fault-catalogue": "Fault catalogue",
 };
 const adminPageDescriptions: Record<AdminPage, string> = {
   "shop-profile": "Your active Shop details.",
@@ -32,6 +38,10 @@ const adminPageDescriptions: Record<AdminPage, string> = {
   "employee-directory-search": "Search and load employee records for this Company.",
   "create-employee": "Register an employee and assign their Company-wide role.",
   "employee-directory": "Review and administer employee registration records.",
+  "customer-directory": "Search and manage Company customers.",
+  "catalog-items": "Manage Products and Services shared across Shops.",
+  "product-categories": "Manage Company product categories.",
+  "fault-catalogue": "Manage service faults shared across Shops.",
 };
 
 export default function App() {
@@ -63,6 +73,12 @@ export default function App() {
             window.history.replaceState({}, document.title, "/");
           });
           await callbackProcessing;
+        } else if (window.location.pathname === "/auth/silent-callback") {
+          silentCallbackProcessing ??= userManager.signinSilentCallback().finally(() => {
+            silentCallbackProcessing = undefined;
+          });
+          await silentCallbackProcessing;
+          return;
         }
         const token = await getShopAccessToken();
         if (!token) {
@@ -91,6 +107,14 @@ export default function App() {
     void initialize();
     return () => { active = false; };
   }, []);
+
+  useEffect(() => userManager.events.addSilentRenewError(() => {
+    void userManager.removeUser().finally(() => {
+      setShop(null);
+      setStatus("Your Shop session has expired. Sign in again.");
+      setError(null);
+    });
+  }), []);
 
   async function handleCredentialSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -176,14 +200,15 @@ export default function App() {
     }
   }
 
-  if (window.location.pathname === "/auth/callback" || window.location.pathname === "/auth/logout-callback") {
+  if (window.location.pathname === "/auth/callback" || window.location.pathname === "/auth/logout-callback" || window.location.pathname === "/auth/silent-callback") {
+    const isSilentCallback = window.location.pathname === "/auth/silent-callback";
     return (
       <main className="auth-shell">
         <section className="auth-card" aria-live="polite">
           <Brand />
           <div className="auth-content">
-            <h1>{window.location.pathname === "/auth/callback" ? "Completing sign-in" : "Completing sign out"}</h1>
-            <p className="auth-description">{window.location.pathname === "/auth/callback" ? "Please wait while your Shop session is verified." : "Please wait while your Shop session is cleared."}</p>
+            <h1>{isSilentCallback ? "Renewing Shop session" : window.location.pathname === "/auth/callback" ? "Completing sign-in" : "Completing sign out"}</h1>
+            <p className="auth-description">{isSilentCallback ? "Please wait while your access is renewed." : window.location.pathname === "/auth/callback" ? "Please wait while your Shop session is verified." : "Please wait while your Shop session is cleared."}</p>
             {error && (
               <div className="auth-error" role="alert">
                 <p>{error}</p>
@@ -197,13 +222,14 @@ export default function App() {
   }
 
   return (
-    <main className="auth-shell">
+    <main className={shop ? "auth-shell auth-shell-full" : "auth-shell"}>
       <section className={shop ? "auth-card auth-card-wide" : "auth-card"}>
         <div className="app-header"><Brand />{shop && <div className="admin-menu">
           <button className="admin-menu-trigger" aria-label="Open administration menu" aria-expanded={menuOpen} onClick={() => setMenuOpen(value => !value)}><span/><span/><span/></button>
           {menuOpen && <nav className="admin-menu-panel" aria-label="Administration">
             <p>SHOP</p><button className="admin-menu-item" aria-current={activePage === "shop-profile" ? "page" : undefined} onClick={() => navigateAdmin("shop-profile")}>Shop profile</button><button className="admin-menu-item" aria-current={activePage === "shop-access-credential" ? "page" : undefined} onClick={() => navigateAdmin("shop-access-credential")}>Shop access credential</button>
             <p>EMPLOYEES</p><button className="admin-menu-item" aria-current={activePage === "employee-password-change" ? "page" : undefined} onClick={() => navigateAdmin("employee-password-change")}>Change my password</button><button className="admin-menu-item" aria-current={activePage === "employee-directory-search" ? "page" : undefined} onClick={() => navigateAdmin("employee-directory-search")}>Load employees</button><button className="admin-menu-item" aria-current={activePage === "create-employee" ? "page" : undefined} onClick={() => navigateAdmin("create-employee")}>Create employee</button><button className="admin-menu-item" aria-current={activePage === "employee-directory" ? "page" : undefined} onClick={() => navigateAdmin("employee-directory")}>Employee directory</button>
+            <p>CATALOGUE</p><button className="admin-menu-item" aria-current={activePage === "customer-directory" ? "page" : undefined} onClick={() => navigateAdmin("customer-directory")}>Customers</button><button className="admin-menu-item" aria-current={activePage === "catalog-items" ? "page" : undefined} onClick={() => navigateAdmin("catalog-items")}>Products and Services</button><button className="admin-menu-item" aria-current={activePage === "product-categories" ? "page" : undefined} onClick={() => navigateAdmin("product-categories")}>Product categories</button><button className="admin-menu-item" aria-current={activePage === "fault-catalogue" ? "page" : undefined} onClick={() => navigateAdmin("fault-catalogue")}>Fault catalogue</button>
             <p>SESSION</p><button className="admin-menu-item" disabled={signingOut} onClick={() => { setMenuOpen(false); void handleSignOut(); }}>{signingOut ? "Signing out…" : "Sign out"}</button>
           </nav>}
         </div>}</div>
@@ -262,8 +288,10 @@ export default function App() {
               <button className="auth-submit" disabled={saving}>{saving ? "Saving…" : "Save credential"}</button>
             </form>
           )}
-          {shop && activePage !== "shop-profile" && activePage !== "shop-access-credential" &&
+          {shop && (activePage === "employee-password-change" || activePage === "employee-directory-search" || activePage === "create-employee" || activePage === "employee-directory") &&
             <EmployeeAdministration page={activePage} companyId={shop.companyId} getShopAccessToken={getShopAccessToken} />}
+          {shop && (activePage === "customer-directory" || activePage === "catalog-items" || activePage === "product-categories" || activePage === "fault-catalogue") &&
+            <CatalogueAdministration page={activePage} getShopAccessToken={getShopAccessToken} />}
           <div className="auth-actions">
             {!shop && <button onClick={() => void userManager.signinRedirect()}>Sign in</button>}
           </div>

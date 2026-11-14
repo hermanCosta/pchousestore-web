@@ -11,7 +11,7 @@
 | DISC-05 | Map service-order status transition matrix | DISC-02 | IN_PROGRESS |
 | DISC-06 | Define payment, refund and daily-close formulas | DISC-02 | CASH CLOSE BASELINE SPECIFIED; CASH/CARD-only tender, Manager-only refunds and deposit v1 terms specified; external processor integration deferred |
 | DISC-07 | Inspect report templates and print workflows | DISC-02 | COMPLETED — 15 JRXML / 13 compiled Jasper files inventoried; five active generator methods and refurb label mapped; see legacy-report-inventory.md |
-| DISC-08 | Resolve Shop login, employee password challenge and Company-wide role model | DISC-02 | DECISIONS RECORDED; Manager full / Technician restricted matrix specified |
+| DISC-08 | Resolve Shop login, employee password challenge and Company-wide role model | DISC-02 | DECISIONS RECORDED; Manager full / Technician matrix specified and updated 2026-11-13 (customers, Products, Services, categories, prices, Faults and ServiceOrders allowed; refunds Manager-only) |
 | SPEC-01 | Approve Company/Shop model and authentication boundaries | DISC-03, DISC-04, DISC-08 | DECISIONS RECORDED; MODEL REVIEW PENDING |
 | SPEC-02 | Approve design system and navigation | DISC-02 | PENDING |
 | BASE-01 | Bootstrap .NET solution and React app | SPEC-01, ADR-033, ADR-034 | DONE — .NET solution/layers, PostgreSQL EF Core context, React/TypeScript/Vite shell, lint/format configuration and CI scaffold created; PostgreSQL 16 local development server installed |
@@ -20,7 +20,7 @@
 | AUTH-02 | OAuth 2.0 / OIDC authorization server and JWT Bearer API validation | AUTH-SPEC, AUTH-01, DATA-02 | IMPLEMENTED FOUNDATION — OpenIddict Authorization Code + PKCE, SPA registration, JWT validation and `shop.api` authorization wired; end-to-end integration validation pending |
 | EMP-01 | Company-wide employee administration (registration profiles, roles and credentials) | AUTH-01, DATA-02 | IMPLEMENTED FOUNDATION — approved SPEC, API, Manager UI, bootstrap command, audit records and both local PostgreSQL migrations delivered; end-to-end authorization validation and audit retention policy remain |
 | AUTH-03 | Token/session revocation, refresh-token rotation and signing-key lifecycle | AUTH-02 | IN PROGRESS — refresh tokens disabled; API rejects revoked ShopSessions; link/revoke the related OpenIddict authorization grant and complete production certificate/key recovery operations |
-| CAT-01 | Customers, employees, product/service/fault catalog | AUTH-01, DISC-04 | PENDING |
+| CAT-01 | Customers, product/service/fault catalog | AUTH-01, DISC-04 | IMPLEMENTED FOUNDATION — Shop-session-only Company-scoped APIs and English screens for Customers, Products/Services, categories and Faults; writes require no employee challenge and audit the ShopSession. Catalogue and ShopSession-audit migrations applied to local `pchousestore_dev`. Build validation passed; browser/API integration validation and Shop-specific inventory minimums remain for stock workflows. |
 | SO-01 | Service-order lifecycle, AWAITING_PARTS state and workflow | CAT-01, DISC-05 | SPECIFIED — procurement workflow defined; state matrix validation pending |
 | SO-XFER-SPEC | Discover and approve cross-Shop ServiceOrder transfer SPEC | DATA-06, DISC-05 | DRAFT CREATED — `specs/04-features/service-order-shop-transfer.md`; source evidence and confirmed transfer rules recorded. Custody, parts, eligibility, authorization and audit details remain OPEN; no implementation before SPEC approval. |
 | PROC-01 | Supplier directory, external purchase tracking, ETA/timeline, partial receipt and request-line allocation | SO-01, stock foundation | SPECIFIED — supplier AP/returns excluded |
@@ -58,7 +58,7 @@ Do not begin domain implementation until the Company/Shop boundaries, employee a
 | DATA-03 | Finalize stock constraints and one-pool-per-Shop baseline | DATA-01 | COMPLETE — integer quantity stock, negative quantity-tracked balances, non-negative reservations, full-settlement posting, one pool per Shop, no reservation expiry, unique refurbished-unit identity and owner-approved return inspection/disposition are specified. |
 | DATA-06 | Validate Shop transfers and refurbished-unit condition rules | ADR-07, ADR-08 | COMPLETE - Product transfer discrepancy handling approved; A/B/C grades, inspection gate, refurbished-unit identity and return disposition are specified. Customer-facing commercial guarantee wording still requires legal review. Cross-Shop ServiceOrder transfers are tracked separately in SO-XFER-SPEC. |
 | DATA-04 | Approve closing formula, deposit terms, refund approvals and reopening policies | DISC-06 | COMPLETE — per-Shop cash formula, non-zero variance reason, immutable close/correction-only policy, Manager-only original-tender refunds and deposit no-expiry/no-auto-forfeiture/90-day review rules recorded. Customer-facing deposit terms and accounting/tax mappings remain subject to external review before use. |
-| DATA-05 | Produce executable PostgreSQL DDL and EF Core mappings | DATA-02..04 | IN PROGRESS — initial `AuthenticationFoundationInitial` migration applied to empty local `pchousestore_dev` database; Company/Shop/Person/Employee, authentication and OpenIddict tables created. Shop address/phone fields are included. PostgreSQL concurrency/auth integration validation and remaining domain tables are outstanding; this is not the complete application schema |
+| DATA-05 | Produce executable PostgreSQL DDL and EF Core mappings | DATA-02..04 | IN PROGRESS — authentication, employee administration, Customer/catalogue/Fault and ShopSession-audit migrations applied to local `pchousestore_dev`. Shop address/phone fields are included. PostgreSQL concurrency/auth integration validation and remaining domain tables are outstanding; this is not the complete application schema |
 | DATA-07 | Configure Ireland EUR, cash rounding and effective-dated VAT/tax snapshots | FIN-01, Irish accountant review | BLOCKED ON COMPANY VAT STATUS / ACCOUNTANT REVIEW; application flag OFF |
 | DATA-08 | Legal review of weekly refurbished-sale plan and any early-handover credit mode | FIN-01, Irish legal/compliance review | BLOCKED ON REVIEW |
 | DATA-09 | Approve supplier purchase/receipt model, procurement-request allocation and ETA audit | ADR-13 | PENDING REVIEW — model drafted |
@@ -119,12 +119,12 @@ The current DER and relational model are design artifacts only. DATA-02 approves
 - [x] 12-month commercial guarantee from handover for sold refurbished units.
 - [x] No second approval for supplier/service-parts purchases.
 - [x] Multiple private image uploads for procurement lines and refurbished units.
-- [ ] Approve the detailed MANAGER/TECHNICIAN action-permission matrix.
+- [x] Approve the detailed MANAGER/TECHNICIAN action-permission matrix; Technician permissions for customers, Products, Services, categories, prices, Faults and ServiceOrders updated 2026-11-13. Refunds remain Manager-only.
 
 
 ## Product-owner decisions — v14 (2026-11-05)
 
-- [x] MANAGER full access; TECHNICIAN restricted service/technical/procurement/inspection scope.
+- [x] MANAGER full access; TECHNICIAN may create/edit customers, Products, Services, categories, prices, Faults and ServiceOrders; refunds remain Manager-only. See `employee-access-and-roles.md`.
 - [x] Daily cash close baseline: opening float, net cash receipts, cash-in/out, cash refunds, safe drops, counted variance and immutable correction events.
 - [x] VAT disabled in the application by default; no VAT amount is added while disabled. Legal status remains a go-live gate.
 - [x] Refurbished condition grades A/B/C plus separate functional-test status and inspection history.

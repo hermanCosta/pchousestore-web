@@ -132,7 +132,7 @@ Each feature owns its screens, API functions, schemas, hooks and feature-specifi
 - ShopSession idle and absolute timeout values must be set and validated before production; access tokens remain short-lived with the 10-minute configurable default.
 - Refresh tokens are disabled for the v1 SPA client. Reconsider only through a later ADR that includes rotation and reuse detection.
 - Final OpenIddict package versions and signing-certificate deployment/rotation approach are Phase 2 security setup decisions.
-- MANAGER full-access / TECHNICIAN restricted service-and-technical permission baseline is defined in [Employee Access and Roles](employee-access-and-roles.md); visibility within service context remains to be refined.
+- MANAGER full-access / TECHNICIAN action permissions are defined in [Employee Access and Roles](employee-access-and-roles.md); customer/device visibility and service-context data access follow that matrix and the owning feature specs.
 - Hosting and deployment provider.
 - Report generation library.
 - All image bytes are stored in PostgreSQL `BYTEA` with compact `BYTEA` thumbnails. No external object storage or filesystem is used. See [PostgreSQL Image Storage Architecture](postgresql-image-storage.md). Exact GDPR retention/purge schedule remains pending.

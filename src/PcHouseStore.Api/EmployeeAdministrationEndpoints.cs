@@ -357,7 +357,7 @@ public static class EmployeeAdministrationEndpoints
         return Results.NoContent();
     }
 
-    private static async Task<AuthorizationResult> ConsumeAuthorizationAsync(
+    internal static async Task<AuthorizationResult> ConsumeAuthorizationAsync(
         ClaimsPrincipal principal,
         PcHouseStoreDbContext db,
         HttpContext context,
@@ -365,7 +365,8 @@ public static class EmployeeAdministrationEndpoints
         string expectedAction,
         string expectedResourceType,
         string expectedResourceId,
-        bool managerOnly)
+        bool managerOnly,
+        IReadOnlyCollection<string>? allowedRoles = null)
     {
         if (!TryReadShopContext(principal, out var sessionId, out var shopId, out var companyId))
             return Failure(Problem(context, 401, "invalid_shop_token", "Shop authentication is required."));
@@ -396,6 +397,9 @@ public static class EmployeeAdministrationEndpoints
             return Failure(Problem(context, 403, "employee_password_change_required", "Change the employee password before performing another protected action."));
         if (managerOnly && !await db.EmployeeRoleAssignments.AnyAsync(x =>
                 x.CompanyId == companyId && x.EmployeeId == actor.Id && x.IsActive && x.RoleCode == "MANAGER", cancellationToken))
+            return Failure(Problem(context, 403, "action_not_permitted", "The employee is not permitted to perform this action."));
+        if (allowedRoles is not null && !await db.EmployeeRoleAssignments.AnyAsync(x =>
+                x.CompanyId == companyId && x.EmployeeId == actor.Id && x.IsActive && allowedRoles.Contains(x.RoleCode), cancellationToken))
             return Failure(Problem(context, 403, "action_not_permitted", "The employee is not permitted to perform this action."));
         if (expectedResourceType == "Employee" &&
             !long.TryParse(expectedResourceId, NumberStyles.None, CultureInfo.InvariantCulture, out var targetEmployeeId))
@@ -501,7 +505,7 @@ public static class EmployeeAdministrationEndpoints
         extensions: new Dictionary<string, object?> { ["code"] = code, ["traceId"] = context.TraceIdentifier });
 
     private static AuthorizationResult Failure(IResult error) => new(null, error);
-    private sealed record AuthorizationResult(EmployeeActionAuthorizationRecord? Authorization, IResult? Error);
+    internal sealed record AuthorizationResult(EmployeeActionAuthorizationRecord? Authorization, IResult? Error);
 }
 
 public sealed record EmployeeDirectoryQuery(string? Search);

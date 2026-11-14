@@ -1,6 +1,7 @@
 # Feature Specifications
 
 - [Employee administration](employee-administration.md) — approved and implemented as a local foundation 2026-11-12; bootstrap runbook and end-to-end validation remain.
+- [CAT-01 Customers and Shared Catalogues](customer-and-catalog.md) — DRAFT; legacy audit recorded, product rules remain open; no implementation authorized.
 
 Feature folders are created only when the corresponding legacy behavior has been investigated.
 

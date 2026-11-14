@@ -9,7 +9,7 @@
 |---|---|---|
 | Company & Shops | One company profile and branch operations | Company, Shop |
 | Shop Access | Shop authentication and shared workstation/session context | ShopAccessCredential, ShopSession |
-| Employee Operations | Company-wide staff identity/password, Company-wide MANAGER full access and TECHNICIAN restricted service/technical access, and transaction-level identity verification across all Shops | Employee, EmployeeRoleAssignment, EmployeeActionAuthorization |
+| Employee Operations | Company-wide staff identity/password, Company-wide MANAGER and TECHNICIAN permissions, and transaction-level identity verification across all Shops | Employee, EmployeeRoleAssignment, EmployeeActionAuthorization |
 | People & Customers | Shared company-level customers and contact records | Person, Customer |
 | Catalogue | Shared product and service definitions | CatalogItem, Product, Service, ProductCategory |
 | Stock | Branch balances, reservations, movements, inter-shop transfers and supplier receipts | ShopInventory, InventoryReservation, InventoryMovement, StockTransfer, StockReturn |
@@ -36,7 +36,8 @@
 - The shop session may remain active while different employees use the same workstation. It is not transferred to or owned by the last employee who authenticated a transaction.
 - `Employee` is a company-level workforce identity with an individual credential verifier (stored only as a secure hash) and active status.
 - Each employee has one Company-wide account and password. The same credentials work in every Shop belonging to the Company; no duplicate account is created for each branch.
-- `EmployeeRoleAssignment` assigns Company-wide `MANAGER` or `TECHNICIAN`. MANAGER has full access across every Shop. TECHNICIAN is restricted to service/diagnostic/technical work, service-part procurement/receipt, stock availability/reservations and equipment inspection; it cannot use sales, cash, payment, refund, pricing, staff or configuration capabilities. The active Shop still comes only from `ShopSession`.
+- `EmployeeRoleAssignment` assigns Company-wide `MANAGER` or `TECHNICIAN`. MANAGER has full access across every Shop. TECHNICIAN may manage customers, Products, Services, categories, sale prices and Fault catalogue entries, create/edit ServiceOrders, and perform the approved service/diagnostic, service-part procurement/receipt, stock availability/reservation and equipment inspection work. Refunds remain Manager-only; other restricted capabilities follow `employee-access-and-roles.md`. The active Shop still comes only from `ShopSession`.
+- `ShopInventory.minimum_quantity` is Shop-specific and drives that Shop's low-stock reporting.
 - Before each protected business command, the executing employee supplies their employee code and individual password. The server resolves the employee, verifies the employee is active, belongs to the Company that owns the active Shop and has a role allowed for the action, then creates a short-lived, single-use `EmployeeActionAuthorization` linked to the current `ShopSession` and action code.
 - The authorization is consumed atomically with the operation. A later operation requires a new employee credential challenge. Never place `EmployeeId` or employee role in the long-lived ShopSession identity.
 

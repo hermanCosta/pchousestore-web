@@ -9,6 +9,11 @@ public sealed class PcHouseStoreDbContext(DbContextOptions<PcHouseStoreDbContext
     public DbSet<CompanyRecord> Companies => Set<CompanyRecord>();
     public DbSet<ShopRecord> Shops => Set<ShopRecord>();
     public DbSet<PersonRecord> People => Set<PersonRecord>();
+    public DbSet<CustomerRecord> Customers => Set<CustomerRecord>();
+    public DbSet<ProductCategoryRecord> ProductCategories => Set<ProductCategoryRecord>();
+    public DbSet<CatalogItemRecord> CatalogItems => Set<CatalogItemRecord>();
+    public DbSet<FaultRecord> Faults => Set<FaultRecord>();
+    public DbSet<CatalogueAuditEventRecord> CatalogueAuditEvents => Set<CatalogueAuditEventRecord>();
     public DbSet<EmployeeRecord> Employees => Set<EmployeeRecord>();
     public DbSet<EmployeeRoleAssignmentRecord> EmployeeRoleAssignments => Set<EmployeeRoleAssignmentRecord>();
     public DbSet<EmployeeAdministrationEventRecord> EmployeeAdministrationEvents => Set<EmployeeAdministrationEventRecord>();

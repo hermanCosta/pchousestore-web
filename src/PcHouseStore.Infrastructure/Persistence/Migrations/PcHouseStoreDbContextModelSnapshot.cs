@@ -230,6 +230,171 @@ namespace PcHouseStore.Infrastructure.Persistence.Migrations
                     b.ToTable("OpenIddictTokens", (string)null);
                 });
 
+            modelBuilder.Entity("PcHouseStore.Infrastructure.Persistence.Entities.CatalogItemRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("InventoryTrackingMode")
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)")
+                        .HasColumnName("inventory_tracking_mode");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("kind");
+
+                    b.Property<decimal>("ListPrice")
+                        .HasPrecision(19, 2)
+                        .HasColumnType("numeric(19,2)")
+                        .HasColumnName("list_price");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<long?>("ProductCategoryId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("product_category_id");
+
+                    b.Property<string>("ServiceDescription")
+                        .HasColumnType("text")
+                        .HasColumnName("service_description");
+
+                    b.Property<string>("Sku")
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)")
+                        .HasColumnName("sku");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("Id", "CompanyId")
+                        .HasName("ak_catalog_item_id_company");
+
+                    b.HasIndex("CompanyId", "Sku")
+                        .IsUnique()
+                        .HasDatabaseName("uq_catalog_item_company_sku")
+                        .HasFilter("sku IS NOT NULL");
+
+                    b.HasIndex("ProductCategoryId", "CompanyId");
+
+                    b.HasIndex("CompanyId", "Kind", "IsActive", "Name")
+                        .HasDatabaseName("ix_catalog_item_company_kind_active_name");
+
+                    b.ToTable("catalog_item", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_catalog_item_kind", "kind IN ('PRODUCT', 'SERVICE')");
+
+                            t.HasCheckConstraint("ck_catalog_item_price", "list_price >= 0");
+
+                            t.HasCheckConstraint("ck_catalog_item_sku_format", "sku IS NULL OR (sku = upper(sku) AND sku ~ '^SKU-[A-Z0-9]{8}$')");
+
+                            t.HasCheckConstraint("ck_catalog_item_subtype", "(kind = 'PRODUCT' AND product_category_id IS NOT NULL AND inventory_tracking_mode IN ('QUANTITY', 'SERIALIZED_UNIT') AND service_description IS NULL) OR (kind = 'SERVICE' AND product_category_id IS NULL AND inventory_tracking_mode IS NULL AND service_description IS NOT NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("PcHouseStore.Infrastructure.Persistence.Entities.CatalogueAuditEventRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("ActionCode")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("action_code");
+
+                    b.Property<long?>("ActorEmployeeId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("actor_employee_id");
+
+                    b.Property<string>("ActorType")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("EMPLOYEE")
+                        .HasColumnName("actor_type");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<DateTime>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<long>("ResourceId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("resource_id");
+
+                    b.Property<string>("ResourceType")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("resource_type");
+
+                    b.Property<long>("ShopId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("shop_id");
+
+                    b.Property<long?>("ShopSessionId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("shop_session_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ActorEmployeeId", "CompanyId");
+
+                    b.HasIndex("CompanyId", "OccurredAt")
+                        .HasDatabaseName("ix_catalogue_audit_event_company_time");
+
+                    b.HasIndex("ShopId", "CompanyId");
+
+                    b.HasIndex("ShopSessionId", "OccurredAt")
+                        .HasDatabaseName("ix_catalogue_audit_event_shop_session_time");
+
+                    b.HasIndex("ShopSessionId", "ShopId");
+
+                    b.HasIndex("ResourceType", "ResourceId", "OccurredAt")
+                        .HasDatabaseName("ix_catalogue_audit_event_resource_time");
+
+                    b.ToTable("catalogue_audit_event", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_catalogue_audit_event_actor", "(actor_type = 'EMPLOYEE' AND actor_employee_id IS NOT NULL AND shop_session_id IS NULL) OR (actor_type = 'SHOP_SESSION' AND actor_employee_id IS NULL AND shop_session_id IS NOT NULL)");
+                        });
+                });
+
             modelBuilder.Entity("PcHouseStore.Infrastructure.Persistence.Entities.CompanyRecord", b =>
                 {
                     b.Property<long>("Id")
@@ -293,6 +458,67 @@ namespace PcHouseStore.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("company", (string)null);
+                });
+
+            modelBuilder.Entity("PcHouseStore.Infrastructure.Persistence.Entities.CustomerRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("text")
+                        .HasColumnName("notes");
+
+                    b.Property<long>("PersonId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("person_id");
+
+                    b.Property<string>("PhoneE164")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("phone_e164");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("Id", "CompanyId")
+                        .HasName("ak_customer_id_company");
+
+                    b.HasIndex("CompanyId", "PhoneE164")
+                        .IsUnique()
+                        .HasDatabaseName("uq_customer_company_phone_e164");
+
+                    b.HasIndex("PersonId", "CompanyId");
+
+                    b.HasIndex("CompanyId", "IsActive", "Id")
+                        .HasDatabaseName("ix_customer_company_active");
+
+                    b.ToTable("customer", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_customer_phone_e164", "phone_e164 ~ '^\\+[1-9][0-9]{7,14}$'");
+                        });
                 });
 
             modelBuilder.Entity("PcHouseStore.Infrastructure.Persistence.Entities.EmployeeActionAuthorizationRecord", b =>
@@ -580,6 +806,71 @@ namespace PcHouseStore.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("PcHouseStore.Infrastructure.Persistence.Entities.FaultRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("code");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("description");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("is_active");
+
+                    b.Property<long>("SequenceNumber")
+                        .HasColumnType("bigint")
+                        .HasColumnName("sequence_number");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("Id", "CompanyId")
+                        .HasName("ak_fault_id_company");
+
+                    b.HasIndex("CompanyId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("uq_fault_company_code");
+
+                    b.HasIndex("CompanyId", "SequenceNumber")
+                        .IsUnique()
+                        .HasDatabaseName("uq_fault_company_sequence");
+
+                    b.HasIndex("CompanyId", "IsActive", "Description")
+                        .HasDatabaseName("ix_fault_company_active_description");
+
+                    b.ToTable("fault", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_fault_sequence_number", "sequence_number > 0");
+                        });
+                });
+
             modelBuilder.Entity("PcHouseStore.Infrastructure.Persistence.Entities.PersonRecord", b =>
                 {
                     b.Property<long>("Id")
@@ -620,6 +911,67 @@ namespace PcHouseStore.Infrastructure.Persistence.Migrations
                     b.HasIndex("CompanyId");
 
                     b.ToTable("person", (string)null);
+                });
+
+            modelBuilder.Entity("PcHouseStore.Infrastructure.Persistence.Entities.ProductCategoryRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("code");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text")
+                        .HasColumnName("description");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)")
+                        .HasColumnName("name");
+
+                    b.Property<long?>("ParentCategoryId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("parent_category_id");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("Id", "CompanyId")
+                        .HasName("ak_product_category_id_company");
+
+                    b.HasIndex("CompanyId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("uq_product_category_company_code");
+
+                    b.HasIndex("ParentCategoryId", "CompanyId");
+
+                    b.ToTable("product_category", (string)null);
                 });
 
             modelBuilder.Entity("PcHouseStore.Infrastructure.Persistence.Entities.ShopAccessCredentialEventRecord", b =>
@@ -1070,6 +1422,65 @@ namespace PcHouseStore.Infrastructure.Persistence.Migrations
                     b.Navigation("Authorization");
                 });
 
+            modelBuilder.Entity("PcHouseStore.Infrastructure.Persistence.Entities.CatalogItemRecord", b =>
+                {
+                    b.HasOne("PcHouseStore.Infrastructure.Persistence.Entities.CompanyRecord", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("PcHouseStore.Infrastructure.Persistence.Entities.ProductCategoryRecord", null)
+                        .WithMany()
+                        .HasForeignKey("ProductCategoryId", "CompanyId")
+                        .HasPrincipalKey("Id", "CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("PcHouseStore.Infrastructure.Persistence.Entities.CatalogueAuditEventRecord", b =>
+                {
+                    b.HasOne("PcHouseStore.Infrastructure.Persistence.Entities.CompanyRecord", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("PcHouseStore.Infrastructure.Persistence.Entities.EmployeeRecord", null)
+                        .WithMany()
+                        .HasForeignKey("ActorEmployeeId", "CompanyId")
+                        .HasPrincipalKey("Id", "CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("PcHouseStore.Infrastructure.Persistence.Entities.ShopRecord", null)
+                        .WithMany()
+                        .HasForeignKey("ShopId", "CompanyId")
+                        .HasPrincipalKey("Id", "CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("PcHouseStore.Infrastructure.Persistence.Entities.ShopSessionRecord", null)
+                        .WithMany()
+                        .HasForeignKey("ShopSessionId", "ShopId")
+                        .HasPrincipalKey("Id", "ShopId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("PcHouseStore.Infrastructure.Persistence.Entities.CustomerRecord", b =>
+                {
+                    b.HasOne("PcHouseStore.Infrastructure.Persistence.Entities.CompanyRecord", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("PcHouseStore.Infrastructure.Persistence.Entities.PersonRecord", null)
+                        .WithMany()
+                        .HasForeignKey("PersonId", "CompanyId")
+                        .HasPrincipalKey("Id", "CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("PcHouseStore.Infrastructure.Persistence.Entities.EmployeeActionAuthorizationRecord", b =>
                 {
                     b.HasOne("PcHouseStore.Infrastructure.Persistence.Entities.EmployeeRecord", null)
@@ -1152,6 +1563,15 @@ namespace PcHouseStore.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("PcHouseStore.Infrastructure.Persistence.Entities.FaultRecord", b =>
+                {
+                    b.HasOne("PcHouseStore.Infrastructure.Persistence.Entities.CompanyRecord", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("PcHouseStore.Infrastructure.Persistence.Entities.PersonRecord", b =>
                 {
                     b.HasOne("PcHouseStore.Infrastructure.Persistence.Entities.CompanyRecord", null)
@@ -1159,6 +1579,21 @@ namespace PcHouseStore.Infrastructure.Persistence.Migrations
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("PcHouseStore.Infrastructure.Persistence.Entities.ProductCategoryRecord", b =>
+                {
+                    b.HasOne("PcHouseStore.Infrastructure.Persistence.Entities.CompanyRecord", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("PcHouseStore.Infrastructure.Persistence.Entities.ProductCategoryRecord", null)
+                        .WithMany()
+                        .HasForeignKey("ParentCategoryId", "CompanyId")
+                        .HasPrincipalKey("Id", "CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("PcHouseStore.Infrastructure.Persistence.Entities.ShopAccessCredentialEventRecord", b =>

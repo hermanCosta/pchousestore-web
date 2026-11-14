@@ -37,6 +37,73 @@ public sealed class PersonRecord
     public string? Email { get; set; }
 }
 
+public sealed class CustomerRecord
+{
+    public long Id { get; set; }
+    public long CompanyId { get; set; }
+    public long PersonId { get; set; }
+    public string PhoneE164 { get; set; } = string.Empty;
+    public string? Notes { get; set; }
+    public bool IsActive { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
+}
+
+public sealed class ProductCategoryRecord
+{
+    public long Id { get; set; }
+    public long CompanyId { get; set; }
+    public long? ParentCategoryId { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string Code { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public bool IsActive { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
+}
+
+public sealed class CatalogItemRecord
+{
+    public long Id { get; set; }
+    public long CompanyId { get; set; }
+    public string Kind { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string? Sku { get; set; }
+    public decimal ListPrice { get; set; }
+    public long? ProductCategoryId { get; set; }
+    public string? InventoryTrackingMode { get; set; }
+    public string? ServiceDescription { get; set; }
+    public bool IsActive { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
+}
+
+public sealed class FaultRecord
+{
+    public long Id { get; set; }
+    public long CompanyId { get; set; }
+    public long SequenceNumber { get; set; }
+    public string Code { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public bool IsActive { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
+}
+
+public sealed class CatalogueAuditEventRecord
+{
+    public long Id { get; set; }
+    public long CompanyId { get; set; }
+    public long ShopId { get; set; }
+    public long? ShopSessionId { get; set; }
+    public long? ActorEmployeeId { get; set; }
+    public string ActorType { get; set; } = string.Empty;
+    public string ResourceType { get; set; } = string.Empty;
+    public long ResourceId { get; set; }
+    public string ActionCode { get; set; } = string.Empty;
+    public DateTime OccurredAt { get; set; }
+}
+
 public sealed class EmployeeRecord
 {
     public long Id { get; set; }

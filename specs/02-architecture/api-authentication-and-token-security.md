@@ -55,7 +55,7 @@ No employee access token is issued and the employee password challenge does not 
 5. React redeems the code at the token endpoint using the matching PKCE `code_verifier`.
 6. The authorization server issues an OIDC ID token for the Shop principal and an OAuth access token for the API. The ID token is for the client sign-in result; **only the access token is sent to the API**.
 7. React calls the API with `Authorization: Bearer <access_token>`.
-8. When the access token expires, the client uses a refresh token only if enabled; refresh tokens must be rotated with reuse detection. Alternatively, it can re-run authorization against the still-active Shop OIDC session.
+8. Before the access token expires, the client silently re-runs Authorization Code + PKCE with `prompt=none` against the active Shop OIDC session in a hidden iframe. The client keeps the new access token in memory; refresh tokens remain disabled. If the OIDC cookie or ShopSession has expired/revoked, silent renewal fails and the client requires interactive sign-in. This does not extend ShopSession lifetime.
 9. Shop sign-out revokes the `ShopSession`, authorization/refresh-token family and server-side OIDC session. API calls associated with a revoked session are rejected.
 
 The Shop password is entered only at the authorization endpoint's interactive login UI. Do not implement the OAuth Resource Owner Password Credentials grant (`grant_type=password`) or a custom username/password token endpoint.

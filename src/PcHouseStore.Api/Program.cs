@@ -357,7 +357,6 @@ app.MapPost("/api/v1/employee-action-authorizations", async (
         if (!isManager)
             return ApiProblem(context, StatusCodes.Status403Forbidden, "action_not_permitted", "The employee is not permitted to perform this action.");
     }
-
     if (targetShopId is long scopedShopId)
     {
         var targetShop = await db.Shops.AsNoTracking().SingleOrDefaultAsync(x => x.Id == scopedShopId, cancellationToken);
@@ -653,6 +652,7 @@ app.MapPatch("/api/v1/shops/{shopId:long}/access-credential", async (
 }).RequireAuthorization("ShopApi");
 
 app.MapEmployeeAdministrationEndpoints();
+app.MapCatalogueEndpoints();
 
 app.MapGet("/connect/logout", async (HttpContext context, PcHouseStoreDbContext db) =>
 {
@@ -979,6 +979,7 @@ public sealed class OidcClientRegistration(IServiceScopeFactory scopeFactory, IC
             Requirements = { Requirements.Features.ProofKeyForCodeExchange }
         };
         descriptor.RedirectUris.Add(new Uri(origin.TrimEnd('/') + "/auth/callback"));
+        descriptor.RedirectUris.Add(new Uri(origin.TrimEnd('/') + "/auth/silent-callback"));
         descriptor.PostLogoutRedirectUris.Add(new Uri(origin.TrimEnd('/') + "/auth/logout-callback"));
         var application = await manager.FindByClientIdAsync(clientId, cancellationToken);
         if (application is null) await manager.CreateAsync(descriptor, cancellationToken);
