@@ -48,7 +48,8 @@
 | [Authentication and signing-key persistence](02-architecture/authentication-persistence.md) | DATA-05 physical design for Shop credentials/sessions, one-use employee authorization and `system_services` signing-key registry |
 | [Backend guidelines](02-architecture/backend-guidelines.md) | .NET conventions, OAuth/OIDC and JWT API enforcement |
 | [Frontend guidelines](02-architecture/frontend-guidelines.md) | React conventions |
-| [Design system](03-design/design-system.md) | UX and visual direction |
+| [Design system](03-design/design-system.md) | UX, visual direction and application shell |
+| [Application shell and primary navigation](04-features/application-shell-and-navigation.md) | PC House header, active-Shop address, Home/Catalogue navigation and Settings hamburger |
 | [Feature template](04-features/feature-template.md) | Template for each feature SPEC |
 | [Testing strategy](05-testing/testing-strategy.md) | Quality strategy |
 | [Migration backlog](06-migration/migration-backlog.md) | Phased implementation plan |
