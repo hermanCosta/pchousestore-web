@@ -1,6 +1,6 @@
 # Feature Specifications
 
-- [Application shell and primary navigation](application-shell-and-navigation.md) — owner-approved layout direction 2026-11-18; implementation pending.
+- [Application shell and primary navigation](application-shell-and-navigation.md) — DONE; implementation validated by product owner 2026-11-18.
 
 - [Employee administration](employee-administration.md) — approved and implemented as a local foundation 2026-11-12; bootstrap runbook and end-to-end validation remain.
 - [CAT-01 Customers and Shared Catalogues](customer-and-catalog.md) — DRAFT; legacy audit recorded, product rules remain open; no implementation authorized.
@@ -39,6 +39,8 @@ Do not use guessed requirements to fill gaps.
 Feature scopes must be approved after discovery. A Java class is not automatically a distinct web feature.
 
 ## Current drafts
+
+- [SO-01 Service Orders](service-orders.md) — DRAFT; legacy discovery partially complete; product decisions and full lifecycle state machine remain open; implementation not authorized.
 
 - [Shop authentication and API access](authentication-and-shop-context.md) — approved and implemented foundation; session-grant revocation and end-to-end validation remain.
 - [Authentication and signing-key persistence](../02-architecture/authentication-persistence.md) — DATA-05 logical/physical design approved for implementation; PostgreSQL/Npgsql provider validation remains.
