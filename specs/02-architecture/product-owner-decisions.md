@@ -1,6 +1,6 @@
 # Product-owner Decisions and Remaining Questions — pcHouseStore Web
 
-**Revision:** v38 · 18 November 2026
+**Revision:** v39 · 19 November 2026
 **Status:** Confirmed product decisions are incorporated. A small set of commercial/legal details remains explicitly proposed or deferred; the model is not a production-approved DDL.
 
 ## Confirmed decisions
@@ -144,3 +144,14 @@ No processor must be selected for v1. `CASH` and `CARD` are the payment methods.
 - CCPC, [Your rights when buying goods](https://www.ccpc.ie/consumer-advice/consumer-rights/buying-goods/your-rights-when-buying-goods/) — consumer rights also apply to second-hand goods.
 - CCPC, [Repairs and replacements](https://www.ccpc.ie/consumer-advice/faulty-products-and-goods/repairs-and-replacements) — remedies and reasonable-time principles.
 - OWASP, [File Upload Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html) — secure upload validation, re-encoding and controlled access.
+
+
+## ServiceOrder owner decisions — 19 November 2026
+
+- New ServiceOrders start in `CREATED`, not the legacy `IN_PROGRESS` initial state.
+- Device serial number is mandatory at booking. Brand and model remain required as in the inspected legacy booking form. Serial-number uniqueness across the Company remains undecided.
+- The legacy `badSector` integer represents the count of defective/bad sectors on the device HDD. It is required only for selected Services that need this measurement; operating-system installation is a confirmed example. The exact Service trigger list/configuration and numeric bounds remain open.
+- ServiceOrder workflows must not edit Customer master data. Equipment and service details may be edited in the ServiceOrder workflow, subject to lifecycle restrictions still being finalized. Customer profile changes remain in the Customers feature.
+- Payment and handover actions must not modify Customer, Device, Fault or ServiceOrder line details. They may append a Note alongside their own financial or handover event.
+- Customer handover is allowed when the technical outcome is `NOT_FIXED` and prohibited while the order status is `FIXED`. Whether an outstanding balance blocks a `NOT_FIXED` handover and whether handover is represented by a separate event or a transition to `PICKED` remain open.
+- MANAGER and TECHNICIAN have equal permission to mark a ServiceOrder `NOT_FIXED` and to record handover of a `NOT_FIXED` order. This clarification does not change Manager-only payment, cancellation, deposit-forfeiture or refund permissions.
