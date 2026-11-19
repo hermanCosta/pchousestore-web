@@ -1,6 +1,6 @@
 # SO-01 — Service Orders
 
-**Status:** DRAFT — legacy discovery partially complete; lifecycle and booking rules require product-owner decisions. No implementation is authorized by this draft.  
+**Status:** DRAFT — owner decisions partially recorded 2026-11-19; the remaining lifecycle, edit and data-policy questions still require resolution. No implementation is authorized by this draft.  
 **Type:** Shop-scoped operational workflow.  
 **Depends on:** AUTH-01/AUTH-02, CAT-01, DATA-02, approved employee access matrix, stock and financial policies.  
 **Related work:** PROC-01/PROC-02 (parts procurement), FIN-01 (payments/deposits/refunds), SO-XFER-SPEC (cross-Shop transfer), REP-01 (documents and receipts).
@@ -37,8 +37,8 @@ The legacy repository is https://github.com/hermanCosta/pchousestoremvn, branch 
 - The inspected booking form requires first name, last name, contact number, device brand, device model, serial number, at least one Product/Service line and at least one Fault.
 - The form can populate an existing customer or construct a new Person/Customer record.
 - The form requests an employee password before creating the order. This is legacy behavior only; the target uses employee code + password and a fresh one-use EmployeeActionAuthorization.
-- The order is initially created with status IN_PROGRESS, a creation timestamp, total, due amount, bad-sector integer and free-text note.
-- Device records contain brand, model and serial number. The booking flow searches for an existing Device by serial number and reuses it when found. No serial-number uniqueness constraint was confirmed by this source inspection.
+- The legacy order is initially created with status IN_PROGRESS, a creation timestamp, total, due amount, bad-sector integer and free-text note. The product owner has selected CREATED as the initial status for the target system.
+- Device records contain brand, model and serial number. The legacy booking UI marks the brand, model and serial-number fields as required; it searches for an existing Device by serial number and reuses it when found. No serial-number uniqueness constraint was confirmed by this source inspection.
 - The order can contain multiple Fault references and multiple Product/Service lines. Legacy line quantity is an integer and the persisted line stores a total amount.
 - An optional initial deposit opens a payment dialog and creates a Deposit record alongside the order. The order, faults, Product/Service lines, deposit, payment rows and creation note are persisted through one DAO transaction.
 - The existing-order screen permits edits to customer/device details, faults and Product/Service lines, plus an optional deposit and an update note.
@@ -61,6 +61,12 @@ The legacy repository is https://github.com/hermanCosta/pchousestoremvn, branch 
 - The legacy status and note writes are not consistently committed in one transaction. The target must persist the state change, event and required note atomically.
 - CREATED, FINISHED and CANCELLED are present in the enum, but their complete active UI transitions were not established in the inspected screens.
 
+### 3.4 Bad-sector field — legacy evidence and owner clarification
+
+- The legacy UI labels the field `Bad Sectors`, uses an integer spinner and shows a required-field marker.
+- The product owner clarified that this field represents the count of defective/bad sectors on the device HDD. It is relevant only to certain services, with operating-system installation given as an example; it must be required when one of those services is selected, not treated as universally mandatory.
+- The target requirement is conditional. The exact catalogue services that trigger the requirement, how that requirement is configured, and the accepted numeric range remain open decisions.
+
 ## 4. Approved target business rules
 
 | ID | Rule | Source | Status |
@@ -79,25 +85,33 @@ The legacy repository is https://github.com/hermanCosta/pchousestoremvn, branch 
 | BR-12 | Financial refund and physical stock return are separate. Only selected, physically returned quantities may enter the stock-return workflow; inspection/disposition rules apply. | architecture-decisions.md; stock-and-refurbishment.md | DECIDED |
 | BR-13 | Service-order sourcing rounds and supplier purchases belong to PROC-01/PROC-02; they remain linked to the durable ServicePartRequirement. | service-parts-procurement.md | DECIDED |
 | BR-14 | Cross-Shop ServiceOrder transfer follows SO-XFER-SPEC and is not implemented as a Company reassignment shortcut. | service-order-shop-transfer.md | DECIDED |
+| BR-15 | A newly created ServiceOrder starts in `CREATED`, not `IN_PROGRESS`. | Product-owner decision 2026-11-19 | DECIDED |
+| BR-16 | Device serial number is mandatory at ServiceOrder booking. Brand and model remain required as in the inspected legacy booking form. Serial-number uniqueness across the Company is not decided by this rule. | Product-owner decision 2026-11-19; NewServiceOrderView | DECIDED |
+| BR-17 | `badSector` represents the device HDD bad-sector count. It is conditionally mandatory only when a selected Service requires this measurement; operating-system installation is a confirmed example. The exact Service trigger list/configuration and numeric bounds remain open. | Product-owner clarification 2026-11-19; legacy `spn_bad_sectors` | DECIDED WITH CONFIGURATION OPEN |
+| BR-18 | ServiceOrder workflows must not edit the linked Customer's master data. Equipment and service information may be edited through the order workflow subject to lifecycle restrictions; customer master-data changes remain in the Customers feature. | Product-owner decision 2026-11-19 | DECIDED |
+| BR-19 | Payment and customer-handover actions must not modify Customer, Device, Fault or ServiceOrder line details. They may append a separate Note; financial and handover records remain their own immutable events. | Product-owner decision 2026-11-19 | DECIDED |
+| BR-20 | Customer handover is permitted for an order whose technical outcome is `NOT_FIXED`; handover is prohibited while the order status is `FIXED`. Eligibility from other states, balance-due treatment and persisted post-handover status/event representation remain open. | Product-owner decision 2026-11-19 | PARTIALLY DECIDED |
+| BR-21 | Both `MANAGER` and `TECHNICIAN` have the same permission to mark a ServiceOrder `NOT_FIXED` and to record handover of a `NOT_FIXED` order. This does not change the existing Manager-only payment, cancellation, deposit-forfeiture or refund permissions. | Product-owner decision 2026-11-19; employee-access-and-roles.md | DECIDED |
 
 ## 5. Proposed redesign (REDESIGN)
 
 ### 5.1 Main workflow
 
-1. Find or register the Company customer using CAT-01.
-2. Register or select the device associated with the job, subject to the decisions in Section 11.
-3. Create the ServiceOrder in the active Shop with reported Faults, Product/Service lines, customer-facing description and technician notes.
-4. For each required Product part, create a ServicePartRequirement. Reserve available quantity as appropriate. If a blocking requirement remains short, move the order to AWAITING_PARTS and create a procurement request through PROC-02.
-5. Record diagnosis, work notes and technical findings as append-only events/notes attributed to the employee who authorized each action.
-6. When blocking requirements are fully reserved, explicitly resume the order to IN_PROGRESS.
-7. When repair is complete, an authorized employee records FIXED or NOT_FIXED. FIXED is rejected while a blocking requirement remains short.
-8. Receive payment/deposit application through FIN-01. When the financial balance is fully settled, consume reserved Product parts in the same transaction as the settlement.
-9. Record customer collection as a distinct handover event. Do not infer handover from a payment event.
-10. Cancellation/refund and any physical return are separate, permission-gated workflows. Apply the rules in FIN-01 and the stock-return policy.
+1. Find or register the Company customer using CAT-01. The ServiceOrder workflow references the Customer and must not edit the Customer master record.
+2. Register or select the device associated with the job. Brand, model and serial number are required; serial-number uniqueness is still to be decided.
+3. Create the ServiceOrder in the active Shop with initial status `CREATED`, reported Faults, Product/Service lines, customer-facing description and technician notes.
+4. Capture the HDD bad-sector count when at least one selected Service requires it (operating-system installation is a confirmed example). Do not make this field universally mandatory until its service-trigger configuration is defined.
+5. For each required Product part, create a ServicePartRequirement. Reserve available quantity as appropriate. If a blocking requirement remains short, move the order to `AWAITING_PARTS` and create a procurement request through PROC-02.
+6. Record diagnosis, work notes and technical findings as append-only events/notes attributed to the employee who authorized each action. Equipment and service information may be edited in the ServiceOrder workflow subject to the remaining lifecycle edit policy; Customer master data may not.
+7. When blocking requirements are fully reserved, explicitly resume the order to `IN_PROGRESS`.
+8. When repair is complete, an authorized Manager or Technician may record `FIXED` or `NOT_FIXED`. `FIXED` is rejected while a blocking requirement remains short.
+9. Receive payment/deposit application through FIN-01. Payment actions must not edit Customer, Device, Fault or ServiceOrder line details; a separate Note may be appended. When the financial balance is fully settled, consume reserved Product parts in the same transaction as the settlement.
+10. Customer handover is a separate action. It is allowed for `NOT_FIXED` and blocked for `FIXED`; it must not be inferred from payment. A handover may append a Note but must not edit order details.
+11. Cancellation/refund and any physical return are separate, permission-gated workflows. Apply the rules in FIN-01 and the stock-return policy.
 
 ### 5.2 Target status vocabulary
 
-The following statuses are referenced by the target architecture, but this table is not yet an approved complete state machine:
+A newly created order starts in `CREATED`. The statuses below are referenced by the target architecture, but this table is not yet an approved complete state machine:
 
 - IN_PROGRESS
 - AWAITING_PARTS
@@ -107,12 +121,12 @@ The following statuses are referenced by the target architecture, but this table
 - REFUNDED
 - CANCELLED
 
-The final treatment of legacy CREATED and FINISHED, and the permitted transitions involving NOT_FIXED, PICKED, REFUNDED and CANCELLED, must be resolved before implementation. Do not infer transitions from enum membership alone.
+Owner decisions already made: `CREATED` is the initial target status; `NOT_FIXED` orders may be handed over to the customer; `FIXED` orders may not be handed over; both MANAGER and TECHNICIAN may perform the `NOT_FIXED` and eligible handover actions. The final treatment of `FINISHED`, whether `NOT_FIXED` remains the technical outcome after handover or transitions to a separate `PICKED` status, and the permitted transitions involving `REFUNDED` and `CANCELLED` remain open. Do not infer transitions from enum membership alone.
 
 ### 5.3 Proposed UI
 
 - **Service Orders list:** search by order ID, customer, contact, email, device brand/model and serial; filter by status and creation date after the filter policy is approved.
-- **Create Service Order:** select/create customer, capture device details, select one or more Faults, add Product/Service lines, and record initial notes.
+- **Create Service Order:** select or create a Customer through CAT-01, capture required device brand/model/serial, select one or more Faults, add Product/Service lines, and record initial notes. Display the HDD bad-sector count and require it only when a selected Service is configured to require it.
 - **Service Order detail:** show customer/device identity, order status, reported faults, line items, payment/deposit summary supplied by FIN-01, part requirements/reservations, notes and append-only event history.
 - **Technical actions:** diagnosis, technical note, add/update part requirement, resume from AWAITING_PARTS, Fixed/Not Fixed outcomes and customer handover as separately authorized actions.
 - **Settings/navigation:** proposed primary navigation entry is Service Orders; the exact placement/order must be confirmed against the current application shell before UI implementation.
@@ -124,7 +138,7 @@ Loading, empty, validation, conflict, authorization-denied and retry states must
 
 Use the logical entities already recorded in domain-model.md and database-model.md; do not create a competing physical schema in this feature SPEC.
 
-- ServiceOrder: Shop ownership, Customer, Device, status, currency and lifecycle timestamps.
+- ServiceOrder: Shop ownership, Customer, Device, initial status `CREATED`, currency, lifecycle timestamps and the integer HDD bad-sector count (`badSector` in the legacy model), conditionally required by selected Service.
 - ServiceOrderItem: Product/Service line, whole-unit quantity for Product items, and monetary snapshot values as finalized by DATA-05.
 - ServiceOrderFault: links the order to Company-shared Fault catalogue entries.
 - ServicePartRequirement: durable Product demand, required quantity, blocking flag and reservation state.
@@ -159,12 +173,15 @@ These are route proposals only. FIN-01 owns payment/deposit/refund APIs; PROC-01
 - Payment settlement must be idempotent and must consume reservations at most once.
 - Preserve order, line and fault history. Do not delete/recreate child rows as a substitute for editing.
 - Reject cross-Shop identifiers even when the Company-level customer or catalogue record is otherwise visible.
+- A ServiceOrder command must not mutate the linked Customer master record. Customer updates use the separate CAT-01 customer workflow.
+- Payment and handover commands may append a Note but must not mutate customer, device, fault or service-line details.
 
 ## 9. Acceptance criteria (DRAFT)
 
 - [ ] AC-01: A Shop can list and search only its own ServiceOrders.
 - [ ] AC-02: Search supports order ID, customer identity/contact and device identity fields supported by the approved search policy.
-- [ ] AC-03: An authorized employee can create a ServiceOrder using Company-owned customer/Fault/catalogue records and the active Shop context.
+- [ ] AC-03: An authorized employee can create a ServiceOrder using Company-owned customer/Fault/catalogue records and the active Shop context; the initial status is `CREATED`.
+- [ ] AC-03a: Device brand, model and serial number are required at booking; a blank serial number is rejected.
 - [ ] AC-04: The order records one or more approved Faults and Product/Service lines, subject to the final booking validation rules.
 - [ ] AC-05: Device and serial validation follows the approved identity/reuse policy.
 - [ ] AC-06: Order updates preserve historical line/fault references and create auditable events rather than hard-deleting prior rows.
@@ -177,35 +194,47 @@ These are route proposals only. FIN-01 owns payment/deposit/refund APIs; PROC-01
 - [ ] AC-13: Cancellation, refund and physical stock return obey Manager/stock/finance rules and are separately auditable.
 - [ ] AC-14: Cross-Shop transfer is routed to SO-XFER-SPEC and cannot be implemented through direct Shop/Company reassignment.
 - [ ] AC-15: Replayed or concurrent status/payment commands cannot cause duplicate events, stock movements or reservation consumption.
+- [ ] AC-16: The HDD bad-sector count is required when a selected Service is configured to require it (including the confirmed operating-system installation example); it is not globally mandatory for unrelated Services.
+- [ ] AC-17: ServiceOrder editing never mutates Customer master data. Equipment/service edits follow the approved lifecycle policy.
+- [ ] AC-18: Payment and handover commands do not alter Customer, Device, Fault or ServiceOrder line details; they may append a Note.
+- [ ] AC-19: Handover is accepted from `NOT_FIXED` and rejected from `FIXED`; MANAGER and TECHNICIAN have equal permission for these two actions.
 
 ## 10. Test scenarios
 
 - Shop isolation: list, detail, update, requirement and command attempts using another Shop's ServiceOrder ID.
 - Company ownership: reject customer, catalogue or Fault IDs belonging to another Company.
-- Booking validation: missing required fields, empty Fault list, empty lines, invalid Product/Service kind, invalid quantities and invalid amounts.
+- Booking validation: missing required fields, missing device serial, empty Fault list, empty lines, invalid Product/Service kind, invalid quantities and invalid amounts.
+- Conditional HDD bad-sector validation: qualifying Service selected with missing count; non-qualifying Service selected with the field absent; order includes both qualifying and non-qualifying Services.
 - Customer/device selection: existing customer, new customer, existing device by serial, changed device data and duplicate serial conflict.
 - Status concurrency: stale transition, duplicate request, illegal transition, AWAITING_PARTS with shortage, resume before/after full reservation and Fixed with blocked requirement.
 - Stock settlement: partial payment, explicitly applied deposit, zero balance, negative inventory balance, idempotent retry and reservation consumption exactly once.
-- Pickup: payment without pickup, pickup recorded independently, attempted pickup from ineligible state and repeated handover.
+- Handover: allow from `NOT_FIXED`; reject from `FIXED`; test roles MANAGER and TECHNICIAN; verify no implicit handover on payment; verify Note append without mutating order details.
 - Authorization: MANAGER vs TECHNICIAN per action, missing/expired/replayed authorization, actor attribution and ShopSession-only reads.
 - Audit: status change plus event/note atomicity, immutable prior lines/faults and event chronology.
 - Cancellation/refund: unpaid release, post-consumption selected physical return, partial refund, refund cap and Manager-only authorization.
 
-## 11. Open questions — product-owner decision required
+## 11. Owner decisions received — 2026-11-19
 
-- [ ] **SO-OPEN-01 — Initial status:** Should a new order start as CREATED (explicit acceptance/diagnosis pending) or IN_PROGRESS as the legacy constructor does?
-- [ ] **SO-OPEN-02 — Required booking data:** Must every order include brand, model and serial number? May serial be blank for devices without one? Is one Fault and one Product/Service line always mandatory?
-- [ ] **SO-OPEN-03 — Device identity:** Is serial number unique across the Company, or may different devices share/reuse a serial? Should a ServiceOrder always contain exactly one Device?
-- [ ] **SO-OPEN-04 — Bad sector:** What does the legacy badSector integer represent operationally, on which device types is it used, and should it remain in the web form?
-- [ ] **SO-OPEN-05 — Edit policy:** Which fields/lines may be edited after diagnosis, after a part reservation, after FIXED, after payment or after pickup? How should price changes affect historical snapshots?
-- [ ] **SO-OPEN-06 — State machine:** What are the intended meanings of CREATED and FINISHED? Should NOT_FIXED be terminal, and can it be resumed? Which current statuses permit CANCELLED?
-- [ ] **SO-OPEN-07 — Handover rule:** May a customer collect a device while any ServiceOrder balance remains due, or is full settlement required before PICKED?
-- [ ] **SO-OPEN-08 — Roles:** May TECHNICIAN mark an order NOT_FIXED and record customer handover, or should those actions be Manager-only? Existing role policy explicitly grants technical movement to FIXED, but does not completely define NOT_FIXED/handover.
+- **SO-OPEN-01 — RESOLVED:** New ServiceOrders start in `CREATED`.
+- **SO-OPEN-02 — PARTIALLY RESOLVED:** Device serial number is mandatory. The inspected legacy form also requires brand, model, at least one Fault and at least one Product/Service line; no contrary change was requested.
+- **SO-OPEN-04 — PARTIALLY RESOLVED:** `badSector` means HDD bad-sector count. It is mandatory only for selected Services that require the measurement; operating-system installation is a confirmed example. The exact trigger list/configuration and numeric bounds remain open.
+- **SO-OPEN-05 — PARTIALLY RESOLVED:** The ServiceOrder workflow must not edit Customer master data. Equipment/service information may be edited subject to lifecycle restrictions. Payment and handover actions must not modify order details and may only append a Note alongside their own financial/handover event. The exact lock point after a payment is recorded remains open.
+- **SO-OPEN-07 — PARTIALLY RESOLVED:** Handover is allowed when the technical outcome is `NOT_FIXED` and prohibited while the order status is `FIXED`. Whether an outstanding balance blocks a `NOT_FIXED` handover, and whether the technical outcome remains `NOT_FIXED` or transitions to a separate `PICKED` status, remain open.
+- **SO-OPEN-08 — RESOLVED:** MANAGER and TECHNICIAN have the same permission to mark an order `NOT_FIXED` and to record a handover for a `NOT_FIXED` order. This does not change Manager-only payment, cancellation, deposit-forfeiture or refund permissions.
+
+## 12. Open questions — product-owner decision required
+
+- [ ] **SO-OPEN-03 — Device identity:** Is serial number unique across the Company, or may different devices share/reuse a serial? Should the target keep exactly one Device per ServiceOrder?
+- [ ] **SO-OPEN-04a — Bad-sector trigger:** Which catalogue Services require HDD bad-sector count (operating-system installation is confirmed), and should this be configured on each Service catalogue record? What numeric range/validation is valid?
+- [ ] **SO-OPEN-05a — Edit lifecycle:** Are equipment/service fields locked after the first settled payment, after any payment attempt, only when balance is zero, or at another state? Which fields remain editable after part reservation and after `FIXED`?
+- [ ] **SO-OPEN-06 — State machine:** What does `FINISHED` mean in the target? Is `NOT_FIXED` terminal or resumable? Which states allow cancellation?
+- [ ] **SO-OPEN-07a — Handover and balance:** Can a `NOT_FIXED` device be handed over with an outstanding balance or held deposit, or must financial settlement/refund handling happen first?
+- [ ] **SO-OPEN-07b — Handover representation:** After handover of a `NOT_FIXED` order, should the technical status remain `NOT_FIXED` with a separate immutable handover event/timestamp, or should it transition to `PICKED` while preserving the technical outcome separately?
 - [ ] **SO-OPEN-09 — Cancellation and deposits:** What customer/deposit terms apply when a ServiceOrder is cancelled before work, after a special-order part, after repair or after full settlement? The legal wording must remain aligned with FIN-01 and Irish consumer review.
-- [ ] **SO-OPEN-10 — Language and order numbering:** Confirm user-facing language and whether the order number is sequential per Shop, Company-wide or generated by another policy.
+- [ ] **SO-OPEN-10 — Numbering and language:** Should the order number be sequential per Shop, Company-wide or generated by another policy? Confirm whether English remains the only v1 UI language.
 
 ## 12. Approval
 
-- Product approval: PENDING — resolve SO-OPEN-01 through SO-OPEN-10.
+- Product approval: PARTIAL — owner decisions recorded 2026-11-19; resolve the remaining open questions above.
 - Technical approval: PENDING — finalize transition matrix, DTOs, persistence constraints and command transactions.
 - Implementation authorization: NOT GRANTED — this DRAFT is for discovery and product decisions only.
