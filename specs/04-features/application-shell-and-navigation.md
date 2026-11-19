@@ -1,6 +1,6 @@
 # Feature: Application shell and primary navigation
 
-**Status:** APPROVED — owner-approved layout direction 2026-11-18; implementation pending  
+**Status:** DONE — implemented and owner-validated 2026-11-18  
 **Type:** REDESIGN — new back-office navigation experience, not an inherited Java Swing workflow.  
 **Depends on:** Existing ShopSession response, approved brand assets, customer/catalogue screens and employee/shop settings screens.
 
@@ -150,5 +150,5 @@ No store address may be sourced from static frontend configuration, the public w
 ## 9. Approval
 
 - Product-owner layout direction: APPROVED — 2026-11-18.
-- Technical approval: PENDING implementation review.
+- Implementation validation: COMPLETE — owner validated the implemented shell 2026-11-18.
 - API/data-model impact: NONE — existing ShopSession DTO already supplies the required Shop address.
