@@ -50,6 +50,7 @@
 | [Frontend guidelines](02-architecture/frontend-guidelines.md) | React conventions |
 | [Design system](03-design/design-system.md) | UX, visual direction and application shell |
 | [Application shell and primary navigation](04-features/application-shell-and-navigation.md) | PC House header, active-Shop address, Home/Catalogue navigation and Settings hamburger |
+| [SO-01 Service Orders](04-features/service-orders.md) | Shop-scoped repair workflow, device/customer, faults, items, status lifecycle and integration with parts, stock and finance |
 | [Feature template](04-features/feature-template.md) | Template for each feature SPEC |
 | [Testing strategy](05-testing/testing-strategy.md) | Quality strategy |
 | [Migration backlog](06-migration/migration-backlog.md) | Phased implementation plan |
