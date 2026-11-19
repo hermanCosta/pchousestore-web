@@ -1,6 +1,6 @@
 # Product-owner Decisions and Remaining Questions — pcHouseStore Web
 
-**Revision:** v37 · 14 November 2026
+**Revision:** v38 · 18 November 2026
 **Status:** Confirmed product decisions are incorporated. A small set of commercial/legal details remains explicitly proposed or deferred; the model is not a production-approved DDL.
 
 ## Confirmed decisions
@@ -11,7 +11,7 @@
 | Database platform | PostgreSQL is selected; use EF Core with the Npgsql provider. This supersedes the earlier MySQL decision. |
 | Shop printable identity | Each Shop has optional branch-specific address and phone fields for print reports/documents. Snapshot their values when a document is issued; populate only after the owner confirms the authoritative branch details. |
 | Shop access | Persistent session represents the active Shop only; it has no Employee identity. |
-| Active profile display | The persistent profile/header always represents the authenticated Shop and displays that Shop's name, address and phone. Employee registration details remain staff-administration data only; an Employee is identified by code and supplies their password only for a requested protected action. |
+| Active profile and application header | The persistent header shows the owner-supplied PC House logo with the wordmark `PC House` and displays the address of the authenticated Shop in place of a search field, sourced only from `ShopSession.shopAddress`. The hamburger Settings menu retains Shop profile and Shop access credential; Shop profile shows the full Shop name, address, phone and Company email where available. No persistent Employee identity is displayed. Employee registration details remain staff-administration data only. |
 | Employee registration profile | Employee registration requires first name, last name and phone number; email is optional. These fields are retained for registration/admin purposes and never replace the active Shop profile shown in the persistent UI. |
 | Employee administration | Any authenticated Shop session may search the employee directory within its Company without an employee credential challenge. Individual employee profile reads and mutations require Manager authorization. Employees are never hard-deleted through staff administration; Managers deactivate them. Creating an employee requires a unique Company-level employee code and individual credentials; the new employee must change the initial password before any protected operation. Phone/email may repeat and are not automatically matched to existing People. |
 | Shop sign-in identifier | Stable Shop code + Shop credential password. |
