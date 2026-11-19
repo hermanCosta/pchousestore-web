@@ -1,6 +1,6 @@
 # Employee Access and Roles — pcHouseStore Web
 
-**Status:** PRODUCT-APPROVED v1 baseline (updated 2026-11-13) — MANAGER full access and the TECHNICIAN matrix below are approved. The 2026-11-13 product-owner updates supersede earlier Technician restrictions for customer, catalogue, Product, Fault and ServiceOrder work. An employee may hold both roles; effective permissions are the union of assigned roles, so MANAGER grants the full capability set. Refunds remain Manager-only. All operations remain scoped to the active Shop and individually attributed.
+**Status:** PRODUCT-APPROVED v1 baseline (updated 2026-11-19) — MANAGER full access and the TECHNICIAN matrix below are approved. The 2026-11-13 product-owner updates supersede earlier Technician restrictions for customer, catalogue, Product, Fault and ServiceOrder work. On 2026-11-19, the owner additionally approved equal MANAGER/TECHNICIAN permission to mark a ServiceOrder `NOT_FIXED` and to record handover of a `NOT_FIXED` order. Payment, cancellation, deposit forfeiture and refunds remain Manager-only. An employee may hold both roles; effective permissions are the union of assigned roles, so MANAGER grants the full capability set. All operations remain scoped to the active Shop and individually attributed.
 
 ## 1. Identity and cross-Shop access
 
@@ -35,7 +35,11 @@ The Product Owner approved the initial action matrix on 2026-11-10 and updated T
 | Read Company customer directory and customer contact details | Yes | Yes, Company scope |
 | Register diagnosis, faults, technical notes and test results | Yes | Yes |
 | Move service between `CREATED`, `IN_PROGRESS`, `AWAITING_PARTS` and `FIXED` | Yes | Yes |
-| Mark customer handover `PICKED`, cancel or financially refund service | Yes | No |
+| Mark a ServiceOrder `NOT_FIXED` | Yes | Yes |
+| Record customer handover for a `NOT_FIXED` ServiceOrder (not permitted from `FIXED`) | Yes | Yes |
+| Cancel a ServiceOrder | Yes | No |
+| Register ServiceOrder payment/deposit transactions | Yes | No |
+| Execute a financial ServiceOrder refund | Yes | No |
 | View product availability in the active Shop | Yes | Yes |
 | Reserve/release parts for a service order | Yes | Yes |
 | Create/manage service-part procurement requests and upload reference images | Yes | Yes |
@@ -48,7 +52,7 @@ The Product Owner approved the initial action matrix on 2026-11-10 and updated T
 | Approve non-refund complaint remedy, replacement or price reduction | Yes | No |
 | Close/reopen complaint cases | Yes | Add technical findings; cannot close the case |
 
-`MANAGER` is the full-access role across all Shops. `TECHNICIAN` may create/edit customer records, Products, Services, categories, sale prices and Fault catalogue entries, and create/edit service orders, in addition to the technical/operational work listed above. Refunds remain Manager-only.
+`MANAGER` is the full-access role across all Shops. `TECHNICIAN` may create/edit customer records, Products, Services, categories, sale prices and Fault catalogue entries, and create/edit service orders, in addition to the technical/operational work listed above. The product owner specifically permits both roles to mark a ServiceOrder `NOT_FIXED` and to record handover of a `NOT_FIXED` order; neither action is permitted to hand over an order while its status is `FIXED`. Payment, cancellation, deposit forfeiture and refunds remain Manager-only.
 
 ### No second purchase approval
 
