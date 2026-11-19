@@ -40,7 +40,7 @@ Feature scopes must be approved after discovery. A Java class is not automatical
 
 ## Current drafts
 
-- [SO-01 Service Orders](service-orders.md) — DRAFT; legacy discovery partially complete; product decisions and full lifecycle state machine remain open; implementation not authorized.
+- [SO-01 Service Orders](service-orders.md) — DRAFT; owner decisions partially recorded 2026-11-19; remaining lifecycle, handover and edit-policy questions remain open; implementation not authorized.
 
 - [Shop authentication and API access](authentication-and-shop-context.md) — approved and implemented foundation; session-grant revocation and end-to-end validation remain.
 - [Authentication and signing-key persistence](../02-architecture/authentication-persistence.md) — DATA-05 logical/physical design approved for implementation; PostgreSQL/Npgsql provider validation remains.
