@@ -99,6 +99,8 @@
 - Every `Sale` belongs to exactly one `Shop`; the customer and catalogue item are shared Company records.
 - `SaleItem` snapshots description, quantity and price at transaction time. Product quantity must be an integer. A serialized refurbished item line has quantity one and references the exact `RefurbishedUnit`.
 - Every `ServiceOrder` belongs to exactly one `Shop` and one customer. It may have a responsible employee distinct from the employee who created or modified it. Its lifecycle includes `AWAITING_PARTS` when booking/diagnosis (while `CREATED`) or later repair work (`IN_PROGRESS`) reveals a blocking part requirement that is not fully reserved. A required-to-complete product part must be fully reserved before the order can move to `FIXED`.
+- When a `NOT_FIXED` ServiceOrder is physically handed over, its lifecycle status changes to `PICKED` and its technical outcome `NOT_FIXED` remains independently persisted and visible; `PICKED` represents handover, not payment completion.
+- Each successfully committed action in the ServiceOrder context appends one immutable, chronological `BusinessNote` attributed to the employee and containing the action, time and concise result/reference. This human-readable timeline complements (and never replaces) the immutable `ServiceOrderEvent` and financial ledger. A Note and its originating action commit atomically; failed/rolled-back commands create no Note.
 - Service-order creation, status transitions, reservation, procurement receipt and payment require fresh employee authorization. `ServiceOrderEvent` and `SupplierPurchaseEvent` record committed state and procurement changes.
 
 ### Service-part requirements and supplier procurement
