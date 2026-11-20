@@ -1,3 +1,5 @@
+> **SUPERSEDING PRODUCT DECISION (2026-11-20):** For employee roles, staff administration, credential lifecycle and protected-operation authorization, [Employee Management](employee-management.md) is authoritative. Replace `TECHNICIAN` with `EMPLOYEE`; use the three profiles `EMPLOYEE`, `MANAGER`, `ADMIN`; remove the `EmployeeActionAuthorization` entity/token/endpoint and one-use consumption flow. Each feature-defined protected operation performs a fresh direct backend validation of the acting employee's credential, active status, Company membership and permission. The employee identity remains outside the persistent ShopSession/OIDC principal. The Shop OIDC Authorization Code + PKCE protocol and Shop-only token claims remain unchanged. Conflicting statements in this older SPEC are superseded.
+
 # Feature: Shop authentication and API access
 
 **Status:** APPROVED — product and technical design validated 2026-11-10; authentication foundation implemented; production and integration validation pending
