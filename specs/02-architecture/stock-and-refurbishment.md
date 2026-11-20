@@ -52,7 +52,7 @@ A reservation is tied to exactly one Sale or ServiceOrder and to the specific so
 3. The ServiceOrder cannot transition to `FIXED` while any blocking part requirement remains short. Once all blocking requirements are reserved, an employee-authorized command resumes the order to `IN_PROGRESS`; after repair, transition to `FIXED` keeps the reservations while the repaired equipment awaits payment/pickup.
 4. When settled payments and explicitly applied deposits reduce the ServiceOrder balance to zero, the service payment command consumes reserved product parts atomically. This is the defined meaning of payment completion for stock posting; partial settlement does not deduct stock. Deduction is not delayed until the later physical `PICKED`/collection event.
 5. Non-blocking product entries follow the same full-settlement deduction rule. If a quantity-tracked balance becomes negative because of the payment posting, the signed deficit is retained and reported.
-6. If the order is cancelled before consumption, active reservations are released; no return movement is posted.
+6. If the order is cancelled before stock consumption, all active ServiceOrder reservations are released atomically with cancellation; reserved and available counters are updated, on-hand is unchanged, and no inbound/return movement is posted. If any parts were already consumed at full settlement, cancellation does not reverse that consumption or automatically restock the parts. Any physically returned parts must use the separate selected StockReturn and inspection/disposition workflow.
 
 ## 5A. Service-part replenishment and reservation
 
@@ -157,7 +157,7 @@ Every refurbished unit sold by the Company carries a 12-month commercial guarant
 - Lock the relevant ShopInventory row while reserving, releasing, consuming, transferring or returning quantity-tracked stock, or use an optimistic concurrency token with retry-safe commands.
 - Verify availability after acquiring the lock; pre-read UI values are not authoritative.
 - Use a unique command/idempotency key for payment settlement, transfer dispatch/receipt and stock returns.
-- Every movement records Shop, Product, employee, action authorization, time, reason and source document/line.
+- Every movement records Shop, Product, the server-resolved employee actor, time, reason and source document/line. Protected stock commands validate the employee's fresh code/password directly; do not persist or reference an EmployeeActionAuthorization or authorization ID.
 - Never mutate `quantity_on_hand` without inserting the matching InventoryMovement in the same database transaction.
 - Reconcile the materialized reserved counter against active reservation lines periodically and provide an administrative repair/audit path.
 - For serialized refurbished units, enforce transitions with concurrency checks and prevent the same unit from being reserved/sold/transferred twice.
@@ -166,6 +166,6 @@ Every refurbished unit sold by the Company carries a 12-month commercial guarant
 
 1. Serial policy is specified: internal asset code is mandatory/Company-unique; manufacturer serial is captured when present and is Company-unique when populated. Exact acquisition/source fields can be refined during DDL review.
 2. The 12-month commercial guarantee duration is confirmed. Proposed coverage/exclusions and remedy terms are in [Refurbished Condition Grades and Customer Complaint Workflow](refurbished-condition-and-complaints.md), but must be reviewed before customer-facing publication.
-3. Initial stock design is one stock pool per Shop. Reservation-expiry automation and multiple internal stock locations are intentionally out of scope. Reservations remain active until explicitly released or consumed. Partial reservation/sourcing is supported for service-part requirements.
+3. Initial stock design is one stock pool per Shop. Reservation-expiry automation and multiple internal stock locations are intentionally out of scope. Reservations remain active until explicitly released or consumed. Partial reservations are supported for service-part requirements; purchases and sourcing happen outside the application.
 4. Returned goods enter pending inspection outside sellable stock; only an explicit RESTOCK disposition credits inventory. Serialized units remain quarantined until inspection passes and restock is approved.
 5. `CREDIT_SALE` handover-before-full-payment remains disabled pending Irish legal/regulatory review; the initial enabled mode is `LAYAWAY`.
