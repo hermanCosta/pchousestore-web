@@ -105,6 +105,7 @@ The legacy repository is https://github.com/hermanCosta/pchousestoremvn, branch 
 | BR-32 | Product-part requirements may be reserved partially as stock becomes available. The order remains `AWAITING_PARTS` while any blocking requirement is not fully reserved. It may resume to `IN_PROGRESS` only after every blocking requirement is fully reserved; partial reservation never permits resumption. A stock shortage does not automatically create a procurement request; sourcing is a separate, deliberate action in the Shop-wide Service Parts Purchase Queue. | Product-owner decision 2026-11-20; stock reservation model | DECIDED |
 | BR-33 | The team may create a new, separate manual procurement request for a ServiceOrder whenever an additional part need is identified, even if an earlier request exists. Each request/round retains its own history; a new request must not overwrite or replace prior requests or purchase history. Creating a request remains deliberate and manual; a stock shortage never creates one automatically. | Product-owner decision 2026-11-20; PROC-01/PROC-02 request-round model | DECIDED |
 | BR-34 | An open, not-yet-completed ServiceOrder procurement request may be cancelled with a mandatory reason. Cancellation is recorded as an immutable, timestamped event/Note and preserves the request and its full history. A completed/fulfilled request cannot be cancelled; any correction must be recorded as a separate event or request, without rewriting completed purchase/receipt history. For partially fulfilled requests, preserve fulfilled quantities and cancel only the outstanding remainder. | Product-owner decision 2026-11-20 | DECIDED |
+| BR-35 | When a procurement request is cancelled, any remaining requirement quantity that is neither fulfilled nor already committed to an active supplier purchase becomes available again in the Shop-wide Service Parts Purchase Queue. It is shown as uncovered demand and may be included in a new manual request; no new procurement request is created automatically. Quantities already fulfilled or committed to an active supplier purchase remain allocated and must not be duplicated in the queue. | Product-owner decision 2026-11-20 | DECIDED |
 
 ## 5. Proposed redesign (REDESIGN)
 
@@ -126,6 +127,10 @@ The legacy repository is https://github.com/hermanCosta/pchousestoremvn, branch 
 #
 
 Procurement request cancellation is available only while a request remains open. The operator must provide a reason. The request is retained with its cancellation event and actor/timestamp; fulfilled quantities and completed purchase/receipt records are never reversed or deleted. For a partially fulfilled request, cancellation applies only to the unfulfilled remainder. A completed request is not cancellable.
+
+
+
+When a procurement request is cancelled, recompute the uncovered requirement quantity. Any quantity not fulfilled and not already committed to an active supplier purchase is returned to the Shop-wide Service Parts Purchase Queue as available demand. This does not create a new request automatically; a buyer must deliberately include the demand in a new request. Quantities already fulfilled or allocated to an active supplier purchase remain accounted for and are not exposed as additional demand, preventing duplicate sourcing. Preserve the original requested quantity and all allocations; record the cancelled remainder and reason in the append-only request event history.
 
 ## 5.2 Target status vocabulary
 
