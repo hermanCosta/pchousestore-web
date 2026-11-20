@@ -70,7 +70,7 @@
 ### Cancellation and selected stock returns
 
 - Cancelling an unpaid Sale/ServiceOrder releases active reservations and creates no positive stock movement.
-- When a Sale or ServiceOrder is in `REFUNDED` or `CANCELLED`, the operator may select the product lines and quantities physically returned to inventory.
+- Physical stock return is a separate operation for Sales and ServiceOrders. It applies only to explicitly selected, previously consumed product quantities that have actually been physically returned; a refund or ServiceOrder lifecycle status does not automatically create a stock return.
 - `StockReturn` and `StockReturnLine` record only physically received, selected products. Receipt starts pending inspection and does not change sellable stock; only an explicit `RESTOCK` decision creates a positive movement. Serialized refurbished units remain quarantined until inspection passes.
 - A stock return cannot exceed the product quantity already consumed minus previous returns. A serialized refurbished return must identify the exact original physical unit.
 - Financial refund and physical stock return are separate facts. A `PaymentTransaction` of kind `REFUND` does not automatically restock goods.
@@ -155,7 +155,7 @@
 11. For serialized refurbished products, one `RefurbishedUnit` represents one physical unit; serialized sale/reservation/return/transfer quantity equals one.
 12. An active reservation reduces availability but not on-hand. Release restores availability only. Consumption reduces both on-hand and reserved quantity; unreserved payment deduction reduces available/on-hand stock.
 13. Sale stock is consumed when settled payments reduce the balance to zero. Service-order `FIXED` preserves reservations; full settlement consumes stock regardless of the later pickup status. Partial payment does not consume stock. Quantity-tracked stock may become negative at settlement.
-14. Cancellation before consumption releases reservations without stock-in movement. `REFUNDED`/`CANCELLED` permits explicit selected stock-return lines only for previously consumed quantities.
+14. Cancellation before consumption releases reservations without stock-in movement. Physical stock returns are separate from refunds and lifecycle statuses; only explicitly selected, previously consumed quantities that are physically received may enter the stock-return workflow.
 15. Financial refunds do not imply physical stock return. Each physical return is separately selected, authorized, recorded and ledgered.
 16. Stock transfer dispatch decreases source stock; receipt increases destination stock. In-transit stock is unavailable; source and destination belong to the same Company.
 17. Inventory balance/unit-state update and corresponding InventoryMovement insert are atomic and idempotent.
