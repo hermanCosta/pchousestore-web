@@ -1,6 +1,6 @@
 # Product-owner Decisions and Remaining Questions — pcHouseStore Web
 
-**Revision:** v44 · 20 November 2026
+**Revision:** v45 · 20 November 2026
 **Status:** Confirmed product decisions are incorporated. A small set of commercial/legal details remains explicitly proposed or deferred; the model is not a production-approved DDL.
 
 ## Confirmed decisions
@@ -185,3 +185,5 @@ The detailed approved requirements are maintained in [Employee Management](../04
 ## ServiceOrder owner decisions — 20 November 2026 (continued)
 
 - Preserve the legacy `Undo Fixed` capability with a settlement guard: a `FIXED` ServiceOrder may return to `IN_PROGRESS` only while its balance remains outstanding. Keep active stock reservations; do not reverse payments or inventory postings. Once full settlement consumes reserved parts, block direct reversal. Any later rework must use a separate corrective workflow that does not undo settled financial or stock movements.
+
+- ServiceOrder booking creates the order in `CREATED` and does not imply repair has started. An explicit employee-authorized start-work action moves it to `IN_PROGRESS`. A blocking part shortage found before work starts may move it directly from `CREATED` to `AWAITING_PARTS`; receiving/reserving parts never starts work automatically, and resumption remains explicit.
