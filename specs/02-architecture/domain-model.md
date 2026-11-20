@@ -65,7 +65,7 @@
 - For a standard Sale, product quantities are deducted only when the balance reaches zero through settled payment transactions. Active reservations are consumed in the same transaction. Quantity-tracked stock may become negative; the signed deficit is retained and reported.
 - Weekly refurbished instalments use `LAYAWAY` in the initial release: the serialized unit remains reserved until full settlement, and handover occurs after settlement. `CREDIT_SALE` (handover before full payment) stays disabled pending Irish regulatory review and a new explicit product decision.
 - For a ServiceOrder, moving to `FIXED` retains reservations for its product parts. Product quantities are deducted when settled payments and explicitly applied deposits reduce the balance to zero; this is not delayed until physical `PICKED`/collection. A deposit received at booking does not consume stock and reduces the order balance only when explicitly applied to the order.
-- `InventoryMovement` is the immutable stock ledger. Each balance/unit state change and movement insert is atomic and attributed to a single-use employee authorization.
+- `InventoryMovement` is the immutable stock ledger. Each balance/unit state change and movement insert are atomic and attributed to the employee resolved by the fresh employee code/password challenge for that operation.
 
 ### Cancellation and selected stock returns
 
@@ -127,7 +127,7 @@
 
 ### Cash management and closing
 
-- `CashMovement` is attributed to one Shop and to the employee authorization used to record it.
+- `CashMovement` is attributed to one Shop and to the employee resolved by the fresh employee code/password challenge used to record it.
 - Each `DailyClosing` belongs to exactly one Shop and one business date. Its unique key is `(ShopId, BusinessDate)`.
 - Initial localization is Ireland (`IE`), EUR and `Europe/Dublin`. Euro amounts use exact decimal arithmetic with two decimal places. Irish cash rounding is optional per Shop, applies only to the final cash bill total to the nearest €0.05, and is stored as a separate adjustment; electronic tenders and the VAT calculation base are not rounded.
 
@@ -187,7 +187,7 @@
 
 ## 5. Open decisions
 
-**Decided:** one Company with multiple Shops; Shop-only persistent session; Company-wide employee account/password and exactly EMPLOYEE/MANAGER/ADMIN profiles (ADMIN inherits MANAGER; no multi-role union); fresh employee code + password validation per protected operation without EmployeeActionAuthorization; integer Product stock with negative balances allowed; stock deduction at full balance settlement; optional reservations and selected physical returns; inter-Shop transfers; configurable refurb categories, serialized units, one-year commercial guarantee and image uploads; Company VAT enable/disable flag; .
+**Decided:** one Company with multiple Shops; Shop-only persistent session; Company-wide employee account/password and exactly EMPLOYEE/MANAGER/ADMIN profiles (ADMIN inherits MANAGER; no multi-role union); fresh employee code + password validation per protected operation without EmployeeActionAuthorization; integer Product stock with negative balances allowed and no minimum-stock field; explicit employee-authorized reservations and releases; stock deduction at full balance settlement; selected physical returns; inter-Shop transfers; configurable refurb categories, serialized units, one-year commercial guarantee and image uploads; Company VAT enable/disable flag.
 
 **Still open:**
 
@@ -200,7 +200,7 @@
 - Credit-sale handover before full instalment settlement remains disabled pending Irish legal/regulatory review; initial mode is LAYAWAY.
 - Complete Sale/ServiceOrder transition matrix and production DDL/migrations remain to be reviewed. Images are stored only in PostgreSQL; exact GDPR retention/purge schedule remains pending.
 
-**Out of initial scope by product-owner instruction:** multiple stockrooms/locations within a Shop and reservation-expiry automation. Initial design uses one stock pool per Shop and reservations remain until explicitly consumed or released. Partial sourcing/reservation remains supported where service requirements are fulfilled in batches.
+**Out of initial scope by product-owner instruction:** multiple stockrooms/locations within a Shop and reservation-expiry automation. Initial design uses one stock pool per Shop and explicit reservations remain until consumed or released. Partial reservation is supported when stock is replenished in batches; receipt never reserves automatically.
 
 
 See the [consolidated product-owner decision register](product-owner-decisions.md) for confirmed choices and remaining questions.
