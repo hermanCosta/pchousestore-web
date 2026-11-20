@@ -148,11 +148,11 @@ Loading, empty, validation, conflict, authorization-denied and retry states must
 Use the logical entities already recorded in domain-model.md and database-model.md; do not create a competing physical schema in this feature SPEC.
 
 - ServiceOrder: globally unique internal ID, Shop ownership, immutable Shop-scoped sequential display number, Customer, exactly one non-null Device, initial status `CREATED`, lifecycle status, independently persisted technical outcome (including `NOT_FIXED` after status becomes `PICKED`), handover timestamp, currency, lifecycle timestamps and the integer HDD bad-sector count (`badSector` in the legacy model), conditionally required by selected Service.
-- ServiceOrderItem: Product/Service line, whole-unit quantity for Product items, and monetary snapshot values as finalized by DATA-05. Line additions, edits, removals and repricing are blocked after the first stock reservation or first recorded payment, whichever occurs first; issued document snapshots follow REP-01.
+- ServiceOrderItem: Product/Service line, whole-unit quantity for Product items, and monetary snapshot values as finalized by DATA-05. Line additions, edits, removals and repricing are blocked after the first stock reservation or first recorded payment, whichever occurs first. Before that lock, edits must preserve before/after values in the append-only ServiceOrderEvent history; removal is logical and must not hard-delete the original line. Issued document snapshots follow REP-01.
 - Service catalogue configuration: each `Service` has `requiresBadSectorCount BOOLEAN NOT NULL DEFAULT FALSE`; selecting any Service with this flag enabled makes the order's HDD bad-sector count mandatory.
-- ServiceOrderFault: links the order to Company-shared Fault catalogue entries.
+- ServiceOrderFault: links the order to Company-shared Fault catalogue entries. Removal of a Fault link is logical and must preserve its prior association in the append-only ServiceOrderEvent history.
 - ServicePartRequirement: durable Product demand, required quantity, blocking flag and reservation state.
-- ServiceOrderEvent: append-only status and operational event history with Shop, server-resolved actor Employee, previous/new state, event type/description and timestamp. No employee action-authorization token or authorization foreign key is stored.
+- ServiceOrderEvent: append-only status and operational event history with Shop, server-resolved actor Employee, previous/new state, event type/description, structured before/after payload where data is edited, and timestamp. No employee action-authorization token or authorization foreign key is stored.
 - BusinessNote: append-only employee-attributed notes associated with the ServiceOrder. A human-readable Note is automatically appended for every successfully committed ServiceOrder action, including linked financial and handover actions; it records the server-resolved employee name snapshot, action, timestamp and concise result/reference. Notes are created atomically with their originating action and cannot be edited or deleted. No employee action-authorization token or authorization foreign key is stored.
 - Financial records are owned by FIN-01; procurement records are owned by PROC-01/PROC-02; stock reservation/movement records are owned by the inventory module.
 
@@ -197,7 +197,7 @@ These are route proposals only. FIN-01 owns payment/deposit/refund APIs; PROC-01
 - [ ] AC-03a: Device brand, model and serial number are required at booking; a blank serial number is rejected.
 - [ ] AC-04: The order records one or more approved Faults and Product/Service lines, subject to the final booking validation rules.
 - [ ] AC-05: Device and serial validation follows the approved identity/reuse policy.
-- [ ] AC-06: Order updates preserve historical line/fault references and create auditable events rather than hard-deleting prior rows. Product/Service lines can be changed only before the first stock reservation or first recorded payment, whichever occurs first; all line additions, edits, removals and repricing are rejected afterward.
+- [ ] AC-06: Order updates preserve historical line/fault references and create auditable events rather than hard-deleting prior rows. Before the first stock reservation or first recorded payment, line/fault edits append before/after snapshots to ServiceOrderEvent and removals are logical; after the lock, all line additions, edits, removals and repricing are rejected.
 - [ ] AC-07: The UI shows the current status and append-only event/notes history.
 - [ ] AC-08: A blocking Product requirement that is not fully reserved moves the order to AWAITING_PARTS.
 - [ ] AC-09: Only an explicit authorized command resumes an order when all blocking requirements are fully reserved.
@@ -261,7 +261,7 @@ These are route proposals only. FIN-01 owns payment/deposit/refund APIs; PROC-01
 - **Customer integrity:** ServiceOrder edits may update the order's Device and operational details, but never mutate the linked Customer master record.
 - **State-machine boundary:** `NOT_FIXED` may return to `IN_PROGRESS` before handover. `FIXED` reversal is not inferred from legacy UI and remains a blocker until its target transition is explicitly resolved. `FINISHED` and `REFUNDED` are not target lifecycle statuses.
 - **Shared architecture documents:** `domain-model.md`, `database-model.md` and authentication persistence drafts still contain superseded `TECHNICIAN`/`EmployeeActionAuthorization` designs. Their global reconciliation is required before technical approval and implementation; this SO-01 update does not claim those shared documents have been fully migrated.
-- **Numbering/persistence:** enforce a globally unique internal ID and unique `(shop_id, display_number)`. Allocate the next Shop-scoped display number atomically in the order-creation transaction; never reuse allocated numbers. Physical schema/migration details remain subject to DATA-05 review.
+- **Numbering/persistence:** enforce a globally unique internal ID and unique `(shop_id, display_number)`. Allocate the next Shop-scoped display number atomically in the order-creation transaction; never reuse allocated numbers. Before the line lock, persist line/fault changes as logical updates/removals and append before/after snapshots to ServiceOrderEvent; do not hard-delete historical child rows. Physical schema/migration details remain subject to DATA-05 review.
 
 ## 14. Approval
 
