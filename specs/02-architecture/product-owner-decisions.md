@@ -1,6 +1,6 @@
 # Product-owner Decisions and Remaining Questions — pcHouseStore Web
 
-**Revision:** v43 · 20 November 2026
+**Revision:** v44 · 20 November 2026
 **Status:** Confirmed product decisions are incorporated. A small set of commercial/legal details remains explicitly proposed or deferred; the model is not a production-approved DDL.
 
 ## Confirmed decisions
@@ -180,3 +180,8 @@ The detailed approved requirements are maintained in [Employee Management](../04
 - Editing an employee's email or profile does not invalidate or change the password and does not force a password change.
 - Deactivation blocks new protected operations but does not close the shared ShopSession. An operation that already passed credential, active-status, Company-membership and permission checks may complete even if the employee is deactivated while it is in flight.
 - Reactivation is immediate, requires no additional approval, and preserves the existing credential and any pending mandatory-password-change state.
+
+
+## ServiceOrder owner decisions — 20 November 2026 (continued)
+
+- Preserve the legacy `Undo Fixed` capability with a settlement guard: a `FIXED` ServiceOrder may return to `IN_PROGRESS` only while its balance remains outstanding. Keep active stock reservations; do not reverse payments or inventory postings. Once full settlement consumes reserved parts, block direct reversal. Any later rework must use a separate corrective workflow that does not undo settled financial or stock movements.
