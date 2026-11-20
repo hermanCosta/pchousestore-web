@@ -1,3 +1,5 @@
+> **EMPLOYEE-MANAGEMENT SUPERSESSION (2026-11-20):** Older ADR statements in this file that describe `TECHNICIAN`, dual-role permission unions, `EmployeeActionAuthorization`, one-use employee authorization tokens, employee-authentication audit logging, or employee role details are historical and superseded. The authoritative current rules are in [Employee Management](../04-features/employee-management.md). The Shop-only `ShopSession` and OIDC identity boundary remains valid. Reconcile business-operation permissions in the relevant feature SPECs before implementation.
+
 # Architecture Decision Records — pcHouseStore Web
 
 **Status:** DOMAIN BASELINE RECORDED — v19 (OAuth/OIDC API security added).  
