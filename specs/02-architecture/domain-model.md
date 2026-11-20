@@ -13,7 +13,7 @@
 | People & Customers | Shared company-level customers and contact records | Person, Customer |
 | Catalogue | Shared product and service definitions | CatalogItem, Product, Service, ProductCategory |
 | Stock | Branch balances, reservations, movements, inter-shop transfers and stock replenishment | ShopInventory, InventoryReservation, InventoryMovement, StockTransfer, StockReturn |
-| Parts to Buy | Read-only Shop-scoped visibility of uncovered service-part demand grouped by Product and traceable to each ServiceOrder | ServicePartRequirement (derived view; no procurement aggregate) |
+| Parts to Buy | Read-only Shop-scoped visibility of uncovered service-part demand grouped by Product, traceable to each ServiceOrder, with Product reference links | ServicePartRequirement (derived view; no procurement aggregate) |
 | Refurbishment & Customer Claims | Category-specific specifications, condition grades, inspections, private unit images, individually tracked equipment, 12-month commercial guarantee and complaint/remedy tracking | ProductAttributeDefinition, RefurbishedConditionGrade, RefurbishedUnit, RefurbishedUnitInspection, RefurbishedUnitWarranty, CustomerComplaintCase, CustomerComplaintCaseEvent, CustomerComplaintCaseAttachment, CustomerComplaintResolution |
 | Sales | Branch sales, lines and seller attribution | Sale, SaleItem |
 | Service Orders | Branch service workflow, device, faults, line items, part requirements and notes | ServiceOrder, ServiceOrderItem, ServiceOrderFault, ServiceOrderEvent, ServicePartRequirement, BusinessNote |
@@ -108,9 +108,9 @@
 - Each Product line that requires parts has a durable `ServicePartRequirement` linked to its `ServiceOrderItem`; only Product catalogue items can create requirements. Required quantities are positive whole numbers.
 - The Shop has a read-only **Parts to Buy** view, independent of individual ServiceOrder screens. It is calculated from each requirement's uncovered quantity after active stock reservations and current Shop stock availability are accounted for.
 - The view groups uncovered quantities by Product and provides a breakdown of the originating ServiceOrders and their individual quantities. It is a presentation of existing demand, not a separate request or purchase record.
-- The view is Shop-scoped. It needs only the Product, total uncovered quantity and source ServiceOrder context; it has no supplier, buyer assignment, priority, reference-image, external-link, order-status, ETA, tracking or receipt workflow.
+- The view is Shop-scoped. It shows the Product, total uncovered quantity, source ServiceOrder context and all external reference links configured on that Product. Multiple URLs are allowed per Product and are maintained centrally in the Product catalogue; the Parts to Buy view only displays them. There is no supplier, buyer assignment, priority, reference-image, purchase status, ETA, tracking or receipt workflow.
 - As stock is replenished through the Stock module and reserved against requirements, the view recalculates automatically. Partial reservations reduce the uncovered quantity; the ServiceOrder remains `AWAITING_PARTS` while any blocking requirement is not fully reserved.
-- A stock shortage does not create a purchase request. The business purchases parts outside the application using any preferred source. The application records only the stock changes needed to keep inventory and ServiceOrder reservations accurate.
+- A stock shortage does not create a purchase request. The business purchases parts outside the application using any preferred source. Product external reference links are informational only and do not record supplier or purchase activity. The application records only the stock changes needed to keep inventory and ServiceOrder reservations accurate.
 - When every blocking requirement for an order is fully reserved, an employee-authorized `ResumeServiceOrder` command may move it from `AWAITING_PARTS` to `IN_PROGRESS`. Partial reservations are retained but never satisfy the resume guard.
 - After repair, `FIXED` retains reservations. While its balance remains outstanding, it may return to `IN_PROGRESS` without releasing reservations or reversing financial/inventory postings. Full settlement consumes reserved parts; later rework requires a separate corrective workflow. Cancelling before consumption releases reservations.
 
@@ -159,7 +159,7 @@
 19. `DailyClosing` is unique on `(ShopId, BusinessDate)` and reconciles only that Shop.
 20. A service order may enter `AWAITING_PARTS` from `CREATED` or `IN_PROGRESS` only while at least one blocking `ServicePartRequirement` is not fully reserved.
 21. A stock entry increases Shop availability; any reservation against service requirements is applied atomically and reflected in the Parts to Buy view.
-22. The Parts to Buy view is derived from uncovered Product-part requirements and current stock reservations; it must not create or track external purchase records.
+22. The Parts to Buy view is derived from uncovered Product-part requirements and current stock reservations; it may display multiple informational external reference URLs maintained on each Product, but must not create or track external purchase records.
 
 ## 4. Aggregate boundaries and transactional use cases
 
