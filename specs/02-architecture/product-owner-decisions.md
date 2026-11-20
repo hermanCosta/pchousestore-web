@@ -1,6 +1,6 @@
 # Product-owner Decisions and Remaining Questions — pcHouseStore Web
 
-**Revision:** v41 · 20 November 2026
+**Revision:** v42 · 20 November 2026
 **Status:** Confirmed product decisions are incorporated. A small set of commercial/legal details remains explicitly proposed or deferred; the model is not a production-approved DDL.
 
 ## Confirmed decisions
@@ -30,7 +30,7 @@
 | Employee administration audit | Do not write employee-administration actions to business `notes` and do not introduce a dedicated employee-administration audit log. General application logs remain subject to existing redaction rules. |
 | Last active administrator/manager | A Company must retain at least one active `ADMIN` and at least one active user with management authority (`MANAGER` or `ADMIN`). Reject profile/status changes that violate either invariant. |
 | Employee removal | Use deactivation rather than hard deletion; preserve historical employee references. `MANAGER`/`ADMIN` deactivation permissions and invariants are defined in Employee Management. |
-| Password baseline and failed attempts | Minimum 12 characters; support at least 128 characters and password managers/paste; no arbitrary periodic expiry; rotate after compromise or authorized reset; use vetted adaptive hashing. Failed attempts never lock or disable an account or trigger credential-specific waiting/rejection windows. Limit authentication request rates by source/network and endpoint. |
+| Employee password baseline and failed attempts | Minimum 6 characters; support at least 128 characters and password managers/paste; no arbitrary periodic expiry; rotate after compromise or authorized reset; use vetted adaptive hashing. Failed attempts never lock or disable an account or trigger credential-specific waiting/rejection windows. Limit authentication request rates by source/network and endpoint. |
 | Authentication request-rate limit | Maximum 10 requests per minute per source IP and authentication endpoint, counting successes and failures. Excess requests receive HTTP 429 through the end of that one-minute window; no credential lockout. |
 | Inventory | Only Product catalogue items have stock. Product quantities are whole units. Quantity-tracked stock may become negative; reservations cannot. One stock pool per Shop; no reservation-expiry automation or multiple internal locations in v1. Minimum quantity is configured per Shop and drives its low-stock reporting. |
 | Physical stock returns | Receive selected returned goods as `PENDING_INSPECTION`, outside sellable stock. Only an explicit inspection disposition `RESTOCK` creates an inbound movement; `QUARANTINE` and `DISPOSE` do not increase sellable stock. A serialized refurbished return remains `QUARANTINED` until inspection passes and it is explicitly restocked. |
