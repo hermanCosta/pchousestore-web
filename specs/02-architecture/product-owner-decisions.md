@@ -152,13 +152,13 @@ No processor must be selected for v1. `CASH` and `CARD` are the payment methods.
 - New ServiceOrders start in `CREATED`, not the legacy `IN_PROGRESS` initial state.
 - Device serial number is mandatory at booking. Brand and model remain required as in the inspected legacy booking form. Serial-number uniqueness across the Company remains undecided.
 - The legacy `badSector` integer represents the count of defective/bad sectors on the device HDD. It is required only for selected Services that need this measurement; operating-system installation is a confirmed example. The exact Service trigger list/configuration and numeric bounds remain open.
-- ServiceOrder workflows must not edit Customer master data. Equipment and service details may be edited through the ServiceOrder edit workflow; payment and handover actions are separate notes-only interactions for order details. Whether Product/Service lines or prices may be changed after reservation or partial/settled payment, and how their historical snapshots are preserved, remains open.
+- ServiceOrder workflows must not edit Customer master data. Equipment and service details may be edited through the ServiceOrder edit workflow. Product/Service lines are locked after the first stock reservation or first recorded payment, whichever occurs first; before that point, edits preserve before/after snapshots in immutable events.
 - Payment and handover actions must not modify Customer, Device, Fault or ServiceOrder line details. They may append a Note alongside their own financial or handover event.
 - Customer handover is allowed only for a ServiceOrder whose technical outcome is `NOT_FIXED`, and is prohibited while its current status is `FIXED`. On handover, the lifecycle status changes to `PICKED`; the technical outcome `NOT_FIXED` must remain independently persisted and visible.
-- MANAGER and TECHNICIAN have equal permission to mark a ServiceOrder `NOT_FIXED` and to record its eligible handover. This does not change Manager-only payment, cancellation, deposit-forfeiture or refund permissions.
+- `EMPLOYEE`, `MANAGER` and `ADMIN` may mark a ServiceOrder `NOT_FIXED` and record eligible handover. Cancellation and financial actions are restricted to `MANAGER`/`ADMIN` where specified by the ServiceOrder SPEC and FIN-01.
 - Every successfully committed action in the ServiceOrder context must append an immutable, chronological, employee-attributed entry to `Notes`, describing the action, timestamp and concise result/reference. The corresponding structured domain or financial record remains authoritative; its Note is committed atomically. Failed/rolled-back actions do not create Notes.
 - At collection of a `NOT_FIXED` order, eligible amounts already received for the order, including refundable deposit balances, may be refunded through FIN-01. Refund is a separate, explicit Manager-only action and is not automatic on handover. Existing original-tender, deposit-lifecycle and refundable-balance limits remain in force.
-- Whether an outstanding ServiceOrder balance blocks handover of a `NOT_FIXED` order remains open.
+- A `NOT_FIXED` order may be handed over with an outstanding balance or held deposit. Handover does not settle, waive or automatically refund the balance; eligible refunds remain separate explicit `MANAGER`/`ADMIN` actions under FIN-01.
 
 
 ## Employee Management — approved 20 November 2026
@@ -195,7 +195,7 @@ The detailed approved requirements are maintained in [Employee Management](../04
 
 - ServiceOrder blocking Product-part requirements support partial reservations as stock becomes available. The order remains in `AWAITING_PARTS` while any blocking requirement is not fully reserved. Resume to `IN_PROGRESS` is allowed only after all blocking requirements are fully reserved; partial reservation alone is insufficient.
 
-- A ServiceOrder stock shortage does not automatically create a procurement/purchase request. The order remains `AWAITING_PARTS` while blocking requirements are short; the team may initiate sourcing separately through the Shop-wide Service Parts Purchase Queue when needed.
+- A ServiceOrder stock shortage does not create a purchase request. The order remains `AWAITING_PARTS` while blocking requirements are not fully reserved. Parts may be purchased outside the application; stock receipt increases availability only, and the employee must explicitly reserve quantities for the target requirement before the order can resume.
 
 
 
