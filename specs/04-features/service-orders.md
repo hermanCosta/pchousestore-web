@@ -228,7 +228,7 @@ These are route proposals only. FIN-01 owns payment/deposit/refund APIs; PROC-01
 - NOT_FIXED collection refunds: validate partial/full refund of eligible settled payments and held refundable deposits through FIN-01, `MANAGER`/`ADMIN` challenge, original-tender allocation, deposit/payment refundable caps, duplicate prevention and no automatic refund when status becomes PICKED.
 - Authorization: EMPLOYEE/MANAGER/ADMIN profile matrix per action; fresh employee code/password challenge for every protected command; inactive/wrong-Company employee rejection; no cached authentication or EmployeeActionAuthorization token; server-resolved actor attribution; ShopSession-only reads.
 - Audit: status change plus event/note atomicity, immutable prior lines/faults and event chronology.
-- Cancellation/refund: allow cancellation from CREATED, IN_PROGRESS and AWAITING_PARTS with and without payments/reservations; reject cancellation from FIXED, NOT_FIXED and PICKED; verify no automatic refund or deposit forfeiture, explicit FIN-01 financial actions, reservation release, separate return of consumed parts, partial refund, refund cap and Manager-only authorization.
+- Cancellation/refund: allow cancellation from CREATED, IN_PROGRESS and AWAITING_PARTS with and without payments/reservations; reject cancellation from FIXED, NOT_FIXED and PICKED; verify no automatic refund or deposit forfeiture, explicit FIN-01 financial actions, reservation release, separate return of consumed parts, partial refund, refund cap and `MANAGER`/`ADMIN` authorization.
 
 ## 11. Owner decisions received — 2026-11-19
 
