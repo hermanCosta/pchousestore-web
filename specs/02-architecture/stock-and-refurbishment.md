@@ -169,3 +169,8 @@ Every refurbished unit sold by the Company carries a 12-month commercial guarant
 3. Initial stock design is one stock pool per Shop. Reservation-expiry automation and multiple internal stock locations are intentionally out of scope. Reservations remain active until explicitly released or consumed. Partial reservations are supported for service-part requirements; purchases and sourcing happen outside the application.
 4. Returned goods enter pending inspection outside sellable stock; only an explicit RESTOCK disposition credits inventory. Serialized units remain quarantined until inspection passes and restock is approved.
 5. `CREDIT_SALE` handover-before-full-payment remains disabled pending Irish legal/regulatory review; the initial enabled mode is `LAYAWAY`.
+
+
+## 11. Legacy evidence reconciliation
+
+See [Legacy Stock and ServiceOrder Reconciliation](legacy-stock-service-order-reconciliation.md) for the source-level comparison with `hermanCosta/pchousestoremvn`. The legacy application stores a manually editable product quantity and provides a low-stock listing, but the reviewed source does not establish a stock ledger, reservation lifecycle or automatic ServiceOrder/Sale stock deduction. The target stock ledger, explicit reservations, settlement consumption and independent pickup/refund/cancellation flows are approved redesign behavior, not legacy parity. Do not infer migration quantities or reorder thresholds from the legacy catalogue without a separate data-validation decision.
