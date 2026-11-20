@@ -47,24 +47,25 @@ A reservation is tied to exactly one Sale or ServiceOrder and to the specific so
 
 ## 5. Service-order stock timing
 
-1. When a `ServicePartRequirement` is created, the Shop reserves currently available whole units immediately, when reservation is requested. If only part is available, reserve that portion and procure the remaining shortage; a blocking shortage moves the ServiceOrder to `AWAITING_PARTS`.
+1. Creating a `ServicePartRequirement` does not reserve stock. Stock replenishment increases on-hand and available quantity only. An employee must explicitly select the ServiceOrder requirement and requested quantity in a separate reservation action. The backend reserves no more than the currently available quantity; if less than requested is available, it creates a partial reservation for the available amount and reports the actual reserved and remaining quantities. A blocking requirement that remains short keeps the ServiceOrder in `AWAITING_PARTS`.
 2. A service deposit received at booking (for example, to secure a battery/keyboard order or as a guarantee) is recorded as a financial deposit. Receiving it does not itself consume stock.
 3. The ServiceOrder cannot transition to `FIXED` while any blocking part requirement remains short. Once all blocking requirements are reserved, an employee-authorized command resumes the order to `IN_PROGRESS`; after repair, transition to `FIXED` keeps the reservations while the repaired equipment awaits payment/pickup.
 4. When settled payments and explicitly applied deposits reduce the ServiceOrder balance to zero, the service payment command consumes reserved product parts atomically. This is the defined meaning of payment completion for stock posting; partial settlement does not deduct stock. Deduction is not delayed until the later physical `PICKED`/collection event.
 5. Non-blocking product entries follow the same full-settlement deduction rule. If a quantity-tracked balance becomes negative because of the payment posting, the signed deficit is retained and reported.
 6. If the order is cancelled before consumption, active reservations are released; no return movement is posted.
 
-## 5A. Service-part procurement and receipt
+## 5A. Service-part replenishment and reservation
 
-The detailed workflow is specified in [Service Parts Procurement Workflow](service-parts-procurement.md). The inventory rules are:
+The former supplier-procurement workflow is retired. Parts to Buy is only a visibility list; purchases happen outside the application. Inventory replenishment is recorded through the normal Stock module and is not linked to an external purchase or a ServiceOrder allocation.
 
-1. Every part needed for a service job must exist as a product `ServiceOrderItem` and a `ServicePartRequirement`. A requirement has a positive integer quantity and may be marked `blocks_work` (default true).
-2. When a requirement is created, the Shop may reserve currently available units. If a blocking requirement is not fully reserved, the ServiceOrder moves to `AWAITING_PARTS`. A partially available requirement may be fulfilled by existing stock plus one or more supplier purchases.
-3. A Shop can create a `SupplierPurchase` with a supplier/source, order reference, purchase link, product listing link, order date, expected delivery date, tracking link/reference and notes. One purchase can contain several purchase lines and allocations to procurement request lines from multiple service orders in the same Shop; the request lines link back to durable service-part requirements.
-4. When goods arrive, an employee enters the actual accepted quantity, including partial deliveries. This posts `PURCHASE_RECEIPT_IN` only for the actual quantity received. Allocated quantities are reserved against the linked service requirements in the same transaction; unallocated over-order quantity stays available as normal Shop stock.
-5. Every order-status, ETA, tracking and receipt change is recorded in an append-only procurement event timeline. An overdue indicator is derived when the ETA passes while the purchase remains open.
-6. When every blocking requirement is fully reserved, an employee-authorized command resumes the ServiceOrder to `IN_PROGRESS`. Receipt is not an automatic repair-start event.
-7. Supplier purchasing is operational traceability plus inventory receipt. Supplier accounts payable, settlement, supplier returns and marketplace API integrations are out of the initial scope.
+1. Every part needed for a service job must exist as a Product `ServiceOrderItem` and a `ServicePartRequirement`. A requirement has a positive integer quantity and may be marked `blocks_work` (default true).
+2. Creating a requirement does not reserve stock. A stock receipt increases on-hand and available quantity only; it never automatically reserves or allocates received units to an order.
+3. `EMPLOYEE`, `MANAGER` or `ADMIN` may explicitly reserve available stock for a ServiceOrder requirement. Each reservation action requires a fresh employee code/password challenge; the backend resolves the employee, validates active status, Company membership and permission, and derives the Shop from ShopSession.
+4. The operator selects the target ServiceOrder requirement and requested whole-unit quantity. The backend checks current availability and creates the reservation atomically. It must never reserve more than the currently available quantity. If availability is lower than requested, reserve the available quantity as a partial reservation and return the actual reserved and remaining quantities to the UI. If no quantity is available, create no reservation and report the shortage.
+5. Each successful reservation/release records the server-resolved employee and timestamp in the relevant immutable inventory/ServiceOrder event and ServiceOrder `Notes`, atomically with the stock update. A failed or rolled-back action creates no event or Note.
+6. A blocking requirement that remains short keeps the ServiceOrder in `AWAITING_PARTS`. When every blocking requirement is fully reserved, an explicit employee-authorized resume command is still required to return the order to `IN_PROGRESS`; reservation itself never resumes work.
+7. Releasing a reservation is a separate explicit, employee-authorized action, except when a defined lifecycle operation (such as eligible cancellation) releases reservations atomically as part of that operation. Release restores availability only and does not change on-hand stock.
+8. No supplier, purchase-order, purchase allocation, ETA, tracking, supplier receipt or procurement event is recorded in this workflow.
 
 ## 6. Refund/cancellation and selected stock return
 
