@@ -1,6 +1,6 @@
 # Product-owner Decisions and Remaining Questions — pcHouseStore Web
 
-**Revision:** v46 · 20 November 2026
+**Revision:** v47 · 20 November 2026
 **Status:** Confirmed product decisions are incorporated. A small set of commercial/legal details remains explicitly proposed or deferred; the model is not a production-approved DDL.
 
 ## Confirmed decisions
@@ -189,3 +189,5 @@ The detailed approved requirements are maintained in [Employee Management](../04
 - ServiceOrder booking creates the order in `CREATED` and does not imply repair has started. An explicit employee-authorized start-work action moves it to `IN_PROGRESS`. A blocking part shortage found before work starts may move it directly from `CREATED` to `AWAITING_PARTS`; receiving/reserving parts never starts work automatically, and resumption remains explicit.
 
 - Starting ServiceOrder work (`CREATED` → `IN_PROGRESS`) requires fresh employee code/password authentication. Record the server-resolved employee as the actor in the immutable ServiceOrder event and `Notes`; ShopSession alone is insufficient for this protected action. Resuming from `AWAITING_PARTS` likewise remains an employee-authenticated explicit action.
+
+- A ServiceOrder in `AWAITING_PARTS` returns to `IN_PROGRESS` only after every blocking part requirement is fully reserved. Resumption is an explicit action requiring fresh employee code/password authentication; receipt/reservation alone never restarts work. Record the authenticated employee in the event and `Notes`.
