@@ -95,6 +95,7 @@ The legacy repository is https://github.com/hermanCosta/pchousestoremvn, branch 
 | BR-22 | Every successfully committed action performed in the ServiceOrder context must append a chronological, employee-attributed entry to `Notes`. The entry describes the action and its result; entries are append-only. The structured ServiceOrder/financial event remains authoritative and the corresponding Note must be committed atomically with its action. Rejected or rolled-back actions must not create Notes. | Product-owner decision 2026-11-19; legacy OrderNote workflow | DECIDED |
 | BR-23 | When a `NOT_FIXED` order is handed over, eligible amounts already received for the order, including refundable deposit balances, may be refunded through FIN-01. A refund is a separate explicit financial action, not an automatic consequence of handover; it remains Manager-only, follows the original-tender and refundable-balance rules, and must be recorded in `Notes`. | Product-owner decision 2026-11-19; FIN-01 | DECIDED |
 | BR-24 | A `NOT_FIXED` device may be handed over even when the ServiceOrder has an outstanding balance or held deposit. Handover changes the lifecycle status to `PICKED` but does not settle, waive or automatically refund the outstanding amount. The financial balance and deposit remain governed by FIN-01; any eligible refund is a separate explicit Manager-only action. | Product-owner decision 2026-11-20 | DECIDED |
+| BR-25 | Each ServiceOrder is associated with exactly one Device. Device serial number is mandatory but is not Company-unique; duplicate serial values are allowed. The operator may explicitly select/reuse an existing Device record during booking. | Product-owner decision 2026-11-20 | DECIDED |
 
 ## 5. Proposed redesign (REDESIGN)
 
@@ -143,7 +144,7 @@ Loading, empty, validation, conflict, authorization-denied and retry states must
 
 Use the logical entities already recorded in domain-model.md and database-model.md; do not create a competing physical schema in this feature SPEC.
 
-- ServiceOrder: Shop ownership, Customer, Device, initial status `CREATED`, lifecycle status, independently persisted technical outcome (including `NOT_FIXED` after status becomes `PICKED`), handover timestamp, currency, lifecycle timestamps and the integer HDD bad-sector count (`badSector` in the legacy model), conditionally required by selected Service.
+- ServiceOrder: Shop ownership, Customer, exactly one Device, initial status `CREATED`, lifecycle status, independently persisted technical outcome (including `NOT_FIXED` after status becomes `PICKED`), handover timestamp, currency, lifecycle timestamps and the integer HDD bad-sector count (`badSector` in the legacy model), conditionally required by selected Service.
 - ServiceOrderItem: Product/Service line, whole-unit quantity for Product items, and monetary snapshot values as finalized by DATA-05.
 - ServiceOrderFault: links the order to Company-shared Fault catalogue entries.
 - ServicePartRequirement: durable Product demand, required quantity, blocking flag and reservation state.
@@ -229,6 +230,7 @@ These are route proposals only. FIN-01 owns payment/deposit/refund APIs; PROC-01
 
 - **SO-OPEN-01 — RESOLVED:** New ServiceOrders start in `CREATED`.
 - **SO-OPEN-02 — PARTIALLY RESOLVED:** Device serial number is mandatory. The inspected legacy form also requires brand, model, at least one Fault and at least one Product/Service line; no contrary change was requested.
+- **SO-OPEN-03 — RESOLVED:** Each ServiceOrder references exactly one Device; serial number is mandatory but not Company-unique. The operator may explicitly select/reuse an existing Device.
 - **SO-OPEN-04 — PARTIALLY RESOLVED:** `badSector` means HDD bad-sector count. It is mandatory only for selected Services that require the measurement; operating-system installation is a confirmed example. The exact trigger list/configuration and numeric bounds remain open.
 - **SO-OPEN-05 — PARTIALLY RESOLVED:** The ServiceOrder workflow must not edit Customer master data. Equipment/service information may be edited subject to lifecycle restrictions. Payment and handover actions must not modify order details and may only append a Note alongside their own financial/handover event. The exact lock point after a payment is recorded remains open.
 - **SO-OPEN-07 — PARTIALLY RESOLVED:** Handover is allowed only for technical outcome `NOT_FIXED` and is prohibited while current status is `FIXED`. Handover changes lifecycle status to `PICKED` while preserving `technicalOutcome = NOT_FIXED`. Whether an outstanding balance blocks handover remains open.
@@ -239,7 +241,7 @@ These are route proposals only. FIN-01 owns payment/deposit/refund APIs; PROC-01
 
 ## 12. Open questions — product-owner decision required
 
-- [ ] **SO-OPEN-03 — Device identity:** Is serial number unique across the Company, or may different devices share/reuse a serial? Should the target keep exactly one Device per ServiceOrder?
+- [x] **SO-OPEN-03 — Device identity — RESOLVED:** Each ServiceOrder references exactly one Device. Serial number is mandatory but not Company-unique; duplicate serial values are allowed. During booking, the operator may explicitly select/reuse an existing Device record.
 - [ ] **SO-OPEN-04a — Bad-sector trigger:** Which catalogue Services require HDD bad-sector count (operating-system installation is confirmed), and should this be configured on each Service catalogue record? What numeric range/validation is valid?
 - [ ] **SO-OPEN-05a — Line and price history:** Can Product/Service lines or their prices be changed after a part reservation or partial/settled payment? How must the original line values and issued document snapshots be preserved?
 - [ ] **SO-OPEN-06 — State machine:** What does `FINISHED` mean in the target? Is `NOT_FIXED` terminal or resumable? Which states allow cancellation?
@@ -249,6 +251,6 @@ These are route proposals only. FIN-01 owns payment/deposit/refund APIs; PROC-01
 
 ## 12. Approval
 
-- Product approval: PARTIAL — owner decisions recorded 2026-11-19 and 2026-11-20, including `NOT_FIXED` to `PICKED` handover representation, independent preservation of technical outcome, handover with outstanding balance, Notes traceability and permission to refund eligible payments/deposits at collection; resolve the remaining open questions above.
+- Product approval: PARTIAL — owner decisions recorded 2026-11-19 and 2026-11-20, including device identity/reuse, `NOT_FIXED` to `PICKED` handover representation, independent preservation of technical outcome, handover with outstanding balance, Notes traceability and permission to refund eligible payments/deposits at collection; resolve the remaining open questions above.
 - Technical approval: PENDING — finalize transition matrix, DTOs, persistence constraints and command transactions.
 - Implementation authorization: NOT GRANTED — this DRAFT is for discovery and product decisions only.
