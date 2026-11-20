@@ -188,6 +188,7 @@ Procurement behavior:
 - For received quantities allocated to request lines, the same database transaction creates/extends inventory reservations for the corresponding ServiceOrder. Excess/unallocated received units stay available in the Shop.
 - ETA or tracking changes create a `SupplierPurchaseEvent`. `OVERDUE` is derived when `expected_delivery_at` is in the past and the purchase is not fully received or cancelled.
 - `AWAITING_PARTS` remains while any blocking requirement is not fully reserved. Once all blocking requirements are reserved, a separate employee-authorized resume command returns the order to `IN_PROGRESS`. The order status itself is not automatically derived from request or purchase status.
+- A `FIXED` order may transition back to `IN_PROGRESS` only while `balance_due > 0`; this transition retains active reservations and must not reverse payments or inventory movements. When settlement reduces the balance to zero and consumes reserved parts, reject direct `FIXED` reversal. Later rework requires a separate corrective workflow.
 - Supplier bills, AP balances, payment to suppliers, procurement tax accounting, supplier returns and third-party marketplace APIs are outside the initial scope.
 
 ### Finance: transactions, service deposits, instalments, refunds and cash management
