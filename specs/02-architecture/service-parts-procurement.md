@@ -1,5 +1,7 @@
 # Service Parts Procurement Workflow
 
+> **SUPERSEDED — DO NOT IMPLEMENT.** On 2026-11-20 the Product Owner replaced this supplier-procurement workflow with the simplified Shop-scoped **Parts to Buy** visibility list. This document is retained only as historical discovery context. Supplier records, procurement requests, request rounds, buyer assignments, supplier purchases, allocations, reference photos, ETA/tracking, purchase receipts and procurement event timelines are out of scope. The authoritative rules are in [SO-01 Service Orders](../04-features/service-orders.md), [Product Owner Decisions](product-owner-decisions.md), and [Stock and Refurbishment](stock-and-refurbishment.md).
+
 **Status:** DRAFT — owner requirement recorded 2026-11-05. See ADR-013 and ADR-014.  
 **Scope:** Identify, queue, source, order, track, receive and reserve electronic parts required to complete a service order. This is an operational procurement workflow, not a supplier accounts-payable module.
 
