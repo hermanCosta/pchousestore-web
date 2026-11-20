@@ -1,6 +1,6 @@
 # Product-owner Decisions and Remaining Questions — pcHouseStore Web
 
-**Revision:** v40 · 19 November 2026
+**Revision:** v41 · 20 November 2026
 **Status:** Confirmed product decisions are incorporated. A small set of commercial/legal details remains explicitly proposed or deferred; the model is not a production-approved DDL.
 
 ## Confirmed decisions
@@ -166,7 +166,7 @@ The detailed approved requirements are maintained in [Employee Management](../04
 
 - Active profiles are `EMPLOYEE`, `MANAGER` and `ADMIN`; retire `TECHNICIAN` and do not use dual-role assignment.
 - All three profiles can operate in every Shop in the same Company; no per-Shop employee assignment exists.
-- `MANAGER` administers `EMPLOYEE` and `MANAGER` accounts but cannot create/grant `ADMIN`. `ADMIN` has full Company-wide administrative authority, can manage other administrators and multiple admins are allowed.
+- `MANAGER` retains the full application permission set assigned to the Manager profile in approved feature SPECs and administers `EMPLOYEE`/`MANAGER` accounts, but cannot create/grant `ADMIN`. `ADMIN` inherits all Manager permissions and has full Company-wide administrative authority, can manage other administrators and multiple admins are allowed.
 - Keep at least one active `ADMIN` and at least one active user with management authority in each Company.
 - Employee registration requires name, email and profile. Email is unique case-insensitively within the Company; duplicate names are allowed.
 - Reuse `EmployeeCredential` and the existing reset flow. Temporary password is `<normalized-first-name>@pchouse`, displayed once after creation/reset and changed before protected operations. Employee recovery is performed only by `MANAGER` or `ADMIN`; self-service change requires the current password.
