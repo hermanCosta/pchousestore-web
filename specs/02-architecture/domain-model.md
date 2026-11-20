@@ -37,7 +37,7 @@
 - `Employee` is a company-level workforce identity with an individual credential verifier (stored only as a secure hash) and active status.
 - Each employee has one Company-wide account and password. The same credentials work in every Shop belonging to the Company; no duplicate account is created for each branch.
 - Employee accounts are Company-wide and use exactly one profile: `EMPLOYEE`, `MANAGER` or `ADMIN`. `TECHNICIAN` and multi-role assignment/permission-union semantics are retired. `ADMIN` inherits the full `MANAGER` permission set; `EMPLOYEE` performs only actions explicitly granted by each approved feature SPEC. The active Shop still comes only from `ShopSession`.
-- `ShopInventory.minimum_quantity` is Shop-specific and drives that Shop's low-stock reporting.
+- `ShopInventory` has no minimum-stock quantity, reorder point or minimum-based low-stock threshold. `quantity_on_hand` represents the physical quantity; `quantity_reserved` is tracked separately, and `available_quantity = quantity_on_hand - quantity_reserved`. Do not import the legacy `minQty` field.
 - Before each protected business command, the executing employee supplies their employee code and individual password. The backend resolves the employee and directly validates the credential, active status, Company membership and feature-specific profile permission before executing the operation. Every protected operation requires a fresh challenge; authentication is never cached or reused. No `EmployeeActionAuthorization` token, entity, endpoint or persisted authorization record is part of the target design. Never place `EmployeeId` or employee role in the long-lived ShopSession identity.
 
 ### People and customers
