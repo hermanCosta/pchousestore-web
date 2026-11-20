@@ -195,3 +195,5 @@ The detailed approved requirements are maintained in [Employee Management](../04
 - ServiceOrder blocking Product-part requirements support partial reservations as stock becomes available. The order remains in `AWAITING_PARTS` while any blocking requirement is not fully reserved. Resume to `IN_PROGRESS` is allowed only after all blocking requirements are fully reserved; partial reservation alone is insufficient.
 
 - A ServiceOrder stock shortage does not automatically create a procurement/purchase request. The order remains `AWAITING_PARTS` while blocking requirements are short; the team may initiate sourcing separately through the Shop-wide Service Parts Purchase Queue when needed.
+
+- A ServiceOrder may have multiple separate, manually initiated procurement requests over its lifetime. When an additional part need is identified, the team may create a new request even if an earlier request exists; each request/round preserves its own history and must not overwrite prior requests or purchase history. Requests are never created automatically from a stock shortage.
