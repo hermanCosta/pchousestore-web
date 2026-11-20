@@ -179,7 +179,8 @@
 | DailyClosing | DailyClosingCashCount, DailyClosingCorrection | Open with counted opening float; calculate expected drawer; count and close once per Shop/date; preserve later corrections separately |
 | Sale | SaleItem, PaymentTransaction, InventoryReservation, StockReturn | Settle sale and consume stock atomically; release on cancellation; record selected return |
 | ServiceOrder | ServiceOrderItem, ServiceOrderEvent, PaymentTransaction, InventoryReservation, StockReturn | Mark FIXED without consumption; consume product stock at full settlement (before any later pickup status); release on cancellation; record selected return |
-| ServicePartRequirement | ServiceOrderItem and InventoryReservationLine | Track required Product quantities, calculate uncovered demand for the Parts to Buy view and keep the order awaiting parts until blocking requirements are fully reserved |
+| ServicePartRequirement | ServiceOrderItem and InventoryReservationLine | Track required Product quantities, calculate uncovered demand for the Parts to Buy list and keep the order awaiting parts until blocking requirements are fully reserved |
+| ManualPartToBuy | Shop, optional Product and ManualPartToBuyReference | Maintain an additional Shop-scoped part reminder independent of ServiceOrders; Product-backed entries reuse catalogue references, while free-text entries own multiple informational URLs |
 | PaymentTransaction | PaymentAllocation | Persist one payment/refund with allocations and enforce aggregate invariants |
 | DailyClosing | Closing snapshots | Reconcile one Shop/business date |
 
