@@ -265,7 +265,7 @@ Parts to Buy behavior:
 | Release/cancel reservation | Reserved quantity decreases | No change | No movement |
 | Sale balance reaches zero | Active reserve consumed; remaining quantity deducted as needed | Decreases by sold product qty | `SALE_OUT` |
 | ServiceOrder marked FIXED | Remains active | No change | No movement |
-| Supplier purchase partially/fully received | Allocated qty reserved for service requirement; excess qty free | Increases by actual accepted qty | `PURCHASE_RECEIPT_IN` |
+| Stock replenished through the Stock module | Available quantity may be reserved against service requirements | Increases by stock-entry quantity | Stock-entry movement |
 | ServiceOrder marked AWAITING_PARTS | Existing available portions remain reserved; no deduction | No change | No movement |
 | ServiceOrder balance reaches zero | Active reserve consumed; remaining unreserved qty is deducted as required | Decreases by used product qty | `SERVICE_ORDER_OUT` (pickup is a separate later event) |
 | Unpaid sale/order cancelled | Reservation released | No change | No movement |
