@@ -78,7 +78,7 @@ The entity-specific image relations below store the parent FK and `stored_image_
 |---|---|---|
 | `customer` | `id`, `company_id`, `person_id`, `phone_e164`, notes, active | Company-level customer shared across Shops; required phone matching key in E.164 format; unique `(company_id,phone_e164)` blocks duplicate customers, including soft-deleted records. |
 | `catalog_item` | `id`, `company_id`, `kind` (`PRODUCT`/`SERVICE`), name, optional SKU, list_price, active | Shared Company catalogue; when present SKU must match `SKU-[A-Z0-9]{8}`, normalized uppercase and unique within Company including inactive records. `OTHER` is not a supported target kind. |
-| `product` | `catalog_item_id` PK/FK, `product_category_id`, `inventory_tracking_mode` (`QUANTITY`/`SERIALIZED_UNIT`), other product-level attributes | Subtype only for kind PRODUCT; refurbished serialized products use SERIALIZED_UNIT |
+| `product` | `catalog_item_id` PK/FK, `product_category_id`, `inventory_tracking_mode` (`QUANTITY`/`SERIALIZED_UNIT`), other product-level attributes | Subtype only for kind PRODUCT; refurbished serialized products use SERIALIZED_UNIT |\n| `product_external_reference` | `id`, `product_catalog_item_id` FK, `url`, `display_order` | Multiple informational external URLs per Product; maintained in Product catalogue and displayed in Parts to Buy. No supplier, purchase, price or delivery metadata. Validate URL format and allowed schemes at application boundary. |
 | `service` | `catalog_item_id` PK/FK, description, `requires_bad_sector_count BOOLEAN NOT NULL DEFAULT FALSE` | Subtype only for kind SERVICE; no stock fields. The flag controls whether a ServiceOrder must capture the HDD bad-sector count when this Service is selected. |
 | `product_category` | `id`, `company_id`, nullable `parent_category_id`, `name`, `code`, `description`, `is_active` | Flexible hierarchy; unique `(company_id,code)`; examples PC, Notebook, Console, TV; not an enum |
 | `fault` | `id`, `company_id`, `sequence_number`, generated `code`, `description`, `is_active` | Unique Company code and sequence; immutable `FLT-` code; description is primary value. |
@@ -168,11 +168,11 @@ Only explicitly selected `StockReturnLine` quantities are physically received. A
 
 Parts to Buy behavior:
 
-- The **Parts to Buy** view is a read-only query/projection; it does not have its own request, purchase, supplier, allocation or event tables.
+- The **Parts to Buy** view is a read-only query/projection; it does not have its own request, purchase, supplier, allocation or event tables. It joins the Product's `product_external_reference` rows to display the Product's multiple informational URLs.
 - Calculate uncovered quantity per `ServicePartRequirement` from required quantity less active reserved quantity, taking current Shop stock availability into account according to the Stock reservation rules.
 - Group the display by Product within the active Shop. Keep each contributing ServiceOrder and requirement visible in the breakdown so the total is explainable and traceable.
 - The view is recalculated when a requirement changes, stock availability changes, or a reservation is created, released or consumed. It must not create or mutate purchase records.
-- The business buys parts outside the application. Stock entries and reservations remain the responsibility of the Stock module; once stock is available and reserved, the uncovered quantity shown in this view decreases.
+- The business buys parts outside the application. Multiple external reference URLs are stored against the Product catalogue record and displayed in this view; they are informational only. Stock entries and reservations remain the responsibility of the Stock module; once stock is available and reserved, the uncovered quantity shown in this view decreases.
 
 ### Finance: transactions, service deposits, instalments, refunds and cash management
 
@@ -207,7 +207,7 @@ Parts to Buy behavior:
 - `Company 1:N Person`, Customer, Employee, CatalogItem, ProductCategory, Device and Fault.
 - `CatalogItem 1:0..1 Product` and `CatalogItem 1:0..1 Service`, exactly one subtype according to kind.
 - `ProductCategory 1:N ProductAttributeDefinition`; category definitions are reused by many Products/RefurbishedUnits.
-- `Product 1:N RefurbishedUnit` when inventory tracking mode is SERIALIZED_UNIT.
+- `Product 1:N ProductExternalReference`; each reference belongs to one Product.\n- `Product 1:N RefurbishedUnit` when inventory tracking mode is SERIALIZED_UNIT.
 - `RefurbishedUnit 1:N RefurbishedUnitAttributeValue` and `RefurbishedUnit 1:N RefurbishedUnitImage`; one physical unit has one value per applicable attribute definition and may have multiple private photos.
 - `RefurbishedUnit 1:0..1 RefurbishedUnitWarranty`; a sold unit gets a 12-month commercial guarantee starting at customer handover.
 - `Shop 1:N ShopInventory`; `Product 1:N ShopInventory` across Shops; unique `(shop_id,product_catalog_item_id)` for quantity-tracked Products.
