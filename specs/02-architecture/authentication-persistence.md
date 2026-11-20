@@ -1,3 +1,5 @@
+> **SUPERSEDING PRODUCT DECISION (2026-11-20):** [Employee Management](../04-features/employee-management.md) is authoritative for employee credential persistence. The `employee_action_authorization` table/entity described below is superseded and is not part of the target design; do not create or depend on it. Reuse the existing `EmployeeCredential` entity and reset flow, adding only the state needed for mandatory password change after create/reset. The Shop credential, ShopSession and OpenIddict persistence sections remain applicable. Review any already-applied development schema through a formal migration; do not perform ad-hoc destructive cleanup.
+
 # Authentication and Signing-Key Persistence — DATA-05 Slice
 
 **Status:** APPROVED FOR IMPLEMENTATION — initial EF Core migration applied to local development database on 2026-11-12; PostgreSQL concurrency/auth integration validation remains
