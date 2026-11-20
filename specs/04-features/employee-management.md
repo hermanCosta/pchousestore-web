@@ -57,7 +57,7 @@ The former `TECHNICIAN` profile is retired and replaced by `EMPLOYEE`. Do not pr
 
 ## 3. Employee administration permissions
 
-Directory search may be available to any authenticated Shop session, limited to the directory fields required by the UI. Full individual employee profile details and all account mutations require the profile permissions below.
+Any authenticated Shop session may search the Company-wide employee directory. The directory includes active and inactive employees and exposes only name, email, profile and status. Search matches name or email case-insensitively, and results are ordered alphabetically by employee name; the UI may filter by active/inactive status. Full individual employee profile details and all account mutations require the profile permissions below.
 
 | Operation | EMPLOYEE | MANAGER | ADMIN |
 |---|---:|---:|---:|
@@ -106,6 +106,8 @@ Validation and identity rules:
 - The same email may be used in a different Company.
 - The immutable account identifier is the stable internal identity. It must not be editable.
 - Name and email may be edited by an actor authorized under Section 3.
+- Changing an employee's email does not change or invalidate their password and does not force a password change.
+- Changing an employee's profile takes effect immediately and does not change or invalidate their password or force a password change.
 - A profile edit must not rewrite employee-name snapshots already recorded in business history.
 
 ## 5. Employee credential lifecycle
@@ -162,8 +164,8 @@ This pattern is explicitly approved as a temporary credential only. It is predic
 - Do not cache employee authentication or reuse it for another operation.
 - Do not add employee identity or role claims to the Shop OIDC token, Shop cookie or `ShopSession`.
 - Remove the `EmployeeActionAuthorization` one-use token/entity/endpoint mechanism from the target design. Do not issue or consume a separate employee authorization token.
-- The backend validates the submitted credential, active status, Company membership and operation permission as part of processing the protected command. It must not execute the command before validation succeeds.
-- Revalidate active status and permission at the point of the protected write so a deactivated account or changed profile cannot continue through a stale authorization result.
+- The backend validates the submitted credential, active status, Company membership and operation permission at the start of processing the protected command. It must not execute the command before validation succeeds.
+- Once the operation has passed this authentication and authorization check, it may complete even if the employee is deactivated while the operation is in progress. Deactivation prevents new protected operations; it does not retroactively cancel an already-authorized in-flight operation.
 - The exact mapping of business operation to required profile is specified by each feature SPEC. This document does not invent that matrix.
 
 ## 7. Business history, administrative history and logs
@@ -178,10 +180,10 @@ This pattern is explicitly approved as a temporary credential only. It is predic
 ## 8. Deactivation and reactivation
 
 - Deactivation immediately prevents the account from authenticating any new protected operation.
-- Since the employee does not own a persistent Shop session, deactivation must not revoke the shared `ShopSession` used by the entire Shop. It must invalidate any employee-specific transient authentication state, if present, and re-check active status before protected writes.
-- Any in-flight protected operation that has not committed must fail if the employee is deactivated before the authorization/commit check.
+- Since the employee does not own a persistent Shop session, deactivation must not revoke or close the shared `ShopSession` used by the entire Shop.
+- An in-flight protected operation that already passed the employee credential, active-status, Company-membership and permission checks may complete after deactivation. Operations that have not yet passed those checks must be rejected.
 - Reactivation restores eligibility to authenticate using the existing password.
-- Reactivation does not force a reset, unless a mandatory password change was already pending.
+- Reactivation is immediate and requires no additional approval or password reset. Preserve the existing credential and any mandatory-password-change requirement that was already pending.
 
 ## 9. Security and abuse controls
 
@@ -199,11 +201,13 @@ This pattern is explicitly approved as a temporary credential only. It is predic
 4. Only `MANAGER` and `ADMIN` can administer employees, with the limits in Section 3.
 5. Only `ADMIN` can create or grant `ADMIN`; multiple active administrators are supported.
 6. The Company cannot be left without an active `ADMIN` or without an active user with management authority.
-7. Employee name and email are required; email is unique case-insensitively within the Company; duplicate names are allowed.
+7. Employee name and email are required; email is unique case-insensitively within the Company; duplicate names are allowed. Email or profile edits do not force password changes.
+7a. Any authenticated user can search active and inactive employees by name or email; the limited directory shows name, email, profile and status, supports status filtering and sorts by name.
 8. Creation/reset generates the approved temporary password, displays it once, and requires a password change before protected business operations.
 9. Employee password recovery is administrative only; self-service change requires the current password.
 10. Reactivation preserves the existing credential and any pending password-change requirement.
-11. Deactivation blocks new protected operations immediately without revoking the shared ShopSession.
+11. Deactivation blocks new protected operations immediately without revoking the shared ShopSession; an operation already authenticated and authorized may complete.
+11a. Reactivation is immediate, preserves credentials and any pending mandatory-password-change state, and requires no additional approval.
 12. Each protected business operation validates the acting employee's own password afresh; no employee authentication is cached or reused.
 13. No employee action-authorization token/entity/endpoint is part of the target design.
 14. Successful protected business operations store an immutable employee-name snapshot in `notes`; failed attempts and staff-administration actions do not create such entries.
