@@ -4,7 +4,7 @@
 
 ## 1. Scope and decisions
 
-The model supports one Company with multiple Shops, a persistent Shop session and employee authentication per protected operation. Every payment, deposit, refund, cash movement and close is scoped to the active Shop and attributed to the employee authorization that performed it.
+The model supports one Company with multiple Shops, a persistent Shop session and employee authentication per protected operation. Every payment, deposit, refund, cash movement and close is scoped to the active Shop and attributed to the employee whose fresh code/password challenge is directly validated by the backend for that operation.
 
 | Requirement | Target rule | Status |
 |---|---|---|
@@ -14,7 +14,7 @@ The model supports one Company with multiple Shops, a persistent Shop session an
 | Refunds | Partial and total; Manager-only; original tender by default | DECIDED v1 baseline |
 | Currency | EUR | DECIDED baseline |
 | Cash rounding | Optional per Shop, Ireland €0.05 cash-only rounding | DECIDED baseline |
-| Approval policy | Every refund and deposit forfeiture requires a fresh Manager authorization; no second Manager approver; procurement has no second approval | DECIDED v1 baseline |
+| Approval policy | Every refund and deposit forfeiture requires a fresh Manager code/password challenge; no second Manager approver | DECIDED v1 baseline |
 | VAT feature | Company-level `vat_enabled` flag; initial behavior is OFF (no VAT amount is added by the application) | NO-CHARGE SOFTWARE SETTING DECIDED; legal status/reason still OPEN |
 | Reconciliation formula | Ledger-derived per Shop/day; external accounting reconciliation deferred | Operational close defined; accountant mapping deferred |
 
@@ -78,10 +78,10 @@ Alternative terminal outcomes include `REFUNDED` and `FORFEITED`; a partially re
 - If the Company cannot supply the agreed service/item, or misses the agreed date and no replacement date is agreed, the unconsumed balance is refundable, subject to applicable consumer rights.
 - If the customer changes their mind, apply the terms disclosed and accepted before payment. Any retention/non-refundable portion must be clearly disclosed, fair and legally valid. For a special-order part, only a documented and genuinely non-recoverable supplier cost may be considered where the customer accepted that term in advance. Never automatically forfeit the whole deposit.
 - A `SECURITY` deposit is returned when its stated purpose ends, less only documented deductions accepted in the terms and permitted by law.
-- `FORFEITED` requires a fresh Manager authorization, reason, terms snapshot and documented evidence/cost. No second Manager approval is required; TECHNICIAN cannot forfeit.
+- `FORFEITED` requires a fresh `MANAGER` or `ADMIN` code/password challenge, reason, terms snapshot and documented evidence/cost. `ADMIN` inherits Manager permissions; no second approver is required.
 - Deposit amount reconciliation: `available_held = settled_receipts - applied - settled_refunds - approved_forfeitures`.
 
-The system must not conflate a parts pre-order deposit with supplier procurement. Operational supplier purchase tracking (supplier/source, order link, ETA, tracking and receipt of actual inventory) is specified in [Service Parts Procurement Workflow](service-parts-procurement.md). Supplier invoice settlement, accounts payable, supplier returns and procurement tax postings remain outside this initial scope.
+A parts pre-order deposit is a financial arrangement only. The application does not capture supplier/source, purchase orders, purchase links, ETA, tracking or supplier receipt. Parts are purchased outside the application and physical stock replenishment is recorded independently through the Stock module.
 
 ## 5. Weekly instalment plans for refurbished sales
 
@@ -119,7 +119,7 @@ Every refund is a separate positive-magnitude `PaymentTransaction` with kind `RE
 
 Validation must lock or use optimistic concurrency on the original transaction so concurrent refund requests cannot over-refund it. A full refund is simply a refund whose amount equals the remaining refundable amount. Partial refunds may be item-linked through `PaymentRefundLine`; order-level refunds are allowed with a documented reason.
 
-- Every refund requires a fresh Manager password challenge and one-use action authorization, regardless of amount. No second Manager approver is required. TECHNICIAN cannot execute refunds.
+- Every refund requires a fresh `MANAGER` or `ADMIN` code/password challenge, regardless of amount. The backend directly validates the employee credential, active status, Company membership and permission; no action-authorization token/entity/endpoint is created or consumed. No second approver is required.
 - Refund is allocated back to the original tender by default. For a split CASH/CARD receipt, each refund allocation is linked to the original `PaymentAllocation` and cannot exceed that allocation's remaining refundable amount. Alternative tender is disabled in v1.
 - For CARD, the Manager performs the refund on the external terminal against the original card transaction, then records the result/reference in the application. Do not store card numbers or security data.
 - A refund transaction does not automatically restock inventory. Physical items returned to the Shop are selected separately through `StockReturn`/`StockReturnLine`, with quantity capped at previously consumed less already returned. A monetary refund and physical return are separate records.
@@ -173,7 +173,7 @@ The formula is the v1 operational till-control baseline. Detailed accounting cha
 12. Cash total €10.22 may be rounded to €10.20 only when the Shop has opted in and the bill is fully cash-paid; line/tax values remain €10.22-derived and the adjustment is stored separately.
 13. Card/bank-transfer totals are never rounded. Exact cash payment can bypass rounding.
 14. A mixed cash/card transaction is not rounded under the initial implementation rule.
-15. Procurement purchase creation/linkage/receipt succeeds without a separate approval record, but still requires the acting employee password challenge and event audit. Refunds and deposit forfeitures use one Manager authorization at every amount; no second approver or configurable threshold applies.
+15. Refunds and deposit forfeitures require one fresh `MANAGER` or `ADMIN` code/password challenge at every amount; no second approver or configurable threshold applies. Stock replenishment is a separate stock operation and is not linked to supplier procurement records.
 
 ## 10. Open and deferred items
 
