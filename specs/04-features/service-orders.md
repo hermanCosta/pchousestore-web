@@ -104,6 +104,7 @@ The legacy repository is https://github.com/hermanCosta/pchousestoremvn, branch 
 | BR-31 | Booking creates the ServiceOrder in `CREATED`; this does not mean repair work has started. An explicit start-work action moves it to `IN_PROGRESS` and requires a fresh employee code/password challenge so the acting employee is identified and recorded in the immutable event and `Notes`. If diagnosis/booking identifies an unfulfilled blocking part requirement before work starts, the order may move directly from `CREATED` to `AWAITING_PARTS`. Receipt/reservation of parts does not automatically start work; an explicit resume action is required to move from `AWAITING_PARTS` to `IN_PROGRESS`, also with fresh employee authentication. | Product-owner decision 2026-11-20 | DECIDED |
 | BR-32 | Product-part requirements may be reserved partially as stock becomes available. The order remains `AWAITING_PARTS` while any blocking requirement is not fully reserved. It may resume to `IN_PROGRESS` only after every blocking requirement is fully reserved; partial reservation never permits resumption. A stock shortage does not automatically create a procurement request; sourcing is a separate, deliberate action in the Shop-wide Service Parts Purchase Queue. | Product-owner decision 2026-11-20; stock reservation model | DECIDED |
 | BR-33 | The team may create a new, separate manual procurement request for a ServiceOrder whenever an additional part need is identified, even if an earlier request exists. Each request/round retains its own history; a new request must not overwrite or replace prior requests or purchase history. Creating a request remains deliberate and manual; a stock shortage never creates one automatically. | Product-owner decision 2026-11-20; PROC-01/PROC-02 request-round model | DECIDED |
+| BR-34 | An open, not-yet-completed ServiceOrder procurement request may be cancelled with a mandatory reason. Cancellation is recorded as an immutable, timestamped event/Note and preserves the request and its full history. A completed/fulfilled request cannot be cancelled; any correction must be recorded as a separate event or request, without rewriting completed purchase/receipt history. For partially fulfilled requests, preserve fulfilled quantities and cancel only the outstanding remainder. | Product-owner decision 2026-11-20 | DECIDED |
 
 ## 5. Proposed redesign (REDESIGN)
 
@@ -122,7 +123,11 @@ The legacy repository is https://github.com/hermanCosta/pchousestoremvn, branch 
 11. During collection of a `NOT_FIXED` order, a `MANAGER` or `ADMIN` may separately initiate a refund of eligible settled payments and refundable deposit balances through FIN-01. This is optional and explicit, not automatic on pickup. Apply original-tender, refundable-balance and deposit-lifecycle rules; never refund the same funds twice. Record the refund in `Notes`. Physical return/stock handling remains separate and follows the stock-return policy.
 12. `NOT_FIXED` may return to `IN_PROGRESS` for another repair attempt, provided the device has not been handed over. Cancellation is allowed only while the order is `CREATED`, `IN_PROGRESS` or `AWAITING_PARTS`; it may still be cancelled when payments or stock reservations exist, but all required financial and stock adjustments must be handled through FIN-01 and the stock module. Cancellation is not allowed from `FIXED`, `NOT_FIXED` or `PICKED`. Physical stock return remains a separate, permission-gated workflow.
 
-### 5.2 Target status vocabulary
+#
+
+Procurement request cancellation is available only while a request remains open. The operator must provide a reason. The request is retained with its cancellation event and actor/timestamp; fulfilled quantities and completed purchase/receipt records are never reversed or deleted. For a partially fulfilled request, cancellation applies only to the unfulfilled remainder. A completed request is not cancellable.
+
+## 5.2 Target status vocabulary
 
 A newly created order starts in `CREATED`. `REFUNDED` is a financial event/outcome, not a ServiceOrder lifecycle status. The target lifecycle vocabulary is:
 
