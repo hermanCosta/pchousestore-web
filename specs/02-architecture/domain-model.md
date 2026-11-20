@@ -122,7 +122,7 @@
 - Refurbished sales can have a weekly `InstallmentPlan` with dated `InstallmentSchedule` rows and `InstallmentSettlement` allocations. Layaway is the default; early handover / credit sale remains gated on Irish legal/compliance review.
 - Refunds can be partial or total. Each refund is a positive-magnitude `PaymentTransaction` linked to the original settled payment; repeated partial refunds cannot cumulatively exceed the unrefunded amount.
 - Optional `PaymentRefundLine` records attribute a refund to specific sale/service lines. Monetary refund remains separate from physical `StockReturn`.
-- Procurement purchases do not require a second approval step; the employee who places/records the purchase is identified by the mandatory per-operation password challenge. Other financial approval policies (for example high-value refunds and deposit forfeiture) remain configurable and open.
+
 
 ### Cash management and closing
 
@@ -159,7 +159,7 @@
 19. `DailyClosing` is unique on `(ShopId, BusinessDate)` and reconciles only that Shop.
 20. A service order may enter `AWAITING_PARTS` from `CREATED` or `IN_PROGRESS` only while at least one blocking `ServicePartRequirement` is not fully reserved.
 21. A stock entry increases Shop availability; any reservation against service requirements is applied atomically and reflected in the Parts to Buy view.
-22. Supplier purchase lines and their request-line allocations must reconcile: received allocations cannot exceed line receipts; total allocations cannot exceed the request-line quantity; active request rounds cannot double-count the requirement shortage; unallocated receipt quantities remain available stock.
+22. The Parts to Buy view is derived from uncovered Product-part requirements and current stock reservations; it must not create or track external purchase records.
 
 ## 4. Aggregate boundaries and transactional use cases
 
