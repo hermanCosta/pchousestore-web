@@ -62,9 +62,9 @@ Key source files:
 
 ### 2.5 Product catalogue and stock evidence
 
-- `ProductService` contains `qty`, `minQty`, category, price and company. Its setter rejects negative quantity and minimum quantity.
-- The catalogue screen permits operators to enter/update quantity and minimum quantity directly.
-- The DAO's minimum-stock query filters products where category is `PRODUCT` and `qty <= 2`; it does not use the stored `minQty` field in that query.
+- `ProductService` contains `qty`, `minQty`, category, price and company. In the legacy model, `qty` is the manually maintained product quantity; the new target model uses physical on-hand quantity only and does not carry over `minQty`.
+- The catalogue screen permits operators to enter/update `qty` and legacy `minQty` directly.
+- The DAO's legacy low-stock query filters products where category is `PRODUCT` and `qty <= 2`; it does not use the stored `minQty` field. This fixed-threshold behavior is not carried into the target.
 - The reviewed ServiceOrder and Sale line DAOs persist document lines but do not adjust ProductService quantity in those persistence methods.
 - No dedicated Stock/Inventory/InventoryMovement/Reservation/StockReceipt class or DAO was found in the repository tree inspected for this review. No explicit stock reservation, release, consumption, receipt, transfer or physical-return workflow was identified in the reviewed code.
 - Consequently, the legacy source supports a manually maintained catalogue quantity and a low-stock listing, but does not establish a reliable stock ledger or automatic ServiceOrder part allocation.
@@ -90,8 +90,8 @@ Key source files:
 
 1. Preserve the target decisions already approved. Legacy behavior is evidence, not an instruction to reproduce defects or coupling.
 2. Do not implement automatic stock deductions or reservations based on the legacy catalogue quantity. The reviewed code does not provide a dependable stock ledger to migrate.
-3. Treat legacy `qty` as an initial catalogue value only if a migration/import policy is separately approved. It cannot be assumed to represent reconciled physical stock.
-4. Do not migrate legacy `minQty` into a target reorder threshold without a separate product decision. The legacy low-stock query hard-codes `qty <= 2`, despite storing `minQty`.
+3. The target has no `min_qty`, minimum-stock threshold or reorder threshold. `qty` maps only to physical on-hand quantity (`quantity_on_hand`) and may be imported only after physical stock reconciliation and a separately approved migration policy.
+4. Do not migrate legacy `minQty` or its hard-coded `qty <= 2` low-stock query into the target.
 5. Retain the target distinction between payment settlement, pickup, refund and cancellation. The legacy coupling is explicitly superseded.
 6. Keep Parts to Buy as the approved visibility list, not a supplier/procurement module.
 7. The target stock ledger, reservation lifecycle and ServiceOrder state machine are redesign capabilities; they are not confirmed legacy features.
@@ -99,5 +99,5 @@ Key source files:
 ## 5. Review limitations and next validation
 
 - This review inspected the current `main` branch source tree and the files listed above. It did not inspect a production database, historical backups, operator procedures or external supplier records.
-- Before data migration, inspect a representative legacy database to establish the meaning and quality of existing `PROD_SERV.QTY`, `MIN_QTY`, ServiceOrder statuses, payment rows, deposits and notes.
+- Before data migration, inspect a representative legacy database to establish the meaning and quality of existing `PROD_SERV.QTY`, ServiceOrder statuses, payment rows, deposits and notes.
 - Before implementation approval, reconcile the remaining shared database model and feature specifications against this evidence. No physical DDL, stock migration strategy or implementation is approved by this report.
