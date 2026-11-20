@@ -1,6 +1,6 @@
 # Product-owner Decisions and Remaining Questions — pcHouseStore Web
 
-**Revision:** v48 · 20 November 2026
+**Revision:** v49 · 20 November 2026
 **Status:** Confirmed product decisions are incorporated. A small set of commercial/legal details remains explicitly proposed or deferred; the model is not a production-approved DDL.
 
 ## Confirmed decisions
@@ -193,3 +193,5 @@ The detailed approved requirements are maintained in [Employee Management](../04
 - A ServiceOrder in `AWAITING_PARTS` returns to `IN_PROGRESS` only after every blocking part requirement is fully reserved. Resumption is an explicit action requiring fresh employee code/password authentication; receipt/reservation alone never restarts work. Record the authenticated employee in the event and `Notes`.
 
 - ServiceOrder blocking Product-part requirements support partial reservations as stock becomes available. The order remains in `AWAITING_PARTS` while any blocking requirement is not fully reserved. Resume to `IN_PROGRESS` is allowed only after all blocking requirements are fully reserved; partial reservation alone is insufficient.
+
+- A ServiceOrder stock shortage does not automatically create a procurement/purchase request. The order remains `AWAITING_PARTS` while blocking requirements are short; the team may initiate sourcing separately through the Shop-wide Service Parts Purchase Queue when needed.
