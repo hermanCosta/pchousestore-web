@@ -126,13 +126,6 @@ The legacy repository is https://github.com/hermanCosta/pchousestoremvn, branch 
 11. During collection of a `NOT_FIXED` order, a `MANAGER` or `ADMIN` may separately initiate a refund of eligible settled payments and refundable deposit balances through FIN-01. This is optional and explicit, not automatic on pickup. Apply original-tender, refundable-balance and deposit-lifecycle rules; never refund the same funds twice. Record the refund in `Notes`. Physical return/stock handling remains separate and follows the stock-return policy.
 12. `NOT_FIXED` may return to `IN_PROGRESS` for another repair attempt, provided the device has not been handed over. Cancellation is allowed only while the order is `CREATED`, `IN_PROGRESS` or `AWAITING_PARTS`; it may still be cancelled when payments or stock reservations exist, but all required financial and stock adjustments must be handled through FIN-01 and the stock module. Cancellation is not allowed from `FIXED`, `NOT_FIXED` or `PICKED`. Physical stock return remains a separate, permission-gated workflow.
 
-#
-
-Procurement request cancellation is available only while a request remains open. The operator must provide a reason. The request is retained with its cancellation event and actor/timestamp; fulfilled quantities and completed stock records are never reversed or deleted. For a partially fulfilled request, cancellation applies only to the unfulfilled remainder. A completed request is not cancellable.
-
-
-
-When a procurement request is cancelled, recompute the uncovered requirement quantity. Any quantity not fulfilled and not already committed to an active supplier purchase is returned to the Shop-wide Parts to Buy view as available demand. This does not create a new request automatically; a buyer must deliberately include the demand in a new request. Quantities already fulfilled or allocated to an active supplier purchase remain accounted for and are not exposed as additional demand, preventing duplicate sourcing. Preserve the original requested quantity and all allocations; record the cancelled remainder and reason in the append-only request event history.
 
 ## 5.2 Target status vocabulary
 
