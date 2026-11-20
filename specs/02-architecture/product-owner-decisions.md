@@ -108,9 +108,9 @@ Image retention is tied to the business record. Deletion is initially soft/audit
 4. **Deposit contract wording:** operational default is defined above, but the final written terms/non-refundable special-order wording must be reviewed for fairness and Irish consumer-law compliance.
 5. **Refurbished commercial guarantee:** 12 months is confirmed; the detailed coverage/exclusions below are a proposed default and require owner/legal review before publishing to customers.
 6. **Customer data/image retention:** image storage is PostgreSQL-only, but exact business-record retention period and lawful purge schedule remain to be approved. Soft delete is used in v1.
-7. **TECHNICIAN permission matrix:** v1 action-level matrix and dual-role precedence approved 2026-11-10, with customer/catalogue/Product/Fault/ServiceOrder permissions updated 2026-11-13; refunds remain Manager-only. See `employee-access-and-roles.md`.
-8. **Complete Sale/ServiceOrder status transition matrix and executable production DDL/EF Core migration review.**
-9. **Shop and employee authentication operations:** credential administration/recovery baseline, employee password policy, failed-attempt throttling without account lockout, action matrix and dual-role precedence approved 2026-11-10. ShopSession timeout values and multi-device/sign-out policy remain configurable and must be decided before production.
+7. **Employee access:** the current Company-wide `EMPLOYEE`, `MANAGER` and `ADMIN` profiles, their permissions and direct employee credential challenge are defined in `employee-management.md`. The former `TECHNICIAN` profile and its legacy permission matrix are retired.
+8. **Sale lifecycle matrix and executable production DDL/EF Core migration review.** ServiceOrder lifecycle transitions and owner business rules are approved in `service-orders.md`; Sale lifecycle transitions still require completion.
+9. **Shop authentication operations:** employee credential administration, password policy, failed-attempt throttling and role authorization are defined in `employee-management.md`. ShopSession timeout values and multi-device/sign-out policy remain configurable and must be decided before production.
 10. **Service-order transfer details:** Device custody, service-part inventory attribution, transfer authorization and final audit fields remain to define. The financial handling is decided: preserve already-settled transactions against the source Shop; transfer the outstanding balance and held/unapplied deposit liability to the destination through an auditable internal event; all post-transfer transactions use the destination.
 
 **Deferred by owner instruction:** installment delinquency treatment beyond `OVERDUE`, renegotiation/late fees, and accounting/bookkeeper reconciliation mapping. These are not v1 implementation blockers.
@@ -136,7 +136,7 @@ No processor must be selected for v1. `CASH` and `CARD` are the payment methods.
 ## Current approval status after website review
 
 - **Confirmed:** CASH/CARD only; no processor integration in v1; PostgreSQL-only image storage; the current website's publicly listed categories/contact/branch data are captured as a reference snapshot.
-- **Recommended terms still pending approval:** final customer-facing deposit cancellation/non-refundable-cost wording and the detailed refurbished guarantee coverage/exclusions. The 90-day deposit review reminder, no automatic expiry/forfeiture, Manager-only original-tender refunds, immutable cash-close policy and v1 TECHNICIAN action matrix are approved operational rules.
+- **Recommended terms still pending approval:** final customer-facing deposit cancellation/non-refundable-cost wording and the detailed refurbished guarantee coverage/exclusions. The 90-day deposit review reminder, no automatic expiry/forfeiture, Manager-only original-tender refunds and immutable cash-close policy are approved operational rules. Employee profiles and permissions are governed by the current `employee-management.md`; the former TECHNICIAN profile is retired.
 - **Owner/accountant confirmation still needed:** VAT registration/tax codes/rates and price display; exact legal Company name and registered address; final ILAC legal/postal address; final warranty policy wording; official logo and exact brand colours; GDPR retention period.
 
 ## External references used
