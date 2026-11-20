@@ -25,3 +25,20 @@ flowchart TD
 
     V[Unpaid Sale/ServiceOrder cancelled] --> W[Release active reservations only]
     W --> X[No stock-in movement]
+
+
+    subgraph ServiceOrder replenishment and reservation
+        AA[Stock replenishment received] --> AB[Increase on-hand and available quantity only]
+        AB --> AC[Recalculate Parts to Buy demand]
+        AC --> AD{Operator explicitly selects ServiceOrder requirement and quantity?}
+        AD -- No --> AE[No reservation; stock remains available]
+        AD -- Yes --> AF[Fresh employee credential validation]
+        AF --> AG[Atomically check current available quantity]
+        AG --> AH{Quantity available?}
+        AH -- No --> AI[No reservation; report shortage]
+        AH -- Yes --> AJ[Reserve up to available quantity]
+        AJ --> AK[Full or partial reservation; record employee and Notes]
+        AK --> AL{All blocking requirements fully reserved?}
+        AL -- No --> AM[Remain AWAITING_PARTS]
+        AL -- Yes --> AN[Explicit employee-authenticated Resume action]
+    end
