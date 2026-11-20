@@ -40,6 +40,8 @@ Feature scopes must be approved after discovery. A Java class is not automatical
 
 ## Current drafts
 
+- [Legacy stock and ServiceOrder reconciliation](../02-architecture/legacy-stock-service-order-reconciliation.md) — evidence review completed 2026-11-20; legacy behavior is separated from approved redesign; no implementation or migration approved.
+
 - [SO-01 Service Orders](service-orders.md) — product decisions complete; status lifecycle, handover, cancellation, balance handling, line-edit lock, Notes traceability and Parts to Buy scope are approved. Technical reconciliation with shared architecture and legacy evidence remains; implementation not authorized.
 
 - [Shop authentication and API access](authentication-and-shop-context.md) — approved and implemented foundation; session-grant revocation and end-to-end validation remain.
