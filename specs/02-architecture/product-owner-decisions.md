@@ -196,13 +196,9 @@ The detailed approved requirements are maintained in [Employee Management](../04
 
 - A ServiceOrder stock shortage does not automatically create a procurement/purchase request. The order remains `AWAITING_PARTS` while blocking requirements are short; the team may initiate sourcing separately through the Shop-wide Service Parts Purchase Queue when needed.
 
-- A ServiceOrder may have multiple separate, manually initiated procurement requests over its lifetime. When an additional part need is identified, the team may create a new request even if an earlier request exists; each request/round preserves its own history and must not overwrite prior requests or purchase history. Requests are never created automatically from a stock shortage.
 
-- An open ServiceOrder procurement request may be cancelled with a mandatory reason. Cancellation is an immutable, timestamped event and preserves the request history. Completed/fulfilled requests cannot be cancelled; corrections are separate events/requests. If a request is partially fulfilled, fulfilled quantities and their purchase/receipt history remain intact and only the unfulfilled remainder may be cancelled.
 
-- When a procurement request is cancelled, the unfulfilled requirement quantity that is not already committed to an active supplier purchase returns to the Shop-wide Service Parts Purchase Queue as uncovered demand. It can be added to a later manual request, but no replacement request is created automatically. Fulfilled quantities and quantities committed to active supplier purchases remain accounted for and must not be duplicated.
 
-- The Shop-wide Service Parts Purchase Queue displays uncovered demand aggregated by Product/part while retaining per-ServiceOrder quantities and source request-line references. A buyer may manually group compatible demand from multiple ServiceOrders into one supplier purchase. Purchase-line quantities must be allocated back to the originating request lines so receipts, reservations and remaining demand remain traceable per ServiceOrder; grouping never merges or erases the underlying requests.
 
 
 ## Simplified parts purchasing scope — owner decision
