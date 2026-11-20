@@ -1,6 +1,6 @@
 # Product-owner Decisions and Remaining Questions — pcHouseStore Web
 
-**Revision:** v47 · 20 November 2026
+**Revision:** v48 · 20 November 2026
 **Status:** Confirmed product decisions are incorporated. A small set of commercial/legal details remains explicitly proposed or deferred; the model is not a production-approved DDL.
 
 ## Confirmed decisions
@@ -191,3 +191,5 @@ The detailed approved requirements are maintained in [Employee Management](../04
 - Starting ServiceOrder work (`CREATED` → `IN_PROGRESS`) requires fresh employee code/password authentication. Record the server-resolved employee as the actor in the immutable ServiceOrder event and `Notes`; ShopSession alone is insufficient for this protected action. Resuming from `AWAITING_PARTS` likewise remains an employee-authenticated explicit action.
 
 - A ServiceOrder in `AWAITING_PARTS` returns to `IN_PROGRESS` only after every blocking part requirement is fully reserved. Resumption is an explicit action requiring fresh employee code/password authentication; receipt/reservation alone never restarts work. Record the authenticated employee in the event and `Notes`.
+
+- ServiceOrder blocking Product-part requirements support partial reservations as stock becomes available. The order remains in `AWAITING_PARTS` while any blocking requirement is not fully reserved. Resume to `IN_PROGRESS` is allowed only after all blocking requirements are fully reserved; partial reservation alone is insufficient.
