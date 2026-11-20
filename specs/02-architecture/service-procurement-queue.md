@@ -1,5 +1,7 @@
 # Service Parts Purchase Queue — Screen Specification
 
+> **SUPERSEDED — DO NOT IMPLEMENT.** On 2026-11-20 the Product Owner replaced this purchasing queue with the simplified **Parts to Buy** list. This file is retained only as historical discovery context. Do not implement the procurement route, purchasing queue, buyer workflow, supplier purchases, request rounds, photos, ETA/tracking, allocations or receipt handling. Follow [SO-01 Service Orders](../04-features/service-orders.md) and [Product Owner Decisions](product-owner-decisions.md) for the approved scope.
+
 **Status:** DRAFT — product-owner requirement recorded 2026-11-05.  
 **Module:** Supplier Procurement / Service Operations  
 **Route proposal:** `/procurement/service-parts`  
