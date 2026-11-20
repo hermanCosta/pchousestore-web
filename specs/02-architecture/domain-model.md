@@ -9,7 +9,7 @@
 |---|---|---|
 | Company & Shops | One company profile and branch operations | Company, Shop |
 | Shop Access | Shop authentication and shared workstation/session context | ShopAccessCredential, ShopSession |
-| Employee Operations | Company-wide staff identity/password, Company-wide MANAGER and TECHNICIAN permissions, and transaction-level identity verification across all Shops | Employee, EmployeeRoleAssignment, EmployeeActionAuthorization |
+| Employee Operations | Company-wide employee identity/password and the exact EMPLOYEE, MANAGER and ADMIN profiles across all Shops | Employee, EmployeeCredential |
 | People & Customers | Shared company-level customers and contact records | Person, Customer |
 | Catalogue | Shared product and service definitions | CatalogItem, Product, Service, ProductCategory |
 | Stock | Branch balances, reservations, movements, inter-shop transfers and supplier receipts | ShopInventory, InventoryReservation, InventoryMovement, StockTransfer, StockReturn |
@@ -36,10 +36,9 @@
 - The shop session may remain active while different employees use the same workstation. It is not transferred to or owned by the last employee who authenticated a transaction.
 - `Employee` is a company-level workforce identity with an individual credential verifier (stored only as a secure hash) and active status.
 - Each employee has one Company-wide account and password. The same credentials work in every Shop belonging to the Company; no duplicate account is created for each branch.
-- `EmployeeRoleAssignment` assigns Company-wide `MANAGER` or `TECHNICIAN`. MANAGER has full access across every Shop. TECHNICIAN may manage customers, Products, Services, categories, sale prices and Fault catalogue entries, create/edit ServiceOrders, and perform the approved service/diagnostic, service-part procurement/receipt, stock availability/reservation and equipment inspection work. Refunds remain Manager-only; other restricted capabilities follow `employee-access-and-roles.md`. The active Shop still comes only from `ShopSession`.
+- Employee accounts are Company-wide and use exactly one profile: `EMPLOYEE`, `MANAGER` or `ADMIN`. `TECHNICIAN` and multi-role assignment/permission-union semantics are retired. `ADMIN` inherits the full `MANAGER` permission set; `EMPLOYEE` performs only actions explicitly granted by each approved feature SPEC. The active Shop still comes only from `ShopSession`.
 - `ShopInventory.minimum_quantity` is Shop-specific and drives that Shop's low-stock reporting.
-- Before each protected business command, the executing employee supplies their employee code and individual password. The server resolves the employee, verifies the employee is active, belongs to the Company that owns the active Shop and has a role allowed for the action, then creates a short-lived, single-use `EmployeeActionAuthorization` linked to the current `ShopSession` and action code.
-- The authorization is consumed atomically with the operation. A later operation requires a new employee credential challenge. Never place `EmployeeId` or employee role in the long-lived ShopSession identity.
+- Before each protected business command, the executing employee supplies their employee code and individual password. The backend resolves the employee and directly validates the credential, active status, Company membership and feature-specific profile permission before executing the operation. Every protected operation requires a fresh challenge; authentication is never cached or reused. No `EmployeeActionAuthorization` token, entity, endpoint or persisted authorization record is part of the target design. Never place `EmployeeId` or employee role in the long-lived ShopSession identity.
 
 ### People and customers
 
@@ -98,10 +97,10 @@
 
 - Every `Sale` belongs to exactly one `Shop`; the customer and catalogue item are shared Company records.
 - `SaleItem` snapshots description, quantity and price at transaction time. Product quantity must be an integer. A serialized refurbished item line has quantity one and references the exact `RefurbishedUnit`.
-- Every `ServiceOrder` belongs to exactly one `Shop` and one customer. It may have a responsible employee distinct from the employee who created or modified it. Its lifecycle includes `AWAITING_PARTS` when booking/diagnosis (while `CREATED`) or later repair work (`IN_PROGRESS`) reveals a blocking part requirement that is not fully reserved. A required-to-complete product part must be fully reserved before the order can move to `FIXED`.
+- Every `ServiceOrder` belongs to exactly one `Shop`, one customer and exactly one non-null `Device`. It has a globally unique internal ID and a sequential display number unique within its Shop; display numbers are never reused and are allocated atomically. It starts in `CREATED`. Its lifecycle includes `AWAITING_PARTS` when booking/diagnosis (while `CREATED`) or later repair work (`IN_PROGRESS`) reveals a blocking part requirement that is not fully reserved. A required-to-complete product part must be fully reserved before the order can move to `FIXED`. Product/Service lines are locked against addition, edit, removal and repricing after the first stock reservation or first recorded payment, whichever occurs first.
 - When a `NOT_FIXED` ServiceOrder is physically handed over, its lifecycle status changes to `PICKED` and its technical outcome `NOT_FIXED` remains independently persisted and visible; `PICKED` represents handover, not payment completion.
 - Each successfully committed action in the ServiceOrder context appends one immutable, chronological `BusinessNote` attributed to the employee and containing the action, time and concise result/reference. This human-readable timeline complements (and never replaces) the immutable `ServiceOrderEvent` and financial ledger. A Note and its originating action commit atomically; failed/rolled-back commands create no Note.
-- Service-order creation, status transitions, reservation, procurement receipt and payment require fresh employee authorization. `ServiceOrderEvent` and `SupplierPurchaseEvent` record committed state and procurement changes.
+- Service-order creation, status transitions, reservation, procurement receipt and payment require a fresh employee code/password challenge validated directly by the backend. `ServiceOrderEvent` and `SupplierPurchaseEvent` record committed state and procurement changes; the event actor is resolved server-side, not supplied by the browser.
 
 ### Service-part requirements and supplier procurement
 
@@ -147,10 +146,9 @@
 1. Exactly one Company is provisioned for the current deployment; every Shop belongs to that Company.
 2. Every operational record is scoped to exactly one Shop; child records must remain in the same Shop as their parent.
 3. `ShopSession` authenticates only the Shop context; it contains no active employee identity.
-4. Each protected committed action requires a fresh employee credential challenge and a single-use authorization.
-5. An employee can operate in any Shop belonging to the employee's Company if active and permitted by a Company-wide MANAGER/TECHNICIAN role; the same password works across all Shops.
-6. `EmployeeActionAuthorization` is short-lived, action-scoped, bound to operation context and consumed atomically; no replay or reuse.
-7. Employee attribution on an operational record must match the consumed authorization; never accept actor identity from the browser.
+4. Each protected committed action requires a fresh employee code/password challenge; the backend validates active status, Company membership and feature-specific profile permission before execution. No employee action-authorization token/entity/endpoint is used.
+5. An employee can operate in any Shop belonging to the employee's Company if active and permitted by their single Company-wide `EMPLOYEE`, `MANAGER` or `ADMIN` profile; the same password works across all Shops. `ADMIN` inherits `MANAGER` permissions.
+6. Employee attribution on an operational record is resolved by the backend from the validated challenge; never accept actor identity from the browser.
 8. Only `PRODUCT` entries can have stock, reservation, transfer, return or movement records. `SERVICE` entries cannot.
 9. Product quantities are integers across stock balances, reservations, stock returns, transfers and product sale/order lines. Fractional product quantities are rejected.
 10. For quantity-tracked products, `ShopInventory` is unique on `(ShopId, ProductId)`; `quantity_on_hand` is signed and may be negative, `quantity_reserved` is non-negative, and `available_quantity = quantity_on_hand - quantity_reserved` may be negative. Reservations are created only from positive available stock; negative deficits are visible and auditable.
@@ -173,7 +171,7 @@
 |---|---|---|
 | Company | Shop, shared master data | Provision Company; create/deactivate Shop |
 | Shop | ShopAccessCredential, ShopSession | Authenticate Shop; create/revoke ShopSession |
-| EmployeeActionAuthorization | One protected business command | Verify employee, consume authorization and persist all command records atomically |
+| Employee credential challenge | One protected business command | Resolve employee and validate credential, active status, Company membership and feature-specific permission before persisting the command |
 | CatalogItem | Product or Service subtype | Create/update shared catalogue and subtype |
 | ProductCategory | ProductAttributeDefinition | Configure category and technical specification schema |
 | ShopInventory | InventoryMovement, active reservation counter | Reserve/release/consume/adjust stock atomically |
@@ -194,7 +192,7 @@
 
 ## 5. Open decisions
 
-**Decided:** one Company with multiple Shops; Shop-only persistent session; Company-wide employee account/password and MANAGER/TECHNICIAN roles; fresh employee code + password challenge per protected operation; integer Product stock with negative balances allowed; stock deduction at full balance settlement; optional reservations and selected physical returns; inter-Shop transfers; configurable refurb categories, serialized units, one-year commercial guarantee and image uploads; Company VAT enable/disable flag; no second approval for supplier purchases.
+**Decided:** one Company with multiple Shops; Shop-only persistent session; Company-wide employee account/password and exactly EMPLOYEE/MANAGER/ADMIN profiles (ADMIN inherits MANAGER; no multi-role union); fresh employee code + password validation per protected operation without EmployeeActionAuthorization; integer Product stock with negative balances allowed; stock deduction at full balance settlement; optional reservations and selected physical returns; inter-Shop transfers; configurable refurb categories, serialized units, one-year commercial guarantee and image uploads; Company VAT enable/disable flag; no second approval for supplier purchases.
 
 **Still open:**
 
