@@ -40,7 +40,7 @@ Feature scopes must be approved after discovery. A Java class is not automatical
 
 ## Current drafts
 
-- [SO-01 Service Orders](service-orders.md) — DRAFT; owner decisions updated 2026-11-19, including `NOT_FIXED` → `PICKED` handover, independent technical outcome, append-only Notes traceability and eligible payment/deposit refunds at collection. Remaining lifecycle, balance and edit-policy questions remain open; implementation not authorized.
+- [SO-01 Service Orders](service-orders.md) — product decisions complete; status lifecycle, handover, cancellation, balance handling, line-edit lock, Notes traceability and Parts to Buy scope are approved. Technical reconciliation with shared architecture and legacy evidence remains; implementation not authorized.
 
 - [Shop authentication and API access](authentication-and-shop-context.md) — approved and implemented foundation; session-grant revocation and end-to-end validation remain.
 - [Authentication and signing-key persistence](../02-architecture/authentication-persistence.md) — DATA-05 logical/physical design approved for implementation; PostgreSQL/Npgsql provider validation remains.
