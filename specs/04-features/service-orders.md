@@ -11,7 +11,7 @@ Define the end-to-end Service Order workflow used to receive a customer's device
 
 A ServiceOrder is an operational record owned by one Shop. Customers and catalogue definitions remain Company-shared master data. The active Shop is always derived from the authenticated ShopSession.
 
-This SPEC is limited to the Service Order workflow and its integration points. It does not redefine the financial ledger, procurement queue, stock ledger, cross-Shop transfer or document-generation modules.
+This SPEC is limited to the Service Order workflow and its integration points. It does not redefine the financial ledger, stock ledger, cross-Shop transfer or document-generation modules. The former supplier-procurement queue is superseded; Parts to Buy is a visibility list only.
 
 ## 2. Legacy references
 
@@ -181,7 +181,7 @@ Money uses C# decimal and PostgreSQL NUMERIC(19,2) in EUR. Store event timestamp
 | POST /api/v1/service-orders/{serviceOrderId}/part-requirements | Add/update required Product parts | Fresh employee code/password; EMPLOYEE, MANAGER or ADMIN |
 | POST /api/v1/service-orders/{serviceOrderId}/resume | Explicitly resume from AWAITING_PARTS | Fresh employee code/password; EMPLOYEE, MANAGER or ADMIN |
 
-These are route proposals only. FIN-01 owns payment/deposit/refund APIs; PROC-01/PROC-02 own procurement APIs; SO-XFER-SPEC owns cross-Shop transfer. Request/response DTOs, pagination contract, error codes, idempotency and action codes must be finalized before implementation.
+These are route proposals only. FIN-01 owns payment/deposit/refund APIs; the Stock module owns inventory reservation, consumption and physical returns; SO-XFER-SPEC owns cross-Shop transfer. Request/response DTOs, pagination contract, error codes, idempotency and action codes must be finalized before implementation.
 
 ## 8. UI authorization and command invariants
 
