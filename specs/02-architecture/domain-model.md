@@ -160,7 +160,7 @@
 19. `DailyClosing` is unique on `(ShopId, BusinessDate)` and reconciles only that Shop.
 20. A service order may enter `AWAITING_PARTS` from `CREATED` or `IN_PROGRESS` only while at least one blocking `ServicePartRequirement` is not fully reserved.
 21. A stock entry increases Shop availability; any reservation against service requirements is applied atomically and reflected in the Parts to Buy view.
-22. The Parts to Buy list combines derived uncovered Product-part requirements with persisted Shop-scoped manual entries. Manual entries may reference a Product or use a free-text part description; multiple informational URLs are available from the Product catalogue or directly on a free-text entry. Neither source creates or tracks external purchase records.
+22. The Parts to Buy list combines derived uncovered Product-part requirements with persisted Shop-scoped manual entries. Manual entries may reference a Product or use a free-text part description; multiple informational URLs are available from the Product catalogue or directly on a free-text entry. Quantity is editable directly through the normal entry-edit flow as a positive whole number, with no separate justification or confirmation; deletion is a separate explicit action. Neither source creates or tracks external purchase records.
 
 ## 4. Aggregate boundaries and transactional use cases
 
