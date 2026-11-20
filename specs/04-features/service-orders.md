@@ -94,6 +94,7 @@ The legacy repository is https://github.com/hermanCosta/pchousestoremvn, branch 
 | BR-21 | Both `MANAGER` and `TECHNICIAN` have the same permission to mark a ServiceOrder `NOT_FIXED` and to record handover of a `NOT_FIXED` order. This does not change the existing Manager-only payment, cancellation, deposit-forfeiture or refund permissions. | Product-owner decision 2026-11-19; employee-access-and-roles.md | DECIDED |
 | BR-22 | Every successfully committed action performed in the ServiceOrder context must append a chronological, employee-attributed entry to `Notes`. The entry describes the action and its result; entries are append-only. The structured ServiceOrder/financial event remains authoritative and the corresponding Note must be committed atomically with its action. Rejected or rolled-back actions must not create Notes. | Product-owner decision 2026-11-19; legacy OrderNote workflow | DECIDED |
 | BR-23 | When a `NOT_FIXED` order is handed over, eligible amounts already received for the order, including refundable deposit balances, may be refunded through FIN-01. A refund is a separate explicit financial action, not an automatic consequence of handover; it remains Manager-only, follows the original-tender and refundable-balance rules, and must be recorded in `Notes`. | Product-owner decision 2026-11-19; FIN-01 | DECIDED |
+| BR-24 | A `NOT_FIXED` device may be handed over even when the ServiceOrder has an outstanding balance or held deposit. Handover changes the lifecycle status to `PICKED` but does not settle, waive or automatically refund the outstanding amount. The financial balance and deposit remain governed by FIN-01; any eligible refund is a separate explicit Manager-only action. | Product-owner decision 2026-11-20 | DECIDED |
 
 ## 5. Proposed redesign (REDESIGN)
 
@@ -108,7 +109,7 @@ The legacy repository is https://github.com/hermanCosta/pchousestoremvn, branch 
 7. When blocking requirements are fully reserved, explicitly resume the order to `IN_PROGRESS`.
 8. When repair is complete, an authorized Manager or Technician may record `FIXED` or `NOT_FIXED`. `FIXED` is rejected while a blocking requirement remains short.
 9. Receive payments, record deposits, apply deposits and process refunds through FIN-01. Each committed financial action associated with the ServiceOrder appends a `Notes` entry; financial ledger records remain authoritative. Payment/refund actions must not edit Customer, Device, Fault or ServiceOrder line details. When the financial balance is fully settled, consume reserved Product parts in the same transaction as the settlement.
-10. Customer handover is a separate action and is allowed only when the order's technical outcome is `NOT_FIXED`; it is blocked while the current status is `FIXED`. On successful handover, set the lifecycle status to `PICKED` and preserve `technicalOutcome = NOT_FIXED` independently. Both MANAGER and TECHNICIAN may perform this handover. Append the handover action to `Notes`; do not edit order details.
+10. Customer handover is a separate action and is allowed only when the order's technical outcome is `NOT_FIXED`; it is blocked while the current status is `FIXED`. An outstanding balance or held deposit does not block handover. On successful handover, set the lifecycle status to `PICKED` and preserve `technicalOutcome = NOT_FIXED` independently. Handover does not settle, waive or automatically refund any financial balance. Both MANAGER and TECHNICIAN may perform this handover. Append the handover action to `Notes`; do not edit order details.
 11. During collection of a `NOT_FIXED` order, a MANAGER may separately initiate a refund of eligible settled payments and refundable deposit balances through FIN-01. This is optional and explicit, not automatic on pickup. Apply original-tender, refundable-balance and deposit-lifecycle rules; never refund the same funds twice. Record the refund in `Notes`. Physical return/stock handling remains separate and follows the stock-return policy.
 12. Cancellation and any physical stock return remain separate, permission-gated workflows. Apply the rules in FIN-01 and the stock-return policy.
 
@@ -234,6 +235,7 @@ These are route proposals only. FIN-01 owns payment/deposit/refund APIs; PROC-01
 - **SO-OPEN-08 — RESOLVED:** MANAGER and TECHNICIAN have the same permission to mark an order `NOT_FIXED` and to record a handover for a `NOT_FIXED` order. This does not change Manager-only payment, cancellation, deposit-forfeiture or refund permissions.
 - **SO-OPEN-11 — RESOLVED:** Every successfully committed action in the ServiceOrder context appends an immutable, chronological, employee-attributed `Notes` entry; the structured event/financial record remains authoritative.
 - **SO-OPEN-12 — RESOLVED:** When collecting a `NOT_FIXED` order, eligible settled payments and refundable deposit balances may be refunded through FIN-01. Refund remains a separate, explicit Manager-only action, not an automatic pickup side effect; original-tender and refundable-balance controls apply.
+- **SO-OPEN-07a — RESOLVED:** A `NOT_FIXED` device may be handed over with an outstanding balance or held deposit. Handover does not settle, waive or automatically refund the balance; FIN-01 continues to govern the financial records.
 
 ## 12. Open questions — product-owner decision required
 
@@ -241,12 +243,12 @@ These are route proposals only. FIN-01 owns payment/deposit/refund APIs; PROC-01
 - [ ] **SO-OPEN-04a — Bad-sector trigger:** Which catalogue Services require HDD bad-sector count (operating-system installation is confirmed), and should this be configured on each Service catalogue record? What numeric range/validation is valid?
 - [ ] **SO-OPEN-05a — Line and price history:** Can Product/Service lines or their prices be changed after a part reservation or partial/settled payment? How must the original line values and issued document snapshots be preserved?
 - [ ] **SO-OPEN-06 — State machine:** What does `FINISHED` mean in the target? Is `NOT_FIXED` terminal or resumable? Which states allow cancellation?
-- [ ] **SO-OPEN-07a — Handover and balance:** Can a `NOT_FIXED` device be handed over with an outstanding balance or held deposit, or must financial settlement/refund handling happen first?
+- [x] **SO-OPEN-07a — Handover and balance — RESOLVED:** A `NOT_FIXED` device may be handed over with an outstanding balance or held deposit. Handover sets `PICKED` without settling, waiving or automatically refunding any amount. Financial balances remain under FIN-01; eligible refunds are separate explicit Manager-only actions.
 - [ ] **SO-OPEN-09 — Cancellation and deposits:** What customer/deposit terms apply when a ServiceOrder is cancelled before work, after a special-order part, after repair or after full settlement? The legal wording must remain aligned with FIN-01 and Irish consumer review.
 - [ ] **SO-OPEN-10 — Numbering and language:** Should the order number be sequential per Shop, Company-wide or generated by another policy? Confirm whether English remains the only v1 UI language.
 
 ## 12. Approval
 
-- Product approval: PARTIAL — owner decisions recorded 2026-11-19, including `NOT_FIXED` to `PICKED` handover representation, independent preservation of technical outcome, Notes traceability and permission to refund eligible payments/deposits at collection; resolve the remaining open questions above.
+- Product approval: PARTIAL — owner decisions recorded 2026-11-19 and 2026-11-20, including `NOT_FIXED` to `PICKED` handover representation, independent preservation of technical outcome, handover with outstanding balance, Notes traceability and permission to refund eligible payments/deposits at collection; resolve the remaining open questions above.
 - Technical approval: PENDING — finalize transition matrix, DTOs, persistence constraints and command transactions.
 - Implementation authorization: NOT GRANTED — this DRAFT is for discovery and product decisions only.
