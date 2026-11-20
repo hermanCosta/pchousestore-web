@@ -12,7 +12,7 @@
 | [Business rules](01-discovery/business-rules.md) | Verified rules and open questions |
 | [Risks and findings](01-discovery/risks-and-findings.md) | Security, data and design findings |
 | [Target architecture](02-architecture/solution-architecture.md) | Proposed web architecture |
-| [Architecture decisions](02-architecture/architecture-decisions.md) | Company/Shop structure, Shop session, employee action authorization and financial decisions |
+| [Architecture decisions](02-architecture/architecture-decisions.md) | Company/Shop structure, Shop session, superseded historical employee ADRs and financial decisions |
 | [Target domain model](02-architecture/domain-model.md) | Conceptual modules, entities and invariants |
 | [Reports, receipts and document printing](02-architecture/reports-and-document-printing.md) | Document catalogue, PDF generation, A4/80 mm print layouts, history and reprints |
 | [Legacy report inventory](01-discovery/legacy-report-inventory.md) | Verified JRXML/Jasper files, ReportGenerator methods and active Swing triggers |
@@ -44,9 +44,9 @@
 | [ER diagram — service parts procurement (PNG)](02-architecture/er-diagram-service-procurement.png) | Image preview of request rounds, request lines, photos, supplier orders and receipt allocations |
 | [ER diagram source — service parts procurement (Mermaid)](02-architecture/er-diagram-service-procurement.mmd) | Editable focused DER source including request rounds and images |
 | [ER diagram source — Mermaid](02-architecture/er-diagram.mmd) | Editable diagram source |
-| [Authentication flow — Mermaid](02-architecture/authentication-flow.mmd) | OAuth Authorization Code + PKCE Shop login, JWT Bearer API access, employee authorization per protected operation |
+| [Authentication flow — Mermaid](02-architecture/authentication-flow.mmd) | OAuth Authorization Code + PKCE Shop login, JWT Bearer API access and fresh direct employee credential validation per protected operation |
 | [API authentication and token security](02-architecture/api-authentication-and-token-security.md) | OAuth 2.0/OIDC profile, JWT validation, Shop-only claims, refresh/revocation and prohibited flows |
-| [Authentication and signing-key persistence](02-architecture/authentication-persistence.md) | DATA-05 physical design for Shop credentials/sessions, one-use employee authorization and `system_services` signing-key registry |
+| [Authentication and signing-key persistence](02-architecture/authentication-persistence.md) | DATA-05 physical design for Shop credentials/sessions and `system_services` signing-key registry; old employee-action authorization table is superseded |
 | [Backend guidelines](02-architecture/backend-guidelines.md) | .NET conventions, OAuth/OIDC and JWT API enforcement |
 | [Frontend guidelines](02-architecture/frontend-guidelines.md) | React conventions |
 | [Design system](03-design/design-system.md) | UX, visual direction and application shell |
