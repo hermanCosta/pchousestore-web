@@ -215,7 +215,7 @@ Parts to Buy behavior:
 - `Sale` and `ServiceOrder` each have zero or more InventoryReservations; each reservation has one or more lines.
 - `StockTransfer 1:N StockTransferLine`; each transfer has one source and one destination Shop.
 - `StockReturn 1:N StockReturnLine`; each return belongs to one Sale or ServiceOrder.
-- `Sale 1:N SaleItem`; `ServiceOrder 1:N ServiceOrderItem`, ServiceOrderEvent, ServicePartRequirement and ServiceProcurementRequest. A product ServiceOrderItem has zero or one durable requirement.
+- `Sale 1:N SaleItem`; `ServiceOrder 1:N ServiceOrderItem`, ServiceOrderEvent, ServicePartRequirement and . A product ServiceOrderItem has zero or one durable requirement.
 - `PaymentTransaction 1:N PaymentAllocation`; refund transactions reference an original settled payment.
 - `ServiceOrder 1:N ServiceDeposit`; each deposit has receipt/refund transactions, deposit events and zero or more DepositApplications.
 - `Sale 1:0..1 InstallmentPlan` for qualifying refurbished sales; each plan has many scheduled instalments; InstallmentSettlement joins schedule entries to payment transactions.
@@ -249,18 +249,12 @@ Parts to Buy behavior:
 22. Partial/total refunds are positive-magnitude transactions tied to original settled payment; cumulative refunds never exceed refundable balance. Physical stock return remains a separate selected StockReturn workflow.
 23. Irish cash rounding is optional per Shop, only for an eligible cash-paid final bill total, to nearest €0.05. Record signed adjustment separately; do not round line prices, tax base or card/electronic payments. VAT calculation is controlled by CompanyTaxConfiguration.vat_enabled and effective-dated company tax codes/rates; tax setup must be reviewed before production tax-document finalization.
 24. `DailyClosing` uniqueness remains `UNIQUE(shop_id,business_date)`; the approved operational formula is specified in `cash-closing-policy.md`. Accounting/tax mapping and processor settlement reconciliation remain subject to finance review.
-25. `ServicePartRequirement` can reference only a product line belonging to the same ServiceOrder and Shop; requirement quantity is a positive whole number. External external supplier purchases do not require a second approval step; the employee who creates/records the purchase is attributed and audited.
-26. A ServiceOrder may have zero or more `ServiceProcurementRequest` records, each linked to exactly one ServiceOrder and Shop. Request numbers are unique within a ServiceOrder. A later-discovered part creates a new request/round; it must not overwrite prior request or purchase history.
-27. Every `ServiceProcurementRequestLine` references a requirement belonging to the same ServiceOrder/Shop as its request. Its quantity is a positive whole number and cannot exceed the currently unreserved/uncovered shortage after accounting for other active procurement requests and allocations.
+25. `ServicePartRequirement` can reference only a product line belonging to the same ServiceOrder and Shop; requirement quantity is a positive whole number. The Parts to Buy view is read-only and derived from the current uncovered quantity.
 28. `StoredImage` binary content and optional thumbnail use PostgreSQL `BYTEA`; application limits remain 10 MiB and 60 KiB respectively. Each owner-specific attachment table references `stored_image` using a foreign key. Image access is Shop-scoped and authorized. Validate file size, MIME by content, signature, dimensions and SHA-256. Do not use public URLs, object storage or filesystem paths. Deletion is soft/audited.
-29. Request mutations and image actions append a `ServiceProcurementRequestEvent` in the same transaction as the operation; event records identify the employee and single-use authorization from the active Shop.
-30. Each SupplierPurchase and its lines are Shop-scoped. A SupplierPurchaseLine can reference only a PRODUCT catalogue entry.
-31. `quantity_received` on a SupplierPurchaseLine cannot exceed `quantity_ordered`; each physical receipt posts inventory movement exactly once using an idempotency key.
-32. Sum of `ServicePartProcurementAllocation.quantity_allocated` for a purchase line cannot exceed its ordered quantity; sum allocated to a request line cannot exceed its requested quantity.
-33. Sum of received allocation quantities cannot exceed actual purchase-line received quantity. Only the received and accepted quantity creates `PURCHASE_RECEIPT_IN`.
+30. Each  and its lines are Shop-scoped. A PurchaseLine can reference only a PRODUCT catalogue entry.
+32. Sum of `.quantity_allocated` for a purchase line cannot exceed its ordered quantity; sum allocated to a request line cannot exceed its requested quantity.
+33. Sum of received allocation quantities cannot exceed actual purchase-line received quantity. Only the received and accepted quantity creates `STOCK_IN`.
 34. Allocated receipt quantities reserved for service orders must create InventoryReservationLine records for the same Shop and ServiceOrder in the same transaction as the receipt movement. Unallocated receipt quantities remain available.
-35. Request and request-line aggregate statuses are derived from sourcing allocations, receipts and cancellations; do not allow a header to be marked `FULFILLED` while any active line remains short.
-36. ETA, tracking, status and receipt history is append-only in `SupplierPurchaseEvent`; purchase URLs are data, never trusted instructions or credentials.
 37. Totals and line prices are recomputed/validated server-side; never trust browser-submitted totals.
 
 ## 5. Stock lifecycle rules
