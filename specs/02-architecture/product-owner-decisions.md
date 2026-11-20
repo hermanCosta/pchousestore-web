@@ -1,6 +1,6 @@
 # Product-owner Decisions and Remaining Questions — pcHouseStore Web
 
-**Revision:** v42 · 20 November 2026
+**Revision:** v43 · 20 November 2026
 **Status:** Confirmed product decisions are incorporated. A small set of commercial/legal details remains explicitly proposed or deferred; the model is not a production-approved DDL.
 
 ## Confirmed decisions
@@ -175,4 +175,8 @@ The detailed approved requirements are maintained in [Employee Management](../04
 - Deactivation blocks further employee operations immediately but does not revoke the shared ShopSession. Reactivation preserves the credential and any pending password-change requirement.
 - Successful protected business operations record the employee name as an immutable snapshot in business `notes`. Employee-administration operations and failed challenges create no `notes` entries; no dedicated employee-administration audit log is added.
 - The operation-to-profile matrix for business workflows remains defined by each feature SPEC. The legacy TECHNICIAN matrix is historical until explicitly reconciled.
-- The temporary password pattern must be reconciled with the existing minimum-length password policy before implementation; do not silently change either decision.
+- Employee passwords have a minimum length of 6 characters; accept at least 128 characters and support password managers/paste. Do not require arbitrary periodic expiry.
+- The Company-wide employee directory is available to any authenticated Shop session and shows only name, email, profile and active/inactive status. Search by name or email is case-insensitive, results are alphabetical by name, and status filtering is supported.
+- Editing an employee's email or profile does not invalidate or change the password and does not force a password change.
+- Deactivation blocks new protected operations but does not close the shared ShopSession. An operation that already passed credential, active-status, Company-membership and permission checks may complete even if the employee is deactivated while it is in flight.
+- Reactivation is immediate, requires no additional approval, and preserves the existing credential and any pending mandatory-password-change state.
