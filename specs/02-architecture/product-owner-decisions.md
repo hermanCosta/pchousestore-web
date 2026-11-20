@@ -158,3 +158,21 @@ No processor must be selected for v1. `CASH` and `CARD` are the payment methods.
 - Every successfully committed action in the ServiceOrder context must append an immutable, chronological, employee-attributed entry to `Notes`, describing the action, timestamp and concise result/reference. The corresponding structured domain or financial record remains authoritative; its Note is committed atomically. Failed/rolled-back actions do not create Notes.
 - At collection of a `NOT_FIXED` order, eligible amounts already received for the order, including refundable deposit balances, may be refunded through FIN-01. Refund is a separate, explicit Manager-only action and is not automatic on handover. Existing original-tender, deposit-lifecycle and refundable-balance limits remain in force.
 - Whether an outstanding ServiceOrder balance blocks handover of a `NOT_FIXED` order remains open.
+
+
+## Employee Management — approved 20 November 2026
+
+The detailed approved requirements are maintained in [Employee Management](../04-features/employee-management.md). The following decisions are authoritative:
+
+- Active profiles are `EMPLOYEE`, `MANAGER` and `ADMIN`; retire `TECHNICIAN` and do not use dual-role assignment.
+- All three profiles can operate in every Shop in the same Company; no per-Shop employee assignment exists.
+- `MANAGER` administers `EMPLOYEE` and `MANAGER` accounts but cannot create/grant `ADMIN`. `ADMIN` has full Company-wide administrative authority, can manage other administrators and multiple admins are allowed.
+- Keep at least one active `ADMIN` and at least one active user with management authority in each Company.
+- Employee registration requires name, email and profile. Email is unique case-insensitively within the Company; duplicate names are allowed.
+- Reuse `EmployeeCredential` and the existing reset flow. Temporary password is `<normalized-first-name>@pchouse`, displayed once after creation/reset and changed before protected operations. Employee recovery is performed only by `MANAGER` or `ADMIN`; self-service change requires the current password.
+- Every protected operation requires a fresh direct backend validation of the acting employee's own password, active status, Company membership and feature-specific permission. Do not cache/reuse employee authentication.
+- Remove `EmployeeActionAuthorization` token/entity/endpoint from the target design. Keep employee identity out of ShopSession and Shop OIDC tokens.
+- Deactivation blocks further employee operations immediately but does not revoke the shared ShopSession. Reactivation preserves the credential and any pending password-change requirement.
+- Successful protected business operations record the employee name as an immutable snapshot in business `notes`. Employee-administration operations and failed challenges create no `notes` entries; no dedicated employee-administration audit log is added.
+- The operation-to-profile matrix for business workflows remains defined by each feature SPEC. The legacy TECHNICIAN matrix is historical until explicitly reconciled.
+- The temporary password pattern must be reconciled with the existing minimum-length password policy before implementation; do not silently change either decision.
