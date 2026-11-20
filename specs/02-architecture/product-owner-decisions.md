@@ -95,7 +95,7 @@ The Company tax tables and `vat_enabled` switch are implemented in the model and
 
 ## PostgreSQL image storage decision
 
-All uploaded image bytes stay in PostgreSQL. A shared `stored_image` table contains normalized binary image content in `BYTEA`; business-specific tables (`service_procurement_request_image`, `refurbished_unit_image`, `customer_complaint_case_attachment`) reference the image through `stored_image_id`. There is no S3/object-storage provider, local filesystem path or external storage workflow. Enforce existing per-file and per-target limits in application validation and database capacity planning.
+All uploaded image bytes stay in PostgreSQL. A shared `stored_image` table contains normalized binary image content in `BYTEA`; business-specific tables (`refurbished_unit_image`, `customer_complaint_case_attachment`) reference the image through `stored_image_id`. There is no S3/object-storage provider, local filesystem path or external storage workflow. Enforce existing per-file and per-target limits in application validation and database capacity planning.
 
 Image retention is tied to the business record. Deletion is initially soft/audited; automated physical purge is not enabled in v1. The Company still needs a documented GDPR/data-retention schedule before production, but it will be implemented as database-controlled retention/purge jobs, not as manual external file management.
 
