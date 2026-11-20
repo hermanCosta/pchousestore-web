@@ -37,11 +37,11 @@ The former `TECHNICIAN` profile is retired and replaced by `EMPLOYEE`. Do not pr
 - Can access all Shops in the Company.
 - Can administer employee accounts within the limits in Section 3.
 - Cannot create, grant or restore the `ADMIN` profile.
-- Does not receive unrestricted application permissions merely because the account is a manager; operation-to-profile authorization remains defined by each feature specification.
+- Retains the full application permission set already assigned to the `MANAGER` profile in approved business-feature specifications. The manager's additional employee-administration authority is defined in this document. Any feature-specific exception must be explicit in that feature SPEC.
 
 ### 2.3 ADMIN
 
-- Has full administrative authority across the Company and all its Shops.
+- Inherits the full `MANAGER` permission set and has full administrative authority across the Company and all its Shops.
 - Can create other `ADMIN` accounts.
 - Can manage any other employee or administrator, including changing profiles, editing data, activating/deactivating accounts and resetting passwords.
 - Multiple `ADMIN` accounts are allowed.
@@ -57,9 +57,12 @@ The former `TECHNICIAN` profile is retired and replaced by `EMPLOYEE`. Do not pr
 
 ## 3. Employee administration permissions
 
+Directory search may be available to any authenticated Shop session, limited to the directory fields required by the UI. Full individual employee profile details and all account mutations require the profile permissions below.
+
 | Operation | EMPLOYEE | MANAGER | ADMIN |
 |---|---:|---:|---:|
-| List/search Company employees | No administrative access | Yes | Yes |
+| Search the Company employee directory (limited directory fields) | Yes, through the authenticated Shop session | Yes | Yes |
+| Read an individual employee's full administrative profile | No | Yes | Yes |
 | Create `EMPLOYEE` | No | Yes | Yes |
 | Create `MANAGER` | No | Yes | Yes |
 | Create `ADMIN` | No | No | Yes |
