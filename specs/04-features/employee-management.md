@@ -146,9 +146,13 @@ This pattern is explicitly approved as a temporary credential only. It is predic
 - There is no employee self-service password recovery by email. Recovery is performed only by a `MANAGER` or `ADMIN` through the existing reset flow.
 - Reactivation alone does not reset the password. Preserve the existing credential and any outstanding mandatory-change requirement.
 
-### 5.4 Password policy compatibility
+### 5.4 Employee password policy
 
-The generated temporary pattern is retained as an explicit product-owner decision. The existing authentication password baseline (including minimum-length requirements) must be reconciled with this pattern before implementation. Do not silently alter the approved pattern or weaken the permanent-password policy. Record any required temporary-credential exception and enforce the mandatory password change before protected operations.
+- The minimum length for employee passwords is **6 characters**.
+- Accept passwords of at least 128 characters and support password managers and paste.
+- The six-character minimum applies to permanent passwords selected by employees as well as temporary credentials.
+- Do not require arbitrary periodic password changes. Require a change after account creation/reset and rotate promptly after suspected compromise or an authorized reset.
+- Use the established vetted adaptive password hasher. The temporary password pattern remains exactly as defined above and must be changed before protected business operations.
 
 ## 6. Employee operation authorization
 
@@ -211,7 +215,7 @@ The generated temporary pattern is retained as an explicit product-owner decisio
 - Reconcile the current `Employee` / `EmployeeCredential` persistence mapping and add a mandatory-password-change state without creating a parallel credential store.
 - Review any existing development migration/table for `EmployeeActionAuthorization`; do not carry it into the target design. Any physical schema cleanup must be handled through a reviewed migration, not an ad-hoc database change.
 - Reconcile the old `TECHNICIAN` role enum/seed/configuration and dual-role assignments with the three-profile model.
-- Reconcile the existing minimum password length with the approved temporary-password pattern.
+- Apply the approved six-character minimum consistently to employee password validation in the API, UI and tests.
 - Update API contracts, frontend staff-administration flows and tests to match this SPEC.
 - Keep Shop OIDC/session/token identity unchanged.
 - Inspect the legacy Java Swing employee screens, controller, DAO, model, password-reset and role checks. Record source references and distinguish confirmed legacy behavior from this approved redesign, per `AGENTS.md`.
