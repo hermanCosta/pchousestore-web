@@ -158,7 +158,7 @@
 18. A PaymentTransaction references exactly one of Sale or ServiceOrder (XOR), from the same Shop.
 19. `DailyClosing` is unique on `(ShopId, BusinessDate)` and reconciles only that Shop.
 20. A service order may enter `AWAITING_PARTS` from `CREATED` or `IN_PROGRESS` only while at least one blocking `ServicePartRequirement` is not fully reserved.
-21. A supplier receipt increases stock only by actual accepted whole units; quantities allocated to service jobs are reserved atomically and cannot be sold elsewhere.
+21. A stock entry increases Shop availability; any reservation against service requirements is applied atomically and reflected in the Parts to Buy view.
 22. Supplier purchase lines and their request-line allocations must reconcile: received allocations cannot exceed line receipts; total allocations cannot exceed the request-line quantity; active request rounds cannot double-count the requirement shortage; unallocated receipt quantities remain available stock.
 
 ## 4. Aggregate boundaries and transactional use cases
