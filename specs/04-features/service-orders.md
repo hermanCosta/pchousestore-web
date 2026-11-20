@@ -3,7 +3,7 @@
 **Status:** PRODUCT DECISIONS COMPLETE — TECHNICAL RECONCILIATION IN PROGRESS (2026-11-20). No implementation is authorized. The latest Employee Management SPEC supersedes older employee-role and authorization designs. Shared domain/database architecture documents still contain obsolete employee authorization references and must be reconciled before technical approval.  
 **Type:** Shop-scoped operational workflow.  
 **Depends on:** AUTH-01/AUTH-02, CAT-01, DATA-02, approved employee access matrix, stock and financial policies.  
-**Related work:** PROC-01/PROC-02 (parts Parts to Buy view), FIN-01 (payments/deposits/refunds), SO-XFER-SPEC (cross-Shop transfer), REP-01 (documents and receipts).
+**Related work:** Stock and Refurbishment (inventory and explicit reservations), FIN-01 (payments/deposits/refunds), SO-XFER-SPEC (cross-Shop transfer), REP-01 (documents and receipts).
 
 ## 1. Objective and scope
 
@@ -164,7 +164,7 @@ Use the logical entities already recorded in domain-model.md and database-model.
 - ServicePartRequirement: durable Product demand, required quantity, blocking flag and reservation state.
 - ServiceOrderEvent: append-only status and operational event history with Shop, server-resolved actor Employee, previous/new state, event type/description, structured before/after payload where data is edited, and timestamp. No employee action-authorization token or authorization foreign key is stored.
 - BusinessNote: append-only employee-attributed notes associated with the ServiceOrder. A human-readable Note is automatically appended for every successfully committed ServiceOrder action, including linked financial and handover actions; it records the server-resolved employee name snapshot, action, timestamp and concise result/reference. Notes are created atomically with their originating action and cannot be edited or deleted. No employee action-authorization token or authorization foreign key is stored.
-- Financial records are owned by FIN-01; procurement records are owned by PROC-01/PROC-02; stock reservation/movement records are owned by the inventory module.
+- Financial records are owned by FIN-01; stock reservation/movement records are owned by the Stock module. Parts to Buy is a visibility list only and creates no procurement records.
 
 Money uses C# decimal and PostgreSQL NUMERIC(19,2) in EUR. Store event timestamps in UTC. Allocate a sequential display number per Shop using a concurrency-safe mechanism; never reuse numbers after cancellation. Retain a globally unique internal identifier independently of the display number. Version 1 user-facing UI is English only, with centralized localization resources to support future translations. All Shop-scoped records must have same-Shop composite FK/integrity enforcement where specified by DATA-02.
 
