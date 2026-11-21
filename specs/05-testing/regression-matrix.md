@@ -31,7 +31,9 @@
 | Service order | Open with customer, device, item and fault | Persist all associations atomically |
 | Service order | Invalid status transition | Rejected with no partial update |
 | Service order | Status change plus note | Both persist or neither persists |
-| Service order | Mark picked after payment | One transition and one payment effect only |
+| Service order | Pickup from FIXED after full settlement | Lifecycle becomes PICKED; technical outcome remains FIXED; no second stock movement or reservation mutation |
+| Service order | Pickup from FIXED with outstanding balance | Pickup succeeds; financial balance and active reservations remain unchanged |
+| Service order | Pickup from NOT_FIXED with used and unused reserved parts | Used quantity posts SERVICE_ORDER_OUT; unused reservation is released without movement; all effects are atomic |
 | Inventory | Reserve a whole product quantity | Reserved increases, on-hand stays unchanged, available decreases |
 | Inventory | Try fractional product quantity | Rejected by API/domain validation |
 | Inventory | Cancel/release reservation | Reserved decreases, on-hand unchanged; no inbound movement |
@@ -64,6 +66,21 @@
 - **Employee challenge isolation:** a valid Shop bearer token alone cannot commit a protected business operation; the operation requires a fresh employee code/password challenge and a one-time authorization. An employee challenge cannot be reused for another action or operation context.
 - **OAuth prohibited flows:** Implicit and Resource Owner Password Credentials grants are unavailable; no client secret or raw token is present in the React bundle, storage, logs or analytics.
 - **Refresh-token rotation:** if refresh tokens are enabled, each successful refresh invalidates the prior token; reuse of an invalidated token revokes the token family.
+
+
+## ServiceOrder Pickup API and transaction regression tests
+
+- FIXED Pickup with zero, partial or outstanding balance succeeds and does not alter stock reservations, on-hand quantity or inventory movements.
+- FIXED Pickup rejects any non-empty stock-disposition payload.
+- NOT_FIXED Pickup accepts a complete disposition for every active reservation line; zero use releases all; partial use consumes only the used amount and releases the remainder; full use consumes the full active reservation.
+- NOT_FIXED Pickup with no active reservations succeeds without stock writes.
+- Reject unreserved Product quantities and reservation lines that are foreign, inactive, released, duplicated, omitted or outside the ServiceOrder/Shop.
+- Require a fresh employee code/password challenge; reject invalid/inactive/wrong-Company employees and unauthorized profiles without creating business Notes/events.
+- Require an Idempotency-Key. Same key and same normalized payload returns the original committed response; same key with changed payload or resource scope returns conflict.
+- A rolled-back Pickup leaves no idempotency record or business effects and can be retried.
+- Distinct concurrent Pickup keys on one ServiceOrder produce one success and one conflict; no duplicate movements, reservation disposition, event or Note.
+- Fault-inject each write boundary and verify atomic rollback of status, picked_at, event, Note, stock movements, reservation updates and idempotency record.
+- Verify Pickup does not settle, waive or refund money and does not mutate Customer, Device, Fault or ServiceOrder lines.
 
 ## Money calculation invariants
 
