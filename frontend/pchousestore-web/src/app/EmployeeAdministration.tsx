@@ -347,7 +347,7 @@ async function responseError(response: Response): Promise<Error> {
 }
 
 function defaultTemporaryPassword(firstName: string) {
-  const firstWord = firstName.trim().split(/\\s+/)[0] ?? "";
-  const normalizedName = firstWord.normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").replace(/[^a-zA-Z0-9]/g, "");
+  const firstWord = firstName.trim().split(/\s+/)[0] ?? "";
+  const normalizedName = firstWord.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]/g, "");
   return normalizedName ? `${normalizedName}@pchouse` : "";
 }
