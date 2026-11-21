@@ -699,6 +699,11 @@ namespace PcHouseStore.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("uq_employee_role");
 
+                    b.HasIndex("EmployeeId")
+                        .IsUnique()
+                        .HasFilter("is_active = TRUE")
+                        .HasDatabaseName("uq_employee_one_active_profile");
+
                     b.ToTable("employee_role_assignment", null, t =>
                         {
                             t.HasCheckConstraint("ck_employee_role_code", "role_code IN ('EMPLOYEE', 'MANAGER', 'ADMIN')");
