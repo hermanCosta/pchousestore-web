@@ -237,9 +237,11 @@ All financial command idempotency is persisted in the shared `idempotency_record
 - `Sale` and `ServiceOrder` each have zero or more InventoryReservations; each reservation has one or more lines.
 - `StockTransfer 1:N StockTransferLine`; each transfer has one source and one destination Shop.
 - `StockReturn 1:N StockReturnLine`; each return belongs to one Sale or ServiceOrder.
-- `Sale 1:N SaleItem`; `ServiceOrder 1:N ServiceOrderItem`, ServiceOrderEvent, ServicePartRequirement and . A product ServiceOrderItem has zero or one durable requirement.
-- `PaymentTransaction 1:N PaymentAllocation`; refund transactions reference an original settled payment.
+- `Sale 1:N SaleItem`; `ServiceOrder 1:N ServiceOrderItem, ServiceOrderEvent, ServicePartRequirement and BusinessNote`. A product ServiceOrderItem has zero or one durable requirement.
+- `Sale` and `ServiceOrder` each have `0..N` linked InventoryReservations; each reservation has one or more lines. Reservations remain Stock-owned records.
+- `PaymentTransaction 1:N PaymentAllocation`; each PaymentTransaction targets exactly one Sale, ServiceOrder or ServiceDeposit; refund transactions reference an original settled payment.
 - `ServiceOrder 1:N ServiceDeposit`; each deposit has receipt/refund transactions, deposit events and zero or more DepositApplications.
+- `StockReturn 1:N StockReturnLine`; each StockReturn belongs to exactly one Sale or ServiceOrder.
 - `Sale 1:0..1 InstallmentPlan` for qualifying refurbished sales; each plan has many scheduled instalments; InstallmentSettlement joins schedule entries to payment transactions.
 - `PaymentMethod 1:N PaymentAllocation`; ShopPaymentMethod controls per-Shop availability.
 - `PaymentTransaction 1:N PaymentRefundLine` optionally attributes a partial/total refund to source lines.
