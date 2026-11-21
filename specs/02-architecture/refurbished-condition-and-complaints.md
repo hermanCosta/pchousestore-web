@@ -18,7 +18,7 @@ These grades are the Company's approved commercial vocabulary, not an official I
 
 Each inspection records:
 
-- exact `RefurbishedUnit`, Shop, employee and action authorization;
+- exact `RefurbishedUnit`, Shop, and the employee resolved by fresh direct credential validation;
 - `condition_grade` A/B/C;
 - functional test status: `NOT_TESTED`, `IN_PROGRESS`, `PASSED`, `FAILED`;
 - category-specific checklist results (e.g. ports, keyboard, display, battery health, controllers, speakers, connectivity, factory reset/data wipe where relevant);
@@ -72,12 +72,12 @@ These categories are workflow labels, not legal findings. A case can be reviewed
 
 1. **Receive:** record customer and proof of purchase/service, exact serialised unit or service order, when the customer first noticed the problem, when they reported it, symptom description and requested remedy. Attach photos/videos only if the supported media policy allows them; initial release supports image evidence.
 2. **Acknowledge:** create a case reference, record date/time and Shop, explain next steps and preserve all customer communications.
-3. **Triage:** classify the claim basis for routing; do not automatically reject based only on elapsed commercial-guarantee time, grade C, or a technician's first “no fault found” result.
-4. **Inspect:** technician records the received condition, accessories, serial/asset code, diagnostic tests, reproducibility, photos and findings. Record evidence of accidental damage/misuse/wear separately; do not convert an allegation into a final rejection without manager review.
-5. **Assess:** Manager reviews the evidence, applicable commercial terms and possible statutory consumer rights. If entitlement is uncertain, the case remains `UNDER_REVIEW` and is escalated for appropriate advice rather than auto-rejected.
+3. **Triage:** classify the claim basis for routing; do not automatically reject based only on elapsed commercial-guarantee time, grade C, or an employee's first “no fault found” result.
+4. **Inspect:** an `EMPLOYEE`, `MANAGER` or `ADMIN` records the received condition, accessories, serial/asset code, diagnostic tests, reproducibility, photos and findings. Record evidence of accidental damage/misuse/wear separately; do not convert an allegation into a final rejection without `MANAGER`/`ADMIN` review.
+5. **Assess:** `MANAGER` or `ADMIN` reviews the evidence, applicable commercial terms and possible statutory consumer rights. If entitlement is uncertain, the case remains `UNDER_REVIEW` and is escalated for appropriate advice rather than auto-rejected.
 6. **Agree remedy:** where appropriate, record `REPAIR`, `REPLACEMENT`, `FULL_REFUND`, `PARTIAL_REFUND`/`PRICE_REDUCTION`, `NO_FAULT_FOUND_AFTER_REVIEW`, or `CUSTOMER_WITHDREW`. “No fault found” is a diagnostic finding, not automatically a denial of rights.
 7. **Execute:** repair creates/links a ServiceOrder; replacement identifies the exact replacement unit; refund creates a partial/total `PaymentTransaction` linked to the original payment. Physical stock return is a separate selected `StockReturn` and inspection/disposition event.
-8. **Resolve:** Manager records the final outcome, reason, dates, customer communication, any refund/replacement/repair references, and closes the case. Preserve append-only event history.
+8. **Resolve:** `MANAGER` or `ADMIN` records the final outcome, reason, dates, customer communication, any refund/replacement/repair references, and closes the case. Preserve append-only event history.
 
 ### Suggested case states
 
@@ -106,16 +106,16 @@ These are system guardrails and workflow prompts, not a legal decision engine. B
 
 ## 6. Roles and audit
 
-- `TECHNICIAN`: may open a case, attach technical evidence, inspect the device, record diagnosis and propose a technical remedy. Cannot approve refund/price reduction/replacement or close the case.
-- `MANAGER`: full access; reviews entitlement/policy, approves and records resolution, refund, replacement and closure.
-- Every mutation requires the acting employee's password challenge and single-use action authorization. The ShopSession still identifies only the Shop.
+- `EMPLOYEE`: may open a case, attach technical evidence, inspect the device, record diagnosis and propose a technical remedy. Cannot approve a refund/price reduction/replacement or close the case.
+- `MANAGER`: full access; reviews entitlement/policy, approves and records resolution, refund, replacement and closure. `ADMIN` inherits the full `MANAGER` permission set.
+- Every protected mutation requires fresh direct validation of the acting employee's code and password, active status, Company membership and feature-specific permission. Do not issue or consume an `EmployeeActionAuthorization`. The ShopSession still identifies only the Shop.
 
 ## 7. Data model additions
 
 | Entity | Responsibility |
 |---|---|
 | `RefurbishedConditionGrade` | Company-configurable grade codes/labels; initial seed A/B/C. |
-| `RefurbishedUnitInspection` | Immutable inspection/test record, checklist, grade, condition and technician attribution. |
+| `RefurbishedUnitInspection` | Immutable inspection/test record, checklist, grade, condition and employee attribution. |
 | `CustomerComplaintCase` | Complaint header, customer, source SaleItem or ServiceOrder, dates, claim basis, status and assignment. |
 | `CustomerComplaintCaseEvent` | Append-only state transitions, notes and customer communications. |
 | `CustomerComplaintCaseAttachment` | Private image evidence and metadata. |
@@ -130,6 +130,6 @@ A complaint must reference at least one supported source (`sale_item_id` or `ser
 3. A customer reports a fault 8 months after handover; the case can be reviewed under statutory rights even if the commercial guarantee terms are disputed.
 4. A customer reports a fault 14 months after handover; the case is not auto-rejected and can still be assessed under statutory rights.
 5. A complaint within 30 days is flagged for manager review of the short-term right to terminate; the system does not force repair where the customer is entitled to choose another remedy.
-6. A technician can add inspection evidence but cannot approve a refund or close the claim.
+6. An `EMPLOYEE` can add inspection evidence but cannot approve a refund or close the claim.
 7. A full/partial refund is linked to the original payment; returned physical goods are handled by a separate StockReturn.
 8. Every communication, inspection, decision and remedy has an employee actor and timestamp.
