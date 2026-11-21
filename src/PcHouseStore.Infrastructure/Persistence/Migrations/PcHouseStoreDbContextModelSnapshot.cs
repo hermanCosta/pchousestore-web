@@ -521,107 +521,6 @@ namespace PcHouseStore.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("PcHouseStore.Infrastructure.Persistence.Entities.EmployeeActionAuthorizationRecord", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<string>("ActionCode")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("action_code");
-
-                    b.Property<DateTime>("AuthenticatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("authenticated_at");
-
-                    b.Property<byte[]>("AuthorizationTokenHash")
-                        .IsRequired()
-                        .HasColumnType("bytea")
-                        .HasColumnName("authorization_token_hash");
-
-                    b.Property<long>("CompanyId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("company_id");
-
-                    b.Property<DateTime?>("ConsumedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("consumed_at");
-
-                    b.Property<long>("EmployeeId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("employee_id");
-
-                    b.Property<DateTime>("ExpiresAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("expires_at");
-
-                    b.Property<byte[]>("OperationContextHash")
-                        .HasColumnType("bytea")
-                        .HasColumnName("operation_context_hash");
-
-                    b.Property<string>("ResourceId")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("resource_id");
-
-                    b.Property<string>("ResourceType")
-                        .HasMaxLength(80)
-                        .HasColumnType("character varying(80)")
-                        .HasColumnName("resource_type");
-
-                    b.Property<long>("RowVersion")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasDefaultValue(1L)
-                        .HasColumnName("row_version");
-
-                    b.Property<long>("ShopId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("shop_id");
-
-                    b.Property<long>("ShopSessionId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("shop_session_id");
-
-                    b.Property<long?>("TargetShopId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("target_shop_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AuthorizationTokenHash")
-                        .IsUnique()
-                        .HasDatabaseName("uq_employee_action_token_hash");
-
-                    b.HasIndex("EmployeeId", "AuthenticatedAt")
-                        .HasDatabaseName("ix_employee_action_employee_time");
-
-                    b.HasIndex("EmployeeId", "CompanyId");
-
-                    b.HasIndex("ShopId", "CompanyId");
-
-                    b.HasIndex("TargetShopId", "CompanyId");
-
-                    b.HasIndex("ShopSessionId", "ShopId", "ConsumedAt", "ExpiresAt")
-                        .HasDatabaseName("ix_employee_action_session_state");
-
-                    b.ToTable("employee_action_authorization", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_employee_action_expiry", "expires_at > authenticated_at");
-
-                            t.HasCheckConstraint("ck_employee_action_hash_lengths", "octet_length(authorization_token_hash) = 32 AND (operation_context_hash IS NULL OR octet_length(operation_context_hash) = 32)");
-
-                            t.HasCheckConstraint("ck_employee_action_row_version", "row_version > 0");
-                        });
-                });
-
             modelBuilder.Entity("PcHouseStore.Infrastructure.Persistence.Entities.EmployeeAdministrationEventRecord", b =>
                 {
                     b.Property<long>("Id")
@@ -802,7 +701,7 @@ namespace PcHouseStore.Infrastructure.Persistence.Migrations
 
                     b.ToTable("employee_role_assignment", null, t =>
                         {
-                            t.HasCheckConstraint("ck_employee_role_code", "role_code IN ('MANAGER', 'TECHNICIAN')");
+                            t.HasCheckConstraint("ck_employee_role_code", "role_code IN ('EMPLOYEE', 'MANAGER', 'ADMIN')");
                         });
                 });
 
@@ -1479,36 +1378,6 @@ namespace PcHouseStore.Infrastructure.Persistence.Migrations
                         .HasPrincipalKey("Id", "CompanyId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-                });
-
-            modelBuilder.Entity("PcHouseStore.Infrastructure.Persistence.Entities.EmployeeActionAuthorizationRecord", b =>
-                {
-                    b.HasOne("PcHouseStore.Infrastructure.Persistence.Entities.EmployeeRecord", null)
-                        .WithMany()
-                        .HasForeignKey("EmployeeId", "CompanyId")
-                        .HasPrincipalKey("Id", "CompanyId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("PcHouseStore.Infrastructure.Persistence.Entities.ShopRecord", null)
-                        .WithMany()
-                        .HasForeignKey("ShopId", "CompanyId")
-                        .HasPrincipalKey("Id", "CompanyId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("PcHouseStore.Infrastructure.Persistence.Entities.ShopSessionRecord", null)
-                        .WithMany()
-                        .HasForeignKey("ShopSessionId", "ShopId")
-                        .HasPrincipalKey("Id", "ShopId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("PcHouseStore.Infrastructure.Persistence.Entities.ShopRecord", null)
-                        .WithMany()
-                        .HasForeignKey("TargetShopId", "CompanyId")
-                        .HasPrincipalKey("Id", "CompanyId")
-                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("PcHouseStore.Infrastructure.Persistence.Entities.EmployeeAdministrationEventRecord", b =>
