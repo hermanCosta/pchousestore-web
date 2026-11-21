@@ -61,7 +61,7 @@ These policies turn the owner's request to use a standard, controlled approach i
 ### Refund policy
 
 - Refund may be partial or full, but cannot exceed the original settled amount less all prior settled refunds.
-- Every refund requires a fresh `MANAGER` employee authorization, regardless of amount. No second Manager approval is required.
+- Every payment refund and deposit refund requires a fresh `MANAGER` or `ADMIN` employee authorization, regardless of amount. No second approver is required. Deposit forfeiture remains `MANAGER`-only.
 - Refunds default to the original tender. For a split payment, each refund allocation must not exceed the refundable balance of its corresponding original allocation.
 - A card refund is processed on the external terminal/provider against the original card transaction; the application records the result and external reference. Do not store PAN, CVV or card credentials.
 - An alternative refund tender is disabled in v1. Exceptional cases are handled manually outside the automated refund flow and require documented Manager review before being recorded.
@@ -76,7 +76,7 @@ These policies turn the owner's request to use a standard, controlled approach i
 - If the customer changes their mind, apply the terms disclosed and accepted before payment. A deposit may be retained only where the contractual term is clear, fair and legally valid. Do not automatically forfeit the entire deposit.
 - For special-order parts, any non-refundable amount must be disclosed and accepted in advance and must be supported by the actual, documented, non-recoverable supplier cost. Manager review is required; no hidden or invented cancellation fee is allowed.
 - A `SECURITY` deposit is returned when its stated purpose is satisfied, less only documented deductions accepted in the terms and permitted by law.
-- `FORFEITED` is never automatic. It requires a Manager authorization, reason, terms snapshot and evidence/cost reference. The application must support full refund, partial refund, partial application and remaining held balance.
+- `FORFEITED` is never automatic. It requires a fresh `MANAGER` authorization, reason, terms snapshot and evidence/cost reference. The application must support full refund, partial refund, partial application and remaining held balance.
 - CCPC guidance says deposits form part of a contract; businesses should disclose refundability/cancellation charges in writing. A business generally does not have to refund merely because a customer changes their mind, but a refund may be due where the business cannot supply what was agreed. See the official [CCPC deposits guidance](https://www.ccpc.ie/consumer-advice/consumer-rights/buying-goods/deposits/).
 
 ### Instalment arrears
@@ -104,7 +104,7 @@ Image retention is tied to the business record. Deletion is initially soft/audit
 
 1. **VAT/legal setup:** Company VAT registration/status, applicable rates/tax codes, tax-inclusive/exclusive display and legal reason for the chosen flag setting. Owner will confirm with an Irish accountant; `vat_enabled=false` is only the initial software switch.
 2. **Card processor:** no provider selection is needed for v1; the existing physical terminal is used and CARD is manually recorded after approval. Integration can be considered later.
-3. **Refund exception policy:** v1 uses Manager-only and original-tender refund. Alternative tender is disabled; exceptional out-of-band case handling may be defined later.
+3. **Refund exception policy:** v1 allows `MANAGER` and `ADMIN` to execute eligible payment/deposit refunds with fresh credentials; deposit forfeiture remains `MANAGER`-only. Original-tender refund applies. Alternative tender is disabled; exceptional out-of-band case handling may be defined later.
 4. **Deposit contract wording:** operational default is defined above, but the final written terms/non-refundable special-order wording must be reviewed for fairness and Irish consumer-law compliance.
 5. **Refurbished commercial guarantee:** 12 months is confirmed; the detailed coverage/exclusions below are a proposed default and require owner/legal review before publishing to customers.
 6. **Customer data/image retention:** image storage is PostgreSQL-only, but exact business-record retention period and lawful purge schedule remain to be approved. Soft delete is used in v1.
@@ -136,7 +136,7 @@ No processor must be selected for v1. `CASH` and `CARD` are the payment methods.
 ## Current approval status after website review
 
 - **Confirmed:** CASH/CARD only; no processor integration in v1; PostgreSQL-only image storage; the current website's publicly listed categories/contact/branch data are captured as a reference snapshot.
-- **Recommended terms still pending approval:** final customer-facing deposit cancellation/non-refundable-cost wording and the detailed refurbished guarantee coverage/exclusions. The 90-day deposit review reminder, no automatic expiry/forfeiture, Manager-only original-tender refunds and immutable cash-close policy are approved operational rules. Employee profiles and permissions are governed by the current `employee-management.md`; the former TECHNICIAN profile is retired.
+- **Recommended terms still pending approval:** final customer-facing deposit cancellation/non-refundable-cost wording and the detailed refurbished guarantee coverage/exclusions. The 90-day deposit review reminder, no automatic expiry/forfeiture, `MANAGER`/`ADMIN` original-tender refunds, `MANAGER`-only deposit forfeiture and immutable cash-close policy are approved operational rules. Employee profiles and permissions are governed by the current `employee-management.md`; the former TECHNICIAN profile is retired.
 - **Owner/accountant confirmation still needed:** VAT registration/tax codes/rates and price display; exact legal Company name and registered address; final ILAC legal/postal address; final warranty policy wording; official logo and exact brand colours; GDPR retention period.
 
 ## External references used
@@ -157,7 +157,7 @@ No processor must be selected for v1. `CASH` and `CARD` are the payment methods.
 - Customer handover is allowed only for a ServiceOrder whose technical outcome is `NOT_FIXED`, and is prohibited while its current status is `FIXED`. On handover, the lifecycle status changes to `PICKED`; the technical outcome `NOT_FIXED` must remain independently persisted and visible.
 - `EMPLOYEE`, `MANAGER` and `ADMIN` may mark a ServiceOrder `NOT_FIXED` and record eligible handover. Cancellation and financial actions are restricted to `MANAGER`/`ADMIN` where specified by the ServiceOrder SPEC and FIN-01.
 - Every successfully committed action in the ServiceOrder context must append an immutable, chronological, employee-attributed entry to `Notes`, describing the action, timestamp and concise result/reference. The corresponding structured domain or financial record remains authoritative; its Note is committed atomically. Failed/rolled-back actions do not create Notes.
-- At collection of a `NOT_FIXED` order, eligible amounts already received for the order, including refundable deposit balances, may be refunded through FIN-01. Refund is a separate, explicit Manager-only action and is not automatic on handover. Existing original-tender, deposit-lifecycle and refundable-balance limits remain in force.
+- For a `NOT_FIXED` order, payment refunds require a settled incoming `PAYMENT`, positive refundable remainder, technical outcome `NOT_FIXED`, and lifecycle status `NOT_FIXED` or `PICKED`. A refundable held deposit is returned through the distinct `DEPOSIT_REFUND` flow. Both payment and deposit refunds are separate, explicit actions available to `MANAGER` and `ADMIN` with fresh credentials; neither is automatic on handover. Original-tender, deposit-lifecycle and refundable-balance limits remain in force.
 - A `NOT_FIXED` order may be handed over with an outstanding balance or held deposit. Handover does not settle, waive or automatically refund the balance; eligible refunds remain separate explicit `MANAGER`/`ADMIN` actions under FIN-01.
 
 
