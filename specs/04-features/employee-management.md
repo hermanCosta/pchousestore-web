@@ -1,8 +1,8 @@
 # Feature: Employee Management
 
-**Status:** PRODUCT-APPROVED REQUIREMENTS BASELINE — 2026-11-20  
+**Status:** PRODUCT-APPROVED REQUIREMENTS BASELINE — 2026-11-20; DIRECT-CREDENTIAL IMPLEMENTATION IN PROGRESS — 2026-11-21  
 **Scope:** Company-wide employee accounts, roles, staff administration and employee credential lifecycle.  
-**Authority:** This specification supersedes conflicting employee-role, employee-session and employee-action-authorization statements in older architecture/authentication documents. It does not authorize implementation until legacy discovery and technical reconciliation are complete.
+**Authority:** This specification supersedes conflicting employee-role, employee-session and employee-action-authorization statements in older architecture/authentication documents. Implementation reconciliation is in progress; the direct-credential request contract and legacy authorization retirement are now being applied.
 
 ## 1. Objective and boundaries
 
@@ -241,10 +241,10 @@ Example:
 ## 11. Required technical reconciliation before implementation
 
 - Reconcile the current `Employee` / `EmployeeCredential` persistence mapping and add a mandatory-password-change state without creating a parallel credential store.
-- Review any existing development migration/table for `EmployeeActionAuthorization`; do not carry it into the target design. Any physical schema cleanup must be handled through a reviewed migration, not an ad-hoc database change.
-- Reconcile the old `TECHNICIAN` role enum/seed/configuration and dual-role assignments with the three-profile model.
+- **COMPLETED — 2026-11-21:** Retired `EmployeeActionAuthorization` from the API, EF entity/configuration/DbSet and model snapshot. Added migration `20261121153000_RemoveEmployeeActionAuthorization` to drop the ephemeral token table and map `TECHNICIAN` to `EMPLOYEE`; apply only through the normal EF Core migration workflow.
+- **IMPLEMENTED IN MIGRATION — 2026-11-21:** Replace `TECHNICIAN` with `EMPLOYEE`, preserve `MANAGER` precedence where legacy dual assignments exist, and enforce one active profile per employee with a filtered unique index.
 - Apply the approved six-character minimum consistently to employee password validation in the API, UI and tests.
-- Update API contracts, frontend staff-administration flows and tests to match this SPEC.
+- **IMPLEMENTED — 2026-11-21:** Employee administration and Shop credential operations now submit a fresh `employeeChallenge` in each protected request body. Added policy/migration tests; full build and database integration execution remain to be run.
 - Keep Shop OIDC/session/token identity unchanged.
 - Inspect the legacy Java Swing employee screens, controller, DAO, model, password-reset and role checks. Record source references and distinguish confirmed legacy behavior from this approved redesign, per `AGENTS.md`.
 
