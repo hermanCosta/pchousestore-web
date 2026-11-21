@@ -241,7 +241,7 @@ Example:
 ## 11. Required technical reconciliation before implementation
 
 - Reconcile the current `Employee` / `EmployeeCredential` persistence mapping and add a mandatory-password-change state without creating a parallel credential store.
-- **IMPLEMENTED — 2026-11-21:** Retired `EmployeeActionAuthorization` and `EmployeeAdministrationEventRecord` from API writes, EF entities/configurations/DbSets and the model snapshot. Migration `20261121153000_RemoveEmployeeActionAuthorization` drops both legacy tables and reconciles `TECHNICIAN` to `EMPLOYEE`; it has not yet been applied to a database.
+- **IMPLEMENTED — 2026-11-21:** Retired `EmployeeActionAuthorization` and `EmployeeAdministrationEventRecord` from API writes, EF entities/configurations/DbSets and the model snapshot. Migration `20261121153000_RemoveEmployeeActionAuthorization` drops both legacy tables and reconciles `TECHNICIAN` to `EMPLOYEE`; it has not yet been applied to a database. Applying this migration permanently deletes any rows currently stored in `employee_administration_event`; the approved design intentionally retains no employee-administration audit history.
 - **IMPLEMENTED IN MIGRATION — 2026-11-21:** Replace `TECHNICIAN` with `EMPLOYEE`, preserve `MANAGER` precedence where legacy dual assignments exist, and enforce one active profile per employee with a filtered unique index.
 - Apply the approved six-character minimum consistently to employee password validation in the API, UI and tests.
 - **IMPLEMENTED — 2026-11-21:** Employee administration and Shop credential operations submit a fresh `employeeChallenge` in each protected request body. Added policy and migration-operation tests. CI build/test and database execution remain pending.
