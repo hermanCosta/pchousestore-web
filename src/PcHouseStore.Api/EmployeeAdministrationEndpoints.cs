@@ -275,7 +275,6 @@ public static class EmployeeAdministrationEndpoints
         var assignments = await db.EmployeeRoleAssignments.AsNoTracking()
             .Where(x => x.CompanyId == actor.CompanyId && x.EmployeeId == employeeId)
             .ToListAsync(cancellationToken);
-        var desiredRole = request.Roles[0];
         var existingDesiredRole = assignments.SingleOrDefault(x => x.RoleCode == desiredRole);
 
         // Deactivate first, then activate the selected profile to satisfy the filtered unique index.
@@ -498,7 +497,6 @@ public static class EmployeeAdministrationEndpoints
         detail: detail,
         extensions: new Dictionary<string, object?> { ["code"] = code, ["traceId"] = context.TraceIdentifier });
 
-    private static AuthorizationResult Failure(IResult error) => new(null, error);
     internal sealed record EmployeeAuthenticationResult(EmployeeRecord? Employee, IResult? Error);
 }
 
