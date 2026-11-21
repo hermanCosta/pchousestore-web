@@ -54,7 +54,7 @@ Only a transaction in `SETTLED` state contributes to the paid balance or till. F
 
 ## 4. Service deposits at booking
 
-A `ServiceDeposit` is created against a `ServiceOrder`. The receipt is captured at booking through a `PaymentTransaction` of kind `DEPOSIT_RECEIPT`, with its tender allocations. Supported purpose values:
+A `ServiceDeposit` is created against a `ServiceOrder`. Its incoming receipt is captured at booking through a `PaymentTransaction` of kind `DEPOSIT_RECEIPT`, with its tender allocations. `DEPOSIT_RECEIPT` and `DEPOSIT_REFUND` transactions target the `ServiceDeposit`; ordinary `PAYMENT` and `REFUND` transactions target exactly one `Sale` or `ServiceOrder`. A `DEPOSIT_REFUND` references the original settled `DEPOSIT_RECEIPT`; a `REFUND` references the original settled `PAYMENT`. Supported purpose values:
 
 - `PARTS_PREORDER`: customer provides funds toward an expected part such as a battery or keyboard.
 - `BOOKING_ADVANCE`: advance intended to be credited to the service price later.
@@ -72,7 +72,7 @@ Alternative terminal outcomes include `REFUNDED` and `FORFEITED`; a partially re
 - A deposit received at booking is a cash/bank/card movement and appears in the correct Shop cash/financial report.
 - It is not automatically applied to `ServiceOrder.balance_due`.
 - `DepositApplication` is an explicit, non-cash operation that credits the service order, optionally against a specific `ServiceOrderItem`. It requires fresh direct employee credential validation and feature-specific permission, and cannot exceed the deposit's available held balance.
-- `DEPOSIT_REFUND` is a real outgoing payment linked to the original deposit receipt. Refund tender allocations identify how money was returned. It is distinct from `REFUND`, which applies only to an original settled `PAYMENT`; deposit refunds follow deposit lifecycle and available-held-balance rules.
+- `DEPOSIT_REFUND` is a real outgoing payment linked to the original settled deposit receipt and must not exceed the deposit's available refundable held balance. Refund tender allocations return funds through the original tender only. It is distinct from `REFUND`, which applies only to an original settled `PAYMENT`; deposit refunds follow deposit lifecycle and available-held-balance rules.
 - No expiry/forfeiture runs automatically. If no customer response has been recorded for 90 days, set an operational `REVIEW_REQUIRED` flag and prompt the Shop to contact the customer; this is not a legal expiry date.
 - Before receipt, snapshot the service/part purpose, expected fulfilment date, refund/cancellation terms and customer acknowledgement.
 - If the Company cannot supply the agreed service/item, or misses the agreed date and no replacement date is agreed, the unconsumed balance is refundable, subject to applicable consumer rights.
@@ -120,7 +120,7 @@ Every refund is a separate positive-magnitude `PaymentTransaction` with kind `RE
 Validation must lock or use optimistic concurrency on the original transaction so concurrent refund requests cannot over-refund it. A full refund is simply a refund whose amount equals the remaining refundable amount. Partial refunds may be item-linked through `PaymentRefundLine`; order-level refunds are allowed with a documented reason.
 
 - Every refund requires a fresh `MANAGER` or `ADMIN` code/password challenge, regardless of amount. The backend directly validates the employee credential, active status, Company membership and permission; no action-authorization token/entity/endpoint is created, persisted or consumed. No second approver is required.
-- Refund is allocated back to the original tender by default. For a split CASH/CARD receipt, each refund allocation is linked to the original `PaymentAllocation` and cannot exceed that allocation's remaining refundable amount. Alternative tender is disabled in v1.
+- Refund is allocated back to the original tender only. For a split CASH/CARD receipt, each refund allocation is linked to the original `PaymentAllocation` and cannot exceed that allocation's remaining refundable amount. Alternative tender is disabled in v1.
 - For CARD, the authorized `MANAGER` or `ADMIN` performs the refund on the external terminal against the original card transaction, then records the result/reference in the application. Do not store card numbers or security data.
 - A refund transaction does not automatically restock inventory. Physical items returned to the Shop are selected separately through `StockReturn`/`StockReturnLine`, with quantity capped at previously consumed less already returned. A monetary refund and physical return are separate records.
 - Partial refunds can be linked to one or more SaleItems/ServiceOrderItems and a reason. A total refund is the residual refundable amount after prior settled refunds.
@@ -145,7 +145,7 @@ FIN-01 owns the financial command and ledger rules. For a financial action assoc
 
 ## 9. Accounting and daily close semantics
 
-Daily closing is one immutable cash reconciliation per Shop and business date. The full operational procedure and formula are specified in [Cash Closing Policy](cash-closing-policy.md). The system creates the `DailyClosing` row in `OPEN` state with a physically counted `opening_float`; it closes once, and any later correction is an append-only manager-authorized record.
+Daily closing is one immutable cash reconciliation per Shop and business date. The full operational procedure and formula are specified in [Cash Closing Policy](cash-closing-policy.md). The system creates the `DailyClosing` row in `OPEN` state with a physically counted `opening_float`; it closes once, and any later correction is an append-only record created/approved by `MANAGER` or `ADMIN` after fresh direct credential validation.
 
 ```text
 expected_cash = opening_float
