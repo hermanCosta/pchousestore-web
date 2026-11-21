@@ -108,7 +108,7 @@ builder.Services.AddRateLimiter(options =>
         var path = context.Request.Path.Value ?? string.Empty;
         if (!path.StartsWith("/connect/", StringComparison.OrdinalIgnoreCase) &&
             !path.StartsWith("/account/login", StringComparison.OrdinalIgnoreCase) &&
-            !path.Equals("/api/v1/employee-action-authorizations", StringComparison.OrdinalIgnoreCase))
+)
             return RateLimitPartition.GetNoLimiter("non-authentication");
 
         var key = $"{context.Connection.RemoteIpAddress?.ToString() ?? "unknown"}:{path}";
@@ -288,174 +288,26 @@ app.MapGet("/api/v1/session", async (ClaimsPrincipal principal, PcHouseStoreDbCo
         shopId.ToString(), sessionId.ToString(), shop.Code, shop.Name, shop.Address, shop.Phone, shop.CompanyEmail));
 }).RequireAuthorization("ShopApi");
 
-app.MapPost("/api/v1/employee-action-authorizations", async (
-    EmployeeActionAuthorizationRequest request,
-    ClaimsPrincipal shopPrincipal,
-    PcHouseStoreDbContext db,
-    IPasswordHasher<EmployeeRecord> hasher,
-    IConfiguration configuration,
-    HttpContext context,
-    CancellationToken cancellationToken) =>
-{
-    if (!long.TryParse(shopPrincipal.FindFirstValue("shop_session_id"), out var sessionId) ||
-        !long.TryParse(shopPrincipal.FindFirstValue("shop_id"), out var shopId) ||
-        !long.TryParse(shopPrincipal.FindFirstValue("company_id"), out var companyId))
-        return ApiProblem(context, StatusCodes.Status401Unauthorized, "invalid_shop_token", "Shop authentication is required.");
-
-    var employeeCode = request.EmployeeCode?.Trim().ToUpperInvariant();
-    var password = request.Password;
-    if (string.IsNullOrWhiteSpace(employeeCode) || string.IsNullOrWhiteSpace(password) ||
-        employeeCode.Length > 40 || password.Length > 128 ||
-        string.IsNullOrWhiteSpace(request.ActionCode) || request.ActionCode.Length > 100)
-        return ApiProblem(context, StatusCodes.Status400BadRequest, "invalid_request", "The employee challenge request is invalid.");
-
-    var shopCredentialAction = request.ActionCode is "SHOP_ACCESS_CREDENTIAL_ROTATE" or "SHOP_ACCESS_CREDENTIAL_CHANGE_STATUS";
-    var employeeManagerAction = request.ActionCode is "EMPLOYEE_READ" or
-        "EMPLOYEE_CREATE" or "EMPLOYEE_PROFILE_UPDATE" or "EMPLOYEE_STATUS_CHANGE" or
-        "EMPLOYEE_ROLE_CHANGE" or "EMPLOYEE_CREDENTIAL_RESET";
-    var employeeSelfPasswordChange = request.ActionCode == "EMPLOYEE_SELF_PASSWORD_CHANGE";
-    if (!shopCredentialAction && !employeeManagerAction && !employeeSelfPasswordChange)
-        return ApiProblem(context, StatusCodes.Status403Forbidden, "action_not_permitted", "The requested action is not available for employee authorization.");
-
-    long? targetShopId = null;
-    long? targetEmployeeId = null;
-    var resourceId = request.ResourceId;
-    if (shopCredentialAction)
-    {
-        if (request.TargetShopId is not long requestedShopId || request.ResourceType != "Shop" ||
-            !long.TryParse(request.ResourceId, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var resourceShopId) ||
-            resourceShopId != requestedShopId)
-            return ApiProblem(context, StatusCodes.Status400BadRequest, "invalid_request", "A matching Shop resource and targetShopId are required.");
-        targetShopId = requestedShopId;
-    }
-    else if (employeeManagerAction && request.ActionCode == "EMPLOYEE_CREATE")
-    {
-        if (request.TargetShopId is not null || request.ResourceType != "Company" || request.ResourceId != companyId.ToString(System.Globalization.CultureInfo.InvariantCulture))
-            return ApiProblem(context, StatusCodes.Status400BadRequest, "invalid_request", "The employee action must be bound to the active Company.");
-    }
-    else
-    {
-        var isSelfAlias = employeeSelfPasswordChange && request.ResourceId == "self";
-        if (request.TargetShopId is not null || request.ResourceType != "Employee" ||
-            (!isSelfAlias && (!long.TryParse(request.ResourceId, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var requestedEmployeeId) || requestedEmployeeId <= 0)))
-            return ApiProblem(context, StatusCodes.Status400BadRequest, "invalid_request", "The employee action must be bound to a valid Employee resource.");
-        if (!isSelfAlias) targetEmployeeId = long.Parse(request.ResourceId!, System.Globalization.CultureInfo.InvariantCulture);
-    }
-
-    var employee = await db.Employees.AsNoTracking().SingleOrDefaultAsync(x =>
-        x.CompanyId == companyId && x.EmployeeCode == employeeCode && x.IsActive, cancellationToken);
-    if (employee is null || hasher.VerifyHashedPassword(employee, employee.PasswordHash, password) == PasswordVerificationResult.Failed)
-        return ApiProblem(context, StatusCodes.Status401Unauthorized, "invalid_employee_credentials", "Employee credentials are invalid.");
-
-    if (employee.MustChangePasswordAtNextUse && !employeeSelfPasswordChange)
-        return ApiProblem(context, StatusCodes.Status403Forbidden, "employee_password_change_required", "Change the employee password before performing another protected action.");
-
-    if (employeeManagerAction || shopCredentialAction)
-    {
-        var isManager = await db.EmployeeRoleAssignments.AsNoTracking().AnyAsync(x =>
-            x.CompanyId == companyId && x.EmployeeId == employee.Id && x.IsActive && x.RoleCode == "MANAGER", cancellationToken);
-        if (!isManager)
-            return ApiProblem(context, StatusCodes.Status403Forbidden, "action_not_permitted", "The employee is not permitted to perform this action.");
-    }
-    if (targetShopId is long scopedShopId)
-    {
-        var targetShop = await db.Shops.AsNoTracking().SingleOrDefaultAsync(x => x.Id == scopedShopId, cancellationToken);
-        if (targetShop is null)
-            return ApiProblem(context, StatusCodes.Status404NotFound, "shop_not_found", "The target Shop was not found.");
-        if (targetShop.CompanyId != companyId)
-            return ApiProblem(context, StatusCodes.Status403Forbidden, "target_shop_outside_company", "The target Shop is outside the active Company.");
-    }
-    if (targetEmployeeId is long scopedEmployeeId &&
-        !await db.Employees.AsNoTracking().AnyAsync(x => x.Id == scopedEmployeeId && x.CompanyId == companyId, cancellationToken))
-        return ApiProblem(context, StatusCodes.Status404NotFound, "employee_not_found", "The Employee was not found.");
-    if (employeeSelfPasswordChange)
-    {
-        if (targetEmployeeId is not null && employee.Id != targetEmployeeId)
-            return ApiProblem(context, StatusCodes.Status403Forbidden, "action_not_permitted", "An employee may change only their own password.");
-        targetEmployeeId = employee.Id;
-        resourceId = employee.Id.ToString(System.Globalization.CultureInfo.InvariantCulture);
-    }
-
-    byte[]? operationContextHash;
-    try
-    {
-        operationContextHash = HashOperationContext(request.OperationContext);
-    }
-    catch (JsonException)
-    {
-        return ApiProblem(context, StatusCodes.Status400BadRequest, "invalid_request", "The operation context is invalid.");
-    }
-
-    var now = DateTime.UtcNow;
-    var activeSession = await db.ShopSessions.AsNoTracking().AnyAsync(x => x.Id == sessionId &&
-        x.CompanyId == companyId && x.ShopId == shopId && x.RevokedAt == null &&
-        (x.IdleExpiresAt == null || x.IdleExpiresAt > now) &&
-        (x.AbsoluteExpiresAt == null || x.AbsoluteExpiresAt > now) &&
-        db.Shops.Any(s => s.Id == shopId && s.CompanyId == companyId && s.IsActive) &&
-        db.Companies.Any(c => c.Id == companyId && c.IsActive), cancellationToken);
-    if (!activeSession)
-        return ApiProblem(context, StatusCodes.Status401Unauthorized, "shop_session_revoked", "The Shop session is no longer active.");
-
-    var rawToken = RandomNumberGenerator.GetBytes(32);
-    var token = Convert.ToBase64String(rawToken).TrimEnd('=').Replace('+', '-').Replace('/', '_');
-    var lifetimeMinutes = Math.Clamp(configuration.GetValue("Authentication:EmployeeAuthorizationLifetimeMinutes", 2), 1, 10);
-    var expiresAt = now.AddMinutes(lifetimeMinutes);
-    db.EmployeeActionAuthorizations.Add(new EmployeeActionAuthorizationRecord
-    {
-        AuthorizationTokenHash = SHA256.HashData(rawToken),
-        ShopSessionId = sessionId,
-        CompanyId = companyId,
-        ShopId = shopId,
-        TargetShopId = targetShopId,
-        EmployeeId = employee.Id,
-        ActionCode = request.ActionCode,
-        ResourceType = request.ResourceType,
-        ResourceId = resourceId,
-        OperationContextHash = operationContextHash,
-        AuthenticatedAt = now,
-        ExpiresAt = expiresAt
-    });
-    await db.SaveChangesAsync(cancellationToken);
-
-    return Results.Created("/api/v1/employee-action-authorizations", new EmployeeActionAuthorizationResponse(
-        token, request.ActionCode, request.ResourceType, resourceId, expiresAt));
-}).RequireAuthorization("ShopApi");
-
 app.MapPut("/api/v1/shops/{shopId:long}/access-credential", async (
     long shopId,
     RotateShopCredentialRequest request,
     ClaimsPrincipal shopPrincipal,
     PcHouseStoreDbContext db,
     IPasswordHasher<ShopAccessCredentialRecord> hasher,
+    IPasswordHasher<EmployeeRecord> employeeHasher,
     HttpContext context,
     CancellationToken cancellationToken) =>
 {
-    if (!long.TryParse(shopPrincipal.FindFirstValue("shop_session_id"), out var sessionId) ||
-        !long.TryParse(shopPrincipal.FindFirstValue("shop_id"), out var activeShopId) ||
-        !long.TryParse(shopPrincipal.FindFirstValue("company_id"), out var companyId))
+    if (!long.TryParse(shopPrincipal.FindFirstValue("company_id"), out var companyId))
         return ApiProblem(context, StatusCodes.Status401Unauthorized, "invalid_shop_token", "Shop authentication is required.");
-
-    var newPassword = request.NewPassword;
-    if (string.IsNullOrEmpty(newPassword) || newPassword.Length is < 12 or > 128 || request.ExpectedCredentialVersion <= 0)
-        return ApiProblem(context, StatusCodes.Status400BadRequest, "password_policy_failed", "The new password must contain between 12 and 128 characters and the expected version must be positive.");
-
-    if (!TryDecodeAuthorizationToken(context.Request.Headers["X-Employee-Action-Authorization"].ToString(), out var authorizationToken))
-        return ApiProblem(context, StatusCodes.Status401Unauthorized, "invalid_employee_action_authorization", "A valid employee action authorization is required.");
+    if (string.IsNullOrEmpty(request.NewPassword) || request.NewPassword.Length is < 12 or > 128 || request.ExpectedCredentialVersion <= 0)
+        return ApiProblem(context, StatusCodes.Status400BadRequest, "password_policy_failed", "The new Shop password must contain between 12 and 128 characters and the expected version must be positive.");
 
     await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-    var now = DateTime.UtcNow;
-
-    var lockedSession = await db.ShopSessions
-        .FromSqlInterpolated($"SELECT * FROM shop_session WHERE id = {sessionId} FOR UPDATE")
-        .SingleOrDefaultAsync(cancellationToken);
-    var activeSession = lockedSession is not null && lockedSession.CompanyId == companyId &&
-        lockedSession.ShopId == activeShopId && lockedSession.RevokedAt is null &&
-        (lockedSession.IdleExpiresAt is null || lockedSession.IdleExpiresAt > now) &&
-        (lockedSession.AbsoluteExpiresAt is null || lockedSession.AbsoluteExpiresAt > now) &&
-        await db.Shops.AnyAsync(s => s.Id == activeShopId && s.CompanyId == companyId && s.IsActive, cancellationToken) &&
-        await db.Companies.AnyAsync(c => c.Id == companyId && c.IsActive, cancellationToken);
-    if (!activeSession)
-        return ApiProblem(context, StatusCodes.Status401Unauthorized, "shop_session_revoked", "The Shop session is no longer active.");
+    var authentication = await EmployeeAdministrationEndpoints.AuthenticateManagerAsync(
+        request.EmployeeChallenge, shopPrincipal, db, employeeHasher, context, cancellationToken);
+    if (authentication.Error is not null) return authentication.Error;
+    var actor = authentication.Employee!;
 
     var targetShop = await db.Shops.AsNoTracking().SingleOrDefaultAsync(x => x.Id == shopId, cancellationToken);
     if (targetShop is null)
@@ -463,78 +315,35 @@ app.MapPut("/api/v1/shops/{shopId:long}/access-credential", async (
     if (targetShop.CompanyId != companyId)
         return ApiProblem(context, StatusCodes.Status403Forbidden, "target_shop_outside_company", "The target Shop is outside the active Company.");
 
-    var authorizationHash = SHA256.HashData(authorizationToken);
-    var authorization = await db.EmployeeActionAuthorizations.AsNoTracking()
-        .SingleOrDefaultAsync(x => x.AuthorizationTokenHash == authorizationHash, cancellationToken);
-    if (authorization is null)
-        return ApiProblem(context, StatusCodes.Status401Unauthorized, "invalid_employee_action_authorization", "A valid employee action authorization is required.");
-    if (authorization.ConsumedAt is not null)
-        return ApiProblem(context, StatusCodes.Status409Conflict, "authorization_replayed", "This employee action authorization has already been consumed.");
-    if (authorization.ExpiresAt <= now)
-        return ApiProblem(context, StatusCodes.Status410Gone, "authorization_expired", "This employee action authorization has expired.");
-    if (authorization.ShopSessionId != sessionId || authorization.CompanyId != companyId ||
-        authorization.ShopId != activeShopId || authorization.TargetShopId != shopId ||
-        authorization.ActionCode != "SHOP_ACCESS_CREDENTIAL_ROTATE" ||
-        authorization.ResourceType != "Shop" || authorization.ResourceId != shopId.ToString(System.Globalization.CultureInfo.InvariantCulture))
-        return ApiProblem(context, StatusCodes.Status403Forbidden, "action_not_permitted", "The employee authorization does not permit this Shop operation.");
-
-    if (authorization.OperationContextHash is not null &&
-        !CryptographicOperations.FixedTimeEquals(authorization.OperationContextHash,
-            HashCredentialVersion(request.ExpectedCredentialVersion)))
-        return ApiProblem(context, StatusCodes.Status409Conflict, "operation_context_mismatch", "The employee authorization is bound to a different credential version.");
-
-    var employeeIsActiveManager = await db.Employees.AsNoTracking().AnyAsync(x =>
-        x.Id == authorization.EmployeeId && x.CompanyId == companyId && x.IsActive &&
-        db.EmployeeRoleAssignments.Any(role => role.EmployeeId == x.Id && role.CompanyId == companyId &&
-            role.IsActive && role.RoleCode == "MANAGER"), cancellationToken);
-    if (!employeeIsActiveManager)
-        return ApiProblem(context, StatusCodes.Status403Forbidden, "action_not_permitted", "The employee is no longer permitted to perform this action.");
-
-    var credential = await db.ShopAccessCredentials.AsNoTracking().SingleOrDefaultAsync(x =>
+    var credential = await db.ShopAccessCredentials.SingleOrDefaultAsync(x =>
         x.ShopId == shopId && x.CompanyId == companyId, cancellationToken);
     if (credential is null)
         return ApiProblem(context, StatusCodes.Status404NotFound, "shop_credential_not_found", "The Shop credential was not found.");
     if (credential.CredentialVersion != request.ExpectedCredentialVersion)
-        return ApiProblem(context, StatusCodes.Status409Conflict, "credential_version_conflict", "The Shop credential changed. Reload it and request a new employee authorization.");
+        return ApiProblem(context, StatusCodes.Status409Conflict, "credential_version_conflict", "The Shop credential changed. Reload it and retry.");
 
-    var affectedAuthorizations = await db.EmployeeActionAuthorizations
-        .Where(x => x.Id == authorization.Id && x.AuthorizationTokenHash == authorizationHash &&
-            x.ConsumedAt == null && x.ExpiresAt > now)
-        .ExecuteUpdateAsync(update => update.SetProperty(x => x.ConsumedAt, now), cancellationToken);
-    if (affectedAuthorizations != 1)
-        return ApiProblem(context, StatusCodes.Status409Conflict, "authorization_replayed", "This employee action authorization is no longer available.");
-
-    var newPasswordHash = hasher.HashPassword(credential, newPassword);
-    var newCredentialVersion = request.ExpectedCredentialVersion + 1;
-    var affectedCredentials = await db.ShopAccessCredentials
-        .Where(x => x.ShopId == shopId && x.CompanyId == companyId &&
-            x.CredentialVersion == request.ExpectedCredentialVersion)
-        .ExecuteUpdateAsync(update => update
-            .SetProperty(x => x.PasswordHash, newPasswordHash)
-            .SetProperty(x => x.CredentialVersion, newCredentialVersion)
-            .SetProperty(x => x.RotatedAt, now)
-            .SetProperty(x => x.UpdatedAt, now)
-            .SetProperty(x => x.UpdatedByEmployeeId, authorization.EmployeeId), cancellationToken);
-    if (affectedCredentials != 1)
-        return ApiProblem(context, StatusCodes.Status409Conflict, "credential_version_conflict", "The Shop credential changed. Reload it and request a new employee authorization.");
-
+    var now = DateTime.UtcNow;
+    credential.PasswordHash = hasher.HashPassword(credential, request.NewPassword);
+    credential.CredentialVersion++;
+    credential.RotatedAt = now;
+    credential.UpdatedAt = now;
+    credential.UpdatedByEmployeeId = actor.Id;
     db.ShopAccessCredentialEvents.Add(new ShopAccessCredentialEventRecord
     {
         ShopId = shopId,
         CompanyId = companyId,
         EventType = "ROTATED",
-        CredentialVersion = newCredentialVersion,
+        CredentialVersion = credential.CredentialVersion,
         OccurredAt = now,
         ActorType = "EMPLOYEE",
-        ActorEmployeeId = authorization.EmployeeId,
-        Reason = "Credential rotated using a one-time employee action authorization."
+        ActorEmployeeId = actor.Id,
+        Reason = "Credential rotated after fresh employee credential validation."
     });
     await db.ShopSessions.Where(x => x.ShopId == shopId && x.CompanyId == companyId && x.RevokedAt == null)
         .ExecuteUpdateAsync(update => update
             .SetProperty(x => x.RevokedAt, now)
             .SetProperty(x => x.RevocationReason, "SHOP_CREDENTIAL_ROTATED")
             .SetProperty(x => x.RowVersion, x => x.RowVersion + 1), cancellationToken);
-
     await db.SaveChangesAsync(cancellationToken);
     await transaction.CommitAsync(cancellationToken);
     return Results.NoContent();
@@ -545,34 +354,20 @@ app.MapPatch("/api/v1/shops/{shopId:long}/access-credential", async (
     ChangeShopCredentialStatusRequest request,
     ClaimsPrincipal shopPrincipal,
     PcHouseStoreDbContext db,
+    IPasswordHasher<EmployeeRecord> employeeHasher,
     HttpContext context,
     CancellationToken cancellationToken) =>
 {
-    if (!long.TryParse(shopPrincipal.FindFirstValue("shop_session_id"), out var sessionId) ||
-        !long.TryParse(shopPrincipal.FindFirstValue("shop_id"), out var activeShopId) ||
-        !long.TryParse(shopPrincipal.FindFirstValue("company_id"), out var companyId))
+    if (!long.TryParse(shopPrincipal.FindFirstValue("company_id"), out var companyId))
         return ApiProblem(context, StatusCodes.Status401Unauthorized, "invalid_shop_token", "Shop authentication is required.");
-
     if (request.ExpectedCredentialVersion <= 0)
         return ApiProblem(context, StatusCodes.Status400BadRequest, "invalid_request", "A positive expected credential version is required.");
-    if (!request.IsActive && shopId == activeShopId)
-        return ApiProblem(context, StatusCodes.Status409Conflict, "cannot_disable_active_shop", "The active Shop credential cannot be disabled from its own session.");
-    if (!TryDecodeAuthorizationToken(context.Request.Headers["X-Employee-Action-Authorization"].ToString(), out var authorizationToken))
-        return ApiProblem(context, StatusCodes.Status401Unauthorized, "invalid_employee_action_authorization", "A valid employee action authorization is required.");
 
     await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-    var now = DateTime.UtcNow;
-    var lockedSession = await db.ShopSessions
-        .FromSqlInterpolated($"SELECT * FROM shop_session WHERE id = {sessionId} FOR UPDATE")
-        .SingleOrDefaultAsync(cancellationToken);
-    var activeSession = lockedSession is not null && lockedSession.CompanyId == companyId &&
-        lockedSession.ShopId == activeShopId && lockedSession.RevokedAt is null &&
-        (lockedSession.IdleExpiresAt is null || lockedSession.IdleExpiresAt > now) &&
-        (lockedSession.AbsoluteExpiresAt is null || lockedSession.AbsoluteExpiresAt > now) &&
-        await db.Shops.AnyAsync(s => s.Id == activeShopId && s.CompanyId == companyId && s.IsActive, cancellationToken) &&
-        await db.Companies.AnyAsync(c => c.Id == companyId && c.IsActive, cancellationToken);
-    if (!activeSession)
-        return ApiProblem(context, StatusCodes.Status401Unauthorized, "shop_session_revoked", "The Shop session is no longer active.");
+    var authentication = await EmployeeAdministrationEndpoints.AuthenticateManagerAsync(
+        request.EmployeeChallenge, shopPrincipal, db, employeeHasher, context, cancellationToken);
+    if (authentication.Error is not null) return authentication.Error;
+    var actor = authentication.Employee!;
 
     var targetShop = await db.Shops.AsNoTracking().SingleOrDefaultAsync(x => x.Id == shopId, cancellationToken);
     if (targetShop is null)
@@ -580,72 +375,34 @@ app.MapPatch("/api/v1/shops/{shopId:long}/access-credential", async (
     if (targetShop.CompanyId != companyId)
         return ApiProblem(context, StatusCodes.Status403Forbidden, "target_shop_outside_company", "The target Shop is outside the active Company.");
 
-    var authorizationHash = SHA256.HashData(authorizationToken);
-    var authorization = await db.EmployeeActionAuthorizations.AsNoTracking()
-        .SingleOrDefaultAsync(x => x.AuthorizationTokenHash == authorizationHash, cancellationToken);
-    if (authorization is null)
-        return ApiProblem(context, StatusCodes.Status401Unauthorized, "invalid_employee_action_authorization", "A valid employee action authorization is required.");
-    if (authorization.ConsumedAt is not null)
-        return ApiProblem(context, StatusCodes.Status409Conflict, "authorization_replayed", "This employee action authorization has already been consumed.");
-    if (authorization.ExpiresAt <= now)
-        return ApiProblem(context, StatusCodes.Status410Gone, "authorization_expired", "This employee action authorization has expired.");
-    if (authorization.ShopSessionId != sessionId || authorization.CompanyId != companyId ||
-        authorization.ShopId != activeShopId || authorization.TargetShopId != shopId ||
-        authorization.ActionCode != "SHOP_ACCESS_CREDENTIAL_CHANGE_STATUS" ||
-        authorization.ResourceType != "Shop" || authorization.ResourceId != shopId.ToString(System.Globalization.CultureInfo.InvariantCulture))
-        return ApiProblem(context, StatusCodes.Status403Forbidden, "action_not_permitted", "The employee authorization does not permit this Shop operation.");
-    if (authorization.OperationContextHash is not null &&
-        !CryptographicOperations.FixedTimeEquals(authorization.OperationContextHash, HashCredentialVersion(request.ExpectedCredentialVersion)))
-        return ApiProblem(context, StatusCodes.Status409Conflict, "operation_context_mismatch", "The employee authorization is bound to a different credential version.");
-
-    var employeeIsActiveManager = await db.Employees.AsNoTracking().AnyAsync(x =>
-        x.Id == authorization.EmployeeId && x.CompanyId == companyId && x.IsActive &&
-        db.EmployeeRoleAssignments.Any(role => role.EmployeeId == x.Id && role.CompanyId == companyId &&
-            role.IsActive && role.RoleCode == "MANAGER"), cancellationToken);
-    if (!employeeIsActiveManager)
-        return ApiProblem(context, StatusCodes.Status403Forbidden, "action_not_permitted", "The employee is no longer permitted to perform this action.");
-
-    var credential = await db.ShopAccessCredentials.AsNoTracking().SingleOrDefaultAsync(x =>
+    var credential = await db.ShopAccessCredentials.SingleOrDefaultAsync(x =>
         x.ShopId == shopId && x.CompanyId == companyId, cancellationToken);
     if (credential is null)
         return ApiProblem(context, StatusCodes.Status404NotFound, "shop_credential_not_found", "The Shop credential was not found.");
     if (credential.CredentialVersion != request.ExpectedCredentialVersion)
-        return ApiProblem(context, StatusCodes.Status409Conflict, "credential_version_conflict", "The Shop credential changed. Reload it and request a new employee authorization.");
+        return ApiProblem(context, StatusCodes.Status409Conflict, "credential_version_conflict", "The Shop credential changed. Reload it and retry.");
 
-    var consumed = await db.EmployeeActionAuthorizations
-        .Where(x => x.Id == authorization.Id && x.AuthorizationTokenHash == authorizationHash && x.ConsumedAt == null && x.ExpiresAt > now)
-        .ExecuteUpdateAsync(update => update.SetProperty(x => x.ConsumedAt, now), cancellationToken);
-    if (consumed != 1)
-        return ApiProblem(context, StatusCodes.Status409Conflict, "authorization_replayed", "This employee action authorization is no longer available.");
-
-    var newVersion = request.ExpectedCredentialVersion + 1;
-    var changed = await db.ShopAccessCredentials
-        .Where(x => x.ShopId == shopId && x.CompanyId == companyId && x.CredentialVersion == request.ExpectedCredentialVersion)
-        .ExecuteUpdateAsync(update => update
-            .SetProperty(x => x.IsActive, request.IsActive)
-            .SetProperty(x => x.CredentialVersion, newVersion)
-            .SetProperty(x => x.UpdatedAt, now)
-            .SetProperty(x => x.UpdatedByEmployeeId, authorization.EmployeeId), cancellationToken);
-    if (changed != 1)
-        return ApiProblem(context, StatusCodes.Status409Conflict, "credential_version_conflict", "The Shop credential changed. Reload it and request a new employee authorization.");
-
+    var now = DateTime.UtcNow;
+    credential.IsActive = request.IsActive;
+    credential.CredentialVersion++;
+    credential.UpdatedAt = now;
+    credential.UpdatedByEmployeeId = actor.Id;
     db.ShopAccessCredentialEvents.Add(new ShopAccessCredentialEventRecord
     {
         ShopId = shopId,
         CompanyId = companyId,
         EventType = request.IsActive ? "ENABLED" : "DISABLED",
-        CredentialVersion = newVersion,
+        CredentialVersion = credential.CredentialVersion,
         OccurredAt = now,
         ActorType = "EMPLOYEE",
-        ActorEmployeeId = authorization.EmployeeId,
-        Reason = string.IsNullOrWhiteSpace(request.Reason) ? "Status changed by Manager." : request.Reason.Trim()
+        ActorEmployeeId = actor.Id,
+        Reason = string.IsNullOrWhiteSpace(request.Reason) ? "Status changed after fresh employee credential validation." : request.Reason.Trim()
     });
     await db.ShopSessions.Where(x => x.ShopId == shopId && x.CompanyId == companyId && x.RevokedAt == null)
         .ExecuteUpdateAsync(update => update
             .SetProperty(x => x.RevokedAt, now)
             .SetProperty(x => x.RevocationReason, request.IsActive ? "SHOP_CREDENTIAL_STATUS_CHANGED" : "SHOP_CREDENTIAL_DISABLED")
             .SetProperty(x => x.RowVersion, x => x.RowVersion + 1), cancellationToken);
-
     await db.SaveChangesAsync(cancellationToken);
     await transaction.CommitAsync(cancellationToken);
     return Results.NoContent();
@@ -690,91 +447,6 @@ static IResult ApiProblem(HttpContext context, int status, string code, string d
         ["code"] = code,
         ["traceId"] = context.TraceIdentifier
     });
-
-static bool TryDecodeAuthorizationToken(string value, out byte[] token)
-{
-    token = [];
-    if (value.Length != 43 || value.Any(character =>
-        !(character is >= 'A' and <= 'Z' or >= 'a' and <= 'z' or >= '0' and <= '9' or '-' or '_')))
-        return false;
-
-    try
-    {
-        token = Convert.FromBase64String(value.Replace('-', '+').Replace('_', '/') + "=");
-        return token.Length == 32;
-    }
-    catch (FormatException)
-    {
-        token = [];
-        return false;
-    }
-}
-
-static byte[] HashCredentialVersion(long credentialVersion)
-{
-    using var stream = new MemoryStream();
-    using (var writer = new Utf8JsonWriter(stream))
-    {
-        writer.WriteStartObject();
-        writer.WriteNumber("credentialVersion", credentialVersion);
-        writer.WriteEndObject();
-    }
-    return SHA256.HashData(stream.ToArray());
-}
-
-static byte[]? HashOperationContext(JsonElement? operationContext)
-{
-    if (operationContext is null || operationContext.Value.ValueKind == JsonValueKind.Null)
-        return null;
-
-    using var stream = new MemoryStream();
-    using (var writer = new Utf8JsonWriter(stream))
-        WriteCanonicalJson(operationContext.Value, writer);
-
-    if (stream.Length > 16 * 1024)
-        throw new JsonException("The operation context is too large.");
-    return SHA256.HashData(stream.ToArray());
-}
-
-static void WriteCanonicalJson(JsonElement element, Utf8JsonWriter writer)
-{
-    switch (element.ValueKind)
-    {
-        case JsonValueKind.Object:
-            writer.WriteStartObject();
-            var names = new HashSet<string>(StringComparer.Ordinal);
-            foreach (var property in element.EnumerateObject().OrderBy(x => x.Name, StringComparer.Ordinal))
-            {
-                if (!names.Add(property.Name)) throw new JsonException("Duplicate object property.");
-                writer.WritePropertyName(property.Name);
-                WriteCanonicalJson(property.Value, writer);
-            }
-            writer.WriteEndObject();
-            break;
-        case JsonValueKind.Array:
-            writer.WriteStartArray();
-            foreach (var item in element.EnumerateArray()) WriteCanonicalJson(item, writer);
-            writer.WriteEndArray();
-            break;
-        case JsonValueKind.String:
-            writer.WriteStringValue(element.GetString());
-            break;
-        case JsonValueKind.Number:
-            element.WriteTo(writer);
-            break;
-        case JsonValueKind.True:
-            writer.WriteBooleanValue(true);
-            break;
-        case JsonValueKind.False:
-            writer.WriteBooleanValue(false);
-            break;
-        case JsonValueKind.Null:
-            writer.WriteNullValue();
-            break;
-        default:
-            throw new JsonException("Unsupported operation context value.");
-    }
-}
 
 static string RenderLoginPage(string returnUrl, string? requestToken, string? error = null)
 {
@@ -934,22 +606,10 @@ public sealed record ShopSessionDto(
     string? ShopAddress,
     string? ShopPhone,
     string? CompanyEmail);
-public sealed record EmployeeActionAuthorizationRequest(
-    string EmployeeCode,
-    string Password,
-    string ActionCode,
-    string? ResourceType,
-    string? ResourceId,
-    long? TargetShopId,
-    JsonElement? OperationContext);
-public sealed record EmployeeActionAuthorizationResponse(
-    string AuthorizationToken,
-    string ActionCode,
-    string? ResourceType,
-    string? ResourceId,
-    DateTime ExpiresAt);
-public sealed record RotateShopCredentialRequest(string NewPassword, long ExpectedCredentialVersion);
-public sealed record ChangeShopCredentialStatusRequest(bool IsActive, long ExpectedCredentialVersion, string? Reason = null);
+public sealed record RotateShopCredentialRequest(
+    string NewPassword, long ExpectedCredentialVersion, PcHouseStore.Api.EmployeeChallengeRequest EmployeeChallenge);
+public sealed record ChangeShopCredentialStatusRequest(
+    bool IsActive, long ExpectedCredentialVersion, PcHouseStore.Api.EmployeeChallengeRequest EmployeeChallenge, string? Reason = null);
 public partial class Program { }
 
 public sealed class OidcClientRegistration(IServiceScopeFactory scopeFactory, IConfiguration configuration) : IHostedService
