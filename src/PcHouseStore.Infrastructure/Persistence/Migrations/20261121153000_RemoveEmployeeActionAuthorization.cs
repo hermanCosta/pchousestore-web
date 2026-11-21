@@ -53,6 +53,9 @@ public partial class RemoveEmployeeActionAuthorization : Migration
             filter: "is_active = TRUE");
 
         migrationBuilder.DropTable(name: "employee_action_authorization");
+
+        // Employee-administration audit was explicitly excluded from the approved feature scope.
+        migrationBuilder.DropTable(name: "employee_administration_event");
     }
 
     protected override void Down(MigrationBuilder migrationBuilder)
@@ -83,6 +86,63 @@ public partial class RemoveEmployeeActionAuthorization : Migration
             name: "ck_employee_role_code",
             table: "employee_role_assignment",
             sql: "role_code IN ('MANAGER', 'TECHNICIAN')");
+
+        migrationBuilder.CreateTable(
+            name: "employee_administration_event",
+            columns: table => new
+            {
+                id = table.Column<long>(type: "bigint", nullable: false)
+                    .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                company_id = table.Column<long>(type: "bigint", nullable: false),
+                actor_employee_id = table.Column<long>(type: "bigint", nullable: true),
+                actor_type = table.Column<string>(type: "character varying(40)", maxLength: 40, nullable: false),
+                actor_identifier = table.Column<string>(type: "character varying(240)", maxLength: 240, nullable: true),
+                target_employee_id = table.Column<long>(type: "bigint", nullable: true),
+                action_code = table.Column<string>(type: "character varying(80)", maxLength: 80, nullable: false),
+                occurred_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+            },
+            constraints: table =>
+            {
+                table.PrimaryKey("PK_employee_administration_event", x => x.id);
+                table.ForeignKey(
+                    name: "FK_employee_administration_event_company_company_id",
+                    column: x => x.company_id,
+                    principalTable: "company",
+                    principalColumn: "id",
+                    onDelete: ReferentialAction.Restrict);
+                table.ForeignKey(
+                    name: "FK_employee_administration_event_employee_actor_employee_id_company_id",
+                    columns: x => new { x.actor_employee_id, x.company_id },
+                    principalTable: "employee",
+                    principalColumns: new[] { "id", "company_id" },
+                    onDelete: ReferentialAction.Restrict);
+                table.ForeignKey(
+                    name: "FK_employee_administration_event_employee_target_employee_id_company_id",
+                    columns: x => new { x.target_employee_id, x.company_id },
+                    principalTable: "employee",
+                    principalColumns: new[] { "id", "company_id" },
+                    onDelete: ReferentialAction.Restrict);
+            });
+
+        migrationBuilder.CreateIndex(
+            name: "IX_employee_administration_event_actor_employee_id_company_id",
+            table: "employee_administration_event",
+            columns: new[] { "actor_employee_id", "company_id" });
+
+        migrationBuilder.CreateIndex(
+            name: "ix_employee_administration_event_company_time",
+            table: "employee_administration_event",
+            columns: new[] { "company_id", "occurred_at" });
+
+        migrationBuilder.CreateIndex(
+            name: "IX_employee_administration_event_target_employee_id_company_id",
+            table: "employee_administration_event",
+            columns: new[] { "target_employee_id", "company_id" });
+
+        migrationBuilder.CreateIndex(
+            name: "ix_employee_administration_event_target_time",
+            table: "employee_administration_event",
+            columns: new[] { "target_employee_id", "occurred_at" });
 
         migrationBuilder.CreateTable(
             name: "employee_action_authorization",
