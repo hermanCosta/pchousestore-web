@@ -137,6 +137,7 @@ public static class EmployeeAdministrationEndpoints
 
     private static async Task<IResult> GetAsync(
         long employeeId,
+        EmployeeChallengeRequest request,
         ClaimsPrincipal principal,
         PcHouseStoreDbContext db,
         IPasswordHasher<EmployeeRecord> hasher,
@@ -430,8 +431,8 @@ public static class EmployeeAdministrationEndpoints
 
     private static string? NormalizeEmail(string? email) => string.IsNullOrWhiteSpace(email) ? null : email.Trim().ToLowerInvariant();
     private static bool ValidPassword(string? password) => !string.IsNullOrEmpty(password) && password.Length is >= 12 and <= 128;
-    private static bool ValidRoles(IReadOnlyCollection<string>? roles) => roles is { Count: > 0 and <= 2 } &&
-        roles.All(x => x is "MANAGER" or "TECHNICIAN") && roles.Distinct(StringComparer.Ordinal).Count() == roles.Count;
+    private static bool ValidRoles(IReadOnlyCollection<string>? roles) => roles is { Count: > 0 and <= 3 } &&
+        roles.All(x => x is "EMPLOYEE" or "MANAGER" or "ADMIN") && roles.Distinct(StringComparer.Ordinal).Count() == roles.Count;
     private static string NormalizeRole(string role) => role.Trim().ToUpperInvariant();
 
     private static bool TryReadShopContext(ClaimsPrincipal principal, out long sessionId, out long shopId, out long companyId)
