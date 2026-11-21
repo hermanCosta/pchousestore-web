@@ -7,7 +7,7 @@ using PcHouseStore.Infrastructure.Persistence.Entities;
 const string prefix = "EmployeeBootstrap";
 const string shopPrefix = "ShopCredentialProvisioning";
 var configuration = new ConfigurationBuilder().AddEnvironmentVariables().Build();
-var operation = configuration[$"{prefix}:Operation"] ?? "BootstrapManager";
+var operation = configuration[$"{prefix}:Operation"] ?? "BootstrapAdmin";
 var connectionString = configuration.GetConnectionString("PcHouseStore");
 var companyId = configuration.GetValue<long?>($"{prefix}:CompanyId");
 var employeeCode = configuration[$"{prefix}:EmployeeCode"]?.Trim().ToUpperInvariant();
@@ -19,11 +19,11 @@ var phone = configuration[$"{prefix}:Phone"]?.Trim();
 var initialPassword = operation == "ProvisionShopCredential"
     ? configuration[$"{shopPrefix}:InitialPassword"]
     : configuration[$"{prefix}:InitialPassword"];
-var needsEmployeeCode = operation is "BootstrapManager" or "ResetEmployeeCredential";
+var needsEmployeeCode = operation is "BootstrapAdmin" or "BootstrapManager" or "ResetEmployeeCredential";
 
 if (string.IsNullOrWhiteSpace(connectionString) || companyId is null or <= 0 ||
     (needsEmployeeCode && string.IsNullOrWhiteSpace(employeeCode)) || string.IsNullOrEmpty(initialPassword) ||
-    (operation == "BootstrapManager" && (string.IsNullOrWhiteSpace(firstName) ||
+    ((operation is "BootstrapAdmin" or "BootstrapManager") && (string.IsNullOrWhiteSpace(firstName) ||
         string.IsNullOrWhiteSpace(lastName) || string.IsNullOrWhiteSpace(phone))) ||
     (operation == "ProvisionShopCredential" &&
         (string.IsNullOrWhiteSpace(currentShopCode) || string.IsNullOrWhiteSpace(newShopCode))))
@@ -32,14 +32,14 @@ if (string.IsNullOrWhiteSpace(connectionString) || companyId is null or <= 0 ||
     return 2;
 }
 
-if (initialPassword.Length is < 12 or > 128 ||
+if (initialPassword.Length is > 128 || (operation == "ProvisionShopCredential" ? initialPassword.Length < 12 : initialPassword.Length < 6) ||
     (employeeCode?.Length > 40) || currentShopCode?.Length > 40 || newShopCode?.Length > 40)
 {
     Console.Error.WriteLine("Bootstrap configuration contains a value outside the supported limits.");
     return 2;
 }
 
-if (operation is not ("BootstrapManager" or "ResetEmployeeCredential" or "ProvisionShopCredential"))
+if (operation is not ("BootstrapAdmin" or "BootstrapManager" or "ResetEmployeeCredential" or "ProvisionShopCredential"))
 {
     Console.Error.WriteLine("Unsupported operator operation.");
     return 2;
@@ -158,12 +158,12 @@ if (operation == "ResetEmployeeCredential")
     return 0;
 }
 
-var hasActiveManager = await db.EmployeeRoleAssignments.AnyAsync(assignment =>
-    assignment.CompanyId == companyId && assignment.RoleCode == "MANAGER" && assignment.IsActive &&
+var hasActiveAdmin = await db.EmployeeRoleAssignments.AnyAsync(assignment =>
+    assignment.CompanyId == companyId && assignment.RoleCode == "ADMIN" && assignment.IsActive &&
     db.Employees.Any(employee => employee.Id == assignment.EmployeeId && employee.CompanyId == companyId && employee.IsActive));
-if (hasActiveManager)
+if (hasActiveAdmin)
 {
-    Console.Error.WriteLine("Bootstrap refused: the Company already has an active Manager. Existing credentials were not changed.");
+    Console.Error.WriteLine("Bootstrap refused: the Company already has an active ADMIN. Existing credentials were not changed.");
     return 4;
 }
 
@@ -198,7 +198,7 @@ db.EmployeeRoleAssignments.Add(new EmployeeRoleAssignmentRecord
 {
     CompanyId = companyIdValue,
     EmployeeId = employee.Id,
-    RoleCode = "MANAGER",
+    RoleCode = "ADMIN",
     IsActive = true,
     AssignedAt = now
 });
@@ -208,11 +208,11 @@ db.EmployeeAdministrationEvents.Add(new EmployeeAdministrationEventRecord
     ActorType = "DEPLOYMENT_OPERATOR",
     ActorIdentifier = $"{Environment.UserDomainName}\\{Environment.UserName}@{Environment.MachineName}",
     TargetEmployeeId = employee.Id,
-    ActionCode = "EMPLOYEE_BOOTSTRAP_MANAGER_CREATED",
+    ActionCode = "EMPLOYEE_BOOTSTRAP_ADMIN_CREATED",
     OccurredAt = now
 });
 await db.SaveChangesAsync();
 await transaction.CommitAsync();
 
-Console.WriteLine($"Manager employee {employee.EmployeeCode} was provisioned for Company {companyIdValue}. A password change is required before any protected action.");
+Console.WriteLine($"ADMIN employee {employee.EmployeeCode} was provisioned for Company {companyIdValue}. A password change is required before any protected action.");
 return 0;
