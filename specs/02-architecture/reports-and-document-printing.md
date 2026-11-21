@@ -23,7 +23,7 @@ The web application will reproduce the business purpose and important informatio
 - Service handover/collection confirmation.
 - Preview, PDF download, browser printing and controlled reprint history.
 - A4 and 80 mm thermal-paper layouts.
-- Internal printable reports for stock, procurement and complaints as follow-up work.
+- Internal printable reports for stock, Parts to Buy and complaints as follow-up work.
 
 ### Out of scope for v1
 
@@ -89,7 +89,7 @@ The recursive repository tree contains 15 `.jrxml` files under `src/main/resourc
 | `INSTALLMENT_PAYMENT_RECEIPT` | NEW | Every settled weekly instalment payment | 80 mm and A4 with plan, refurbished unit/sale, instalment number(s), amount received, paid/remaining schedule summary and tender. |
 | `DAILY_CASH_CLOSING_REPORT` | LEGACY + REDESIGN | When a Shop's daily closing is finalised | A4 report with Shop/date, opening float, cash receipts net of change, cash-in/out, cash refunds, safe drops, expected cash, denomination count, variance, electronic tender summary separately and closing actor/time. |
 | `INTER_SHOP_TRANSFER_NOTE` | NEW | Transfer dispatch and receiving-Shop acceptance | A4 or compact copy with transfer number, source/destination Shop, item/quantity lines, dispatch/receipt times, actors and discrepancy notes. |
-| `SERVICE_PROCUREMENT_QUEUE_REPORT` | NEW | On demand from the Service Parts Purchase Queue | A4 list of open/overdue requests, ServiceOrder IDs, part descriptions, reference-image indicators, quantity outstanding, supplier/source, external order link, ETA and tracking status. |
+| `PARTS_TO_BUY_REPORT` | NEW | On demand from the Parts to Buy view | A4 list of calculated uncovered Product-part demand grouped by Product and originating ServiceOrder, plus separately identified manual reminders. Manual reminders may reference a catalogue Product or free text and may include operator-maintained informational URLs. Do not present supplier, purchase-order, ETA, delivery-tracking or procurement status fields. |
 | `STOCK_MOVEMENT_REPORT` | NEW | On demand for a Shop and date range | A4 report of product, movement type, signed quantity, source reference, timestamp and actor; includes negative-stock deficits. |
 | `CUSTOMER_COMPLAINT_SUMMARY` | NEW | On demand or when a complaint case is resolved | A4 case chronology, product/refurbished unit, purchase/handover reference, inspection findings, communications and resolution. Customer-facing exports must omit internal-only notes. |
 
@@ -143,7 +143,7 @@ Minimum metadata:
 
 ### `DocumentReprintEvent`
 
-- `Id`, `GeneratedDocumentId`, `ShopId`, `PrintedAtUtc`, `PrintedByEmployeeId`, `LayoutCode`, `CopyLabel` (`ORIGINAL`, `COPY`, `REPRINT`), optional reason.
+- `Id`, `GeneratedDocumentId`, `ShopId`, `PrintedAtUtc`, `PrintedByShopSessionId`, optional `PrintedByEmployeeId` when the source action requires an employee challenge, `LayoutCode`, `CopyLabel` (`ORIGINAL`, `COPY`, `REPRINT`), optional reason.
 - Reprints do not create a new payment, sale, refund, stock movement or daily-close event.
 
 ### Storage decision
@@ -169,7 +169,7 @@ UI entry points:
 - Refurbished unit/sale detail: Print sale receipt and warranty certificate.
 - Deposit/payment/refund detail: Print its transaction receipt.
 - Daily Closing detail: Print closing report.
-- Service Parts Purchase Queue, Stock, Transfers and Complaints: Print corresponding operational report on demand.
+- Parts to Buy, Stock, Transfers and Complaints: Print corresponding operational report on demand.
 
 The preview must display document type, number, Shop, issue date and selected layout before printing. Reprint actions must visibly label copies as `COPY`/`REPRINT` when required by the business document type.
 
@@ -177,8 +177,8 @@ The preview must display document type, number, Shop, issue date and selected la
 
 - Every document query and generation is scoped to the active ShopSession and the source record's Company/Shop ownership.
 - Customer-facing documents may be generated only from a valid business record; users cannot post financial effects through a print endpoint.
-- `IssuedByEmployeeId` and `PrintedByEmployeeId` identify the employee who performed the action, not the ShopSession owner.
-- Manager-only document actions follow existing Manager permissions (e.g. refund authorization and void/correction). Technician may print service intake/technical work documents where allowed, but cannot access cash-close, refund or financial documents outside assigned permissions.
+- `IssuedByShopSessionId`, optional `IssuedByEmployeeId` when the source action requires an employee challenge and `PrintedByEmployeeId` identify the employee who performed the action, not the ShopSession owner.
+- Manager-restricted document actions (e.g. refund authorization and void/correction) require `MANAGER` or `ADMIN` authorization with fresh employee credentials; `ADMIN` inherits `MANAGER` permissions unless a feature-specific exception is defined. Other document access follows the relevant feature's authorization rules and the active ShopSession. No `TECHNICIAN` role is defined in the current role model.
 - Reprinting is auditable; it must not duplicate document numbering, payments, stock or refund events.
 - Do not expose internal diagnostic notes, passwords, security tokens, private procurement credentials or private complaint notes on customer-facing documents.
 
@@ -203,7 +203,7 @@ The preview must display document type, number, Shop, issue date and selected la
 - Confirm customer-facing document numbering convention and whether receipts need a distinct Shop prefix.
 - Confirm exact wording/terms on service authorisation and collection signature blocks.
 - Confirm whether PDF binary retention is required; v1 stores snapshots and template versions in PostgreSQL, not PDF binary data by default.
-- Confirm which operational reports beyond the required closing report and service procurement queue are part of v1.
+- Confirm which operational reports beyond the required closing report, Parts to Buy, stock, transfers and complaints are part of v1.
 - Confirm if thermal printer width is exactly 80 mm for each Shop; 58 mm devices are not included in this baseline.
 - Confirm authoritative address/display name and phone values for each Shop before seeding production data; the ILAC address discrepancy documented in `specs/01-discovery/business-profile-from-website.md` remains open.
 
