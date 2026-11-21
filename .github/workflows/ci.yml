@@ -13,6 +13,7 @@ jobs:
         with:
           dotnet-version: 10.0.x
       - run: dotnet restore PcHouseStore.sln
+      - run: dotnet msbuild src/PcHouseStore.Infrastructure/PcHouseStore.Infrastructure.csproj -getItem:Compile -getItem:EmbeddedResource
       - run: dotnet build PcHouseStore.sln --no-restore --configuration Release
       - run: dotnet format PcHouseStore.sln --verify-no-changes --no-restore
 
