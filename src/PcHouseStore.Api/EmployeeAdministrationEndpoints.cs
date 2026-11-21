@@ -450,7 +450,7 @@ public static class EmployeeAdministrationEndpoints
         (session.AbsoluteExpiresAt is null || session.AbsoluteExpiresAt > now);
 
     private static IResult PasswordProblem(HttpContext context) =>
-        Problem(context, 400, "password_policy_failed", "The password must contain between 12 and 128 characters.");
+        Problem(context, 400, "password_policy_failed", "The password must contain between 6 and 128 characters.");
 
     private static IResult Problem(HttpContext context, int status, string code, string detail) => Results.Problem(
         statusCode: status,
