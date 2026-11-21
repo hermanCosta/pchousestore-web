@@ -20,7 +20,6 @@ public sealed class PcHouseStoreDbContext(DbContextOptions<PcHouseStoreDbContext
     public DbSet<ShopAccessCredentialRecord> ShopAccessCredentials => Set<ShopAccessCredentialRecord>();
     public DbSet<ShopAccessCredentialEventRecord> ShopAccessCredentialEvents => Set<ShopAccessCredentialEventRecord>();
     public DbSet<ShopSessionRecord> ShopSessions => Set<ShopSessionRecord>();
-    public DbSet<EmployeeActionAuthorizationRecord> EmployeeActionAuthorizations => Set<EmployeeActionAuthorizationRecord>();
     public DbSet<SystemServiceSigningKeyRecord> SystemServices => Set<SystemServiceSigningKeyRecord>();
     public DbSet<SystemServiceKeyEventRecord> SystemServiceKeyEvents => Set<SystemServiceKeyEventRecord>();
 
