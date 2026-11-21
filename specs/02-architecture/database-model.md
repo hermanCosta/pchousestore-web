@@ -222,7 +222,7 @@ Parts to Buy behavior:
 
 - `Company 1:N Shop`; current deployment provisions one Company.
 - `Shop 1:1 ShopAccessCredential`; `Shop 1:N ShopSession`.
-- `Employee 1:N EmployeeRoleAssignment`; employee credentials and role assignments are Company-wide and can authorize actions in any Shop owned by that Company.
+- `Employee 1:N EmployeeRoleAssignment` for profile history; exactly one assignment is active per Employee. Employee credentials and the active profile are Company-wide and apply in every Shop owned by that Company.
 - `Company 1:N Person`, Customer, Employee, CatalogItem, ProductCategory, Device and Fault.
 - `CatalogItem 1:0..1 Product` and `CatalogItem 1:0..1 Service`, exactly one subtype according to kind.
 - `ProductCategory 1:N ProductAttributeDefinition`; category definitions are reused by many Products/RefurbishedUnits.
