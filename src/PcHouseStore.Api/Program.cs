@@ -107,8 +107,7 @@ builder.Services.AddRateLimiter(options =>
     {
         var path = context.Request.Path.Value ?? string.Empty;
         if (!path.StartsWith("/connect/", StringComparison.OrdinalIgnoreCase) &&
-            !path.StartsWith("/account/login", StringComparison.OrdinalIgnoreCase) &&
-)
+            !path.StartsWith("/account/login", StringComparison.OrdinalIgnoreCase))
             return RateLimitPartition.GetNoLimiter("non-authentication");
 
         var key = $"{context.Connection.RemoteIpAddress?.ToString() ?? "unknown"}:{path}";
