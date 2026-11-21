@@ -106,39 +106,28 @@
 - **Inter-Shop transfer:** dispatch removes source stock, received quantities add destination stock, in-transit stock is unavailable, only same-Company distinct Shops are allowed.
 - **Refurbished inventory:** categories are configurable, attribute definitions drive technical fields, and each physical refurbished unit is uniquely serialized/tracked; transfer/sale/return use the exact unit identity.
 - **Transaction payments:** a mixed cash/card event is persisted as one PaymentTransaction with two allocations; transaction gross is counted once; sum of applied allocations equals transaction amount; change is not revenue.
-- **Refunds:** refund transaction stores positive magnitude, references original transaction, reduces net by its kind and cannot exceed the remaining refundable amount under concurrent requests.
+- **Refunds:** refund transaction stores positive magnitude, references original transaction, reduces net by its kind and cannot exceed the remaining refundable amount under concurrent requests. In v1, every refund must use the original tender; any different tender is rejected regardless of Shop policy or approval.
 - **Shop authentication / employee attribution:** a Shop login creates a ShopSession with no EmployeeId; the same Company-wide employee credentials work in all Shops; profiles are `EMPLOYEE`, `MANAGER` and `ADMIN`; two employees can complete separate operations within the same ShopSession; each protected operation validates a fresh employee code/password directly against the active employee, Company membership and action permission. No employee authorization token is issued or replayed.
 - **Shop/date closing:** enforce `UNIQUE(ShopId, BusinessDate)`; the same date can be closed once in each Shop. Test concurrent attempts to close the same Shop/date (exactly one succeeds), successful closes for two different Shops on the same date, and exclusion of transactions/cash movements from other Shops.
 
 
 - **Refurbished commercial guarantee:** every sold refurbished physical unit receives exactly one 12-calendar-month commercial guarantee starting at recorded customer handover; reservation, booking, quote and deposit timestamps do not start the term. The customer-facing terms never imply that statutory Irish consumer rights are limited or replaced.
-- **Image uploads:** multiple private images can be uploaded to each service procurement request line and refurbished physical unit; verify Shop authorization, actor audit, content/signature validation, generated storage keys, soft deletion and no public/guessable access.
-- **Procurement approvals:** creating, editing, linking and receiving a supplier purchase requires the acting employee password/action permission but never a separate manager approval or approval-state transition.
 - **VAT feature switch:** Company-level `vat_enabled` is switchable on/off; default false and setup `NOT_REVIEWED`; disabled flag is not interpreted as a legal exemption; tax calculation/document finalization requires reviewed configuration.
 
-## Service parts procurement decision tests
+## Parts to Buy decision tests
 
-- Adding a product part requirement with sufficient Shop availability can reserve the whole quantity; on-hand remains unchanged and available stock decreases.
-- Adding a blocking part requirement with no/insufficient availability moves the order to `AWAITING_PARTS`; existing available units remain reserved and only the shortage is procured.
-- One SupplierPurchase may include lines allocated to multiple ServiceOrders; one requirement may be sourced from multiple purchase lines. Allocation totals cannot exceed ordered/required quantities.
-- Purchase record stores supplier/source, order reference/link, product page link, order date, ETA and tracking link/reference; every ETA/tracking/status change creates an immutable timeline event attributed to an employee authorization.
-- A partial receipt increases ShopInventory only by actual accepted quantity, posts one `PURCHASE_RECEIPT_IN` per accepted quantity and reserves allocated units for the correct ServiceOrder atomically. Duplicate receipt submission does not post stock twice.
-- Excess quantity received beyond service allocations becomes available Shop stock; it is not silently assigned to an order.
-- An order can enter `AWAITING_PARTS` from `CREATED` immediately after booking/diagnosis, before repair starts, or from `IN_PROGRESS`; it remains there while any blocking requirement is short. It may resume to `IN_PROGRESS` only after all such requirements are fully reserved and an employee authorizes the transition.
-- After repair, moving to `FIXED` keeps reserved parts; full settlement consumes them once while still `FIXED`; later `PICKED` records handover only.
-- Cancelled service requirements release active reservations; received goods remain Shop inventory unless a separate supplier-return workflow is implemented.
-- Supplier purchase and tracking URLs are treated as external references only; no credentials or payment card data can be stored in link fields.
-- A single ServiceOrder can create multiple procurement request rounds at different times; all rounds remain searchable by ServiceOrder ID and independent histories are preserved.
-- Request creation from the ServiceOrder screen and the purchase queue produces the same Shop-scoped model; cross-Shop ServiceOrder IDs are rejected.
-- Request edits, line updates, buyer assignment, priority changes and image actions append an immutable `ServiceProcurementRequestEvent` attributed to the employee resolved by the fresh code/password challenge.
-- Line status transitions are calculated from purchase allocations, accepted receipts and cancellation; header status aggregates active lines and cannot be manually forced to `FULFILLED`.
-- Soft-deleting a reference image preserves the image metadata, uploader and deletion event; the file is no longer exposed in the normal active gallery but remains in authorized audit history.
-- Each request can include multiple product requirement lines and multiple reference images per line; thumbnails/full-size views are authorized and cannot be accessed from another Shop.
-- Procurement and refurbished-unit image uploads validate file content/MIME/size and use server-generated private storage keys; path traversal, public URL leakage, unsupported content and guessed image IDs are rejected.
-- Cancelling a request round does not cancel the underlying ServicePartRequirement or another request round; unreceived allocations must be explicitly released/reallocated.
-- The same outstanding shortage cannot be simultaneously requested/ordered twice across active requests under concurrent creation attempts.
-- A consolidated SupplierPurchase can allocate lines to requests for several ServiceOrders in one Shop; a request line can be split across multiple purchases without over-allocating quantity.
-- Queue header/line status aggregation correctly handles OPEN, IN_PROGRESS, PARTIALLY_ORDERED, ORDERED, PARTIALLY_RECEIVED, FULFILLED and CANCELLED; overdue is derived from the linked SupplierPurchase ETA.
+- Calculated ServiceOrder demand includes only uncovered Product-part requirements; group by Product while retaining each contributing ServiceOrder and its separate whole-number quantity.
+- Manual reminders remain a distinct source from ServiceOrder demand. Never merge manual quantities into calculated demand or automatically merge/deduplicate manual entries.
+- Sort both sources newest first: manual entries by creation timestamp; ServiceOrder demand groups by the newest contributing ServiceOrder, with contributing orders also newest first.
+- Search updates as the operator types, is case-insensitive and supports partial Product-name matches in calculated demand and Product-backed manual entries, plus free-text description matches in manual entries.
+- Verify the correct empty states: `No parts found` when a search has no matches; `No parts to buy yet` when both sources are empty while keeping manual-entry creation available; and `No items` within an individually empty source section.
+- Manual entries may reference an existing Product or use a free-text description, default quantity to 1, and allow only positive whole-number quantities.
+- Duplicate manual entries, including repeated Product references or identical free-text descriptions, remain independent with separate quantities and reference URLs.
+- Manual entries persist until explicitly deleted, regardless of stock availability or ServiceOrder reservations. Stock changes affect calculated demand only.
+- Manual entries can be edited and permanently deleted; quantity edits require no justification or extra confirmation, while deletion is a separate explicit action.
+- Trim leading/trailing whitespace from descriptions and URL values; ignore blank URL rows. A no-op edit creates no audit entry. Deleting one manual entry does not affect other entries, ServiceOrder requirements, events or Notes.
+- Reference URLs are informational and operator-managed. Do not check availability/reachability or apply special URL validation; an unreachable link must not hide or disable its entry.
+- No supplier selection, purchase records, receipt workflow, delivery tracking or procurement image workflow exists in v1.
 
 ## Additional finance-specific decision tests
 
@@ -154,7 +143,6 @@
 - A `REFUND` references an original settled incoming `PAYMENT`; refunds can be partial/multiple but not exceed the original refundable balance under concurrency. A ServiceOrder payment refund is exposed/accepted only when a settled payment exists, refundable remainder is positive, technical outcome is `NOT_FIXED`, and lifecycle status is `NOT_FIXED` or `PICKED`.
 - A `DEPOSIT_REFUND` references the original deposit receipt and is validated against the deposit's refundable held balance/lifecycle; it is not treated as a `REFUND` or deducted from a payment's refundable remainder.
 - `MANAGER` and `ADMIN` can execute eligible payment and deposit refunds using fresh credentials; `EMPLOYEE` cannot. Deposit forfeiture remains `MANAGER`-only; verify that `ADMIN` is rejected for forfeiture despite inheriting the general Manager permission set.
-- Refund allocation to a different tender than the original is only accepted when Shop policy and approval permit it.
 - EUR amount persistence uses decimal arithmetic and two decimal currency precision. Cash rounding is a separate signed adjustment, voluntary/Shop-configured and only for eligible final cash amounts. VAT tests cover Company feature toggle, tax setup READY gate, effective-date selection and historical tax snapshots.
 - Cash drawer calculations include cash deposit receipts/refunds; electronic tender and provider payout/fees are reconciled separately.
 
@@ -168,9 +156,7 @@
 - A Sale or `FIXED` ServiceOrder with partial payments posts no stock movement; when the balance reaches zero, applicable product quantities are posted once in the settlement transaction. For `NOT_FIXED` ServiceOrders, payment settlement never consumes or releases reservations; Pickup consumes only explicitly used reserved quantities and releases unused reservations, independently of balance due.
 - Serialized refurbished units cannot be sold/transferred as phantom negative stock.
 - Each sold refurbished unit creates a 12-calendar-month commercial warranty starting at recorded customer handover; the customer-facing terms explicitly state that statutory rights are unaffected.
-- Procurement purchase creation, supplier linking and receipt do not require a separate manager approval record; each protected action still requires a fresh employee code/password challenge and immutable actor audit.
 - VAT toggle is Company-scoped. `NOT_REVIEWED` tax setup blocks production tax-document finalization; enabling VAT requires active effective-dated tax codes/rates; flag/rate changes do not alter historical tax snapshots.
-- Procurement request and refurbished-unit image uploads support multiple files and enforce private, Shop-authorized access, content validation, configurable size/count limits and audit events.
 
 ## Product-owner confirmations — v11
 
@@ -180,8 +166,6 @@
 - A quantity-tracked Product balance may become negative after a completed sale/service settlement; it must be persisted and appear as a visible deficit. Reservation quantity remains non-negative; serialized refurbished units cannot be negative.
 - `vat_enabled` can be toggled at Company level. The default is false and tax setup remains `NOT_REVIEWED` until configured and reviewed. No production tax document can be finalized with `NOT_REVIEWED`; changing the flag does not rewrite historical tax snapshots.
 - Every sold refurbished physical unit receives a 12-month commercial guarantee starting on actual handover. Customer terms do not present this guarantee as replacing or limiting Irish statutory rights.
-- Supplier purchase creation/linkage/update/receipt succeeds without a second manager approval; each write is still attributed to an employee authenticated by password and is audited.
-- Multiple private images can be uploaded to a procurement request line and to a refurbished physical unit. Cross-Shop image reads are denied; content/signature checks, file size/count limits and audit events are enforced.
 
 
 ## Product-owner confirmation tests — v13
@@ -189,8 +173,6 @@
 - Employee authorization resolves a Company-wide employee using the configured employee identifier plus password; password-only lookup must not attribute an action to an ambiguous employee.
 - The same active employee identity/password and Company-wide role assignment works across all Shops; `ShopSession` stores no employee identity.
 - `EMPLOYEE`/`MANAGER`/`ADMIN` profile names are recognized globally; enforce the approved feature-specific action permissions and do not infer permissions from UI visibility.
-- Supplier purchase creation, linking, update and receipt do not trigger a second-person approval workflow; the acting employee must still be authorized and audited.
-- Multiple images per procurement request line and refurbished unit are supported; file limits, storage retention and allowed formats are configuration/security tests.
 - Each sold refurbished unit snapshots a 12-calendar-month commercial guarantee from actual handover; customer wording and receipts must not imply that the guarantee replaces Irish statutory rights.
 - VAT enable/disable is a Company-scoped feature flag; `NOT_REVIEWED` is distinct from disabled, and neither state is treated as a legal conclusion.
 
@@ -209,4 +191,3 @@
 - Reprinting a voided/corrected document shows the correct copy/void status and cannot mutate the original snapshot.
 - VAT-off rendering omits tax calculation and does not assert legal exemption; VAT-on rendering requires a valid effective-dated tax snapshot.
 - PDF generation uses `Europe/Dublin`, `en-IE` formatting and EUR currency.
-- Customer-facing exports never include internal-only notes, credentials or private procurement data.
