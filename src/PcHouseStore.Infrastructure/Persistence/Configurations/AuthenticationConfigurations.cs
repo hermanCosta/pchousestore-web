@@ -113,7 +113,7 @@ public sealed class EmployeeRoleAssignmentRecordConfiguration : IEntityTypeConfi
     public void Configure(EntityTypeBuilder<EmployeeRoleAssignmentRecord> builder)
     {
         builder.ToTable("employee_role_assignment", table =>
-            table.HasCheckConstraint("ck_employee_role_code", "role_code IN ('MANAGER', 'TECHNICIAN')"));
+            table.HasCheckConstraint("ck_employee_role_code", "role_code IN ('EMPLOYEE', 'MANAGER', 'ADMIN')"));
         builder.HasKey(x => x.Id);
         builder.HasAlternateKey(x => new { x.Id, x.CompanyId }).HasName("ak_employee_role_id_company");
         builder.Property(x => x.Id).HasColumnName("id").ValueGeneratedOnAdd();
@@ -206,46 +206,6 @@ public sealed class ShopAccessCredentialEventRecordConfiguration : IEntityTypeCo
         builder.HasOne<ShopRecord>().WithMany().HasForeignKey(x => new { x.ShopId, x.CompanyId })
             .HasPrincipalKey(x => new { x.Id, x.CompanyId }).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<EmployeeRecord>().WithMany().HasForeignKey(x => new { x.ActorEmployeeId, x.CompanyId })
-            .HasPrincipalKey(x => new { x.Id, x.CompanyId }).OnDelete(DeleteBehavior.Restrict);
-    }
-}
-
-public sealed class EmployeeActionAuthorizationRecordConfiguration : IEntityTypeConfiguration<EmployeeActionAuthorizationRecord>
-{
-    public void Configure(EntityTypeBuilder<EmployeeActionAuthorizationRecord> builder)
-    {
-        builder.ToTable("employee_action_authorization", table =>
-        {
-            table.HasCheckConstraint("ck_employee_action_expiry", "expires_at > authenticated_at");
-            table.HasCheckConstraint("ck_employee_action_row_version", "row_version > 0");
-            table.HasCheckConstraint("ck_employee_action_hash_lengths", "octet_length(authorization_token_hash) = 32 AND (operation_context_hash IS NULL OR octet_length(operation_context_hash) = 32)");
-        });
-        builder.HasKey(x => x.Id);
-        builder.Property(x => x.Id).HasColumnName("id").ValueGeneratedOnAdd();
-        builder.Property(x => x.AuthorizationTokenHash).HasColumnName("authorization_token_hash").HasColumnType("bytea").IsRequired();
-        builder.Property(x => x.ShopSessionId).HasColumnName("shop_session_id").IsRequired();
-        builder.Property(x => x.CompanyId).HasColumnName("company_id").IsRequired();
-        builder.Property(x => x.ShopId).HasColumnName("shop_id").IsRequired();
-        builder.Property(x => x.TargetShopId).HasColumnName("target_shop_id");
-        builder.Property(x => x.EmployeeId).HasColumnName("employee_id").IsRequired();
-        builder.Property(x => x.ActionCode).HasColumnName("action_code").HasMaxLength(100).IsRequired();
-        builder.Property(x => x.ResourceType).HasColumnName("resource_type").HasMaxLength(80);
-        builder.Property(x => x.ResourceId).HasColumnName("resource_id").HasMaxLength(100);
-        builder.Property(x => x.OperationContextHash).HasColumnName("operation_context_hash").HasColumnType("bytea");
-        builder.Property(x => x.AuthenticatedAt).HasColumnName("authenticated_at").HasColumnType("timestamp with time zone").IsRequired();
-        builder.Property(x => x.ExpiresAt).HasColumnName("expires_at").HasColumnType("timestamp with time zone").IsRequired();
-        builder.Property(x => x.ConsumedAt).HasColumnName("consumed_at").HasColumnType("timestamp with time zone");
-        builder.Property(x => x.RowVersion).HasColumnName("row_version").HasDefaultValue(1L).IsConcurrencyToken().IsRequired();
-        builder.HasIndex(x => x.AuthorizationTokenHash).IsUnique().HasDatabaseName("uq_employee_action_token_hash");
-        builder.HasIndex(x => new { x.ShopSessionId, x.ShopId, x.ConsumedAt, x.ExpiresAt }).HasDatabaseName("ix_employee_action_session_state");
-        builder.HasIndex(x => new { x.EmployeeId, x.AuthenticatedAt }).HasDatabaseName("ix_employee_action_employee_time");
-        builder.HasOne<ShopSessionRecord>().WithMany().HasForeignKey(x => new { x.ShopSessionId, x.ShopId })
-            .HasPrincipalKey(x => new { x.Id, x.ShopId }).OnDelete(DeleteBehavior.Restrict);
-        builder.HasOne<ShopRecord>().WithMany().HasForeignKey(x => new { x.ShopId, x.CompanyId })
-            .HasPrincipalKey(x => new { x.Id, x.CompanyId }).OnDelete(DeleteBehavior.Restrict);
-        builder.HasOne<ShopRecord>().WithMany().HasForeignKey(x => new { x.TargetShopId, x.CompanyId })
-            .HasPrincipalKey(x => new { x.Id, x.CompanyId }).OnDelete(DeleteBehavior.Restrict);
-        builder.HasOne<EmployeeRecord>().WithMany().HasForeignKey(x => new { x.EmployeeId, x.CompanyId })
             .HasPrincipalKey(x => new { x.Id, x.CompanyId }).OnDelete(DeleteBehavior.Restrict);
     }
 }
