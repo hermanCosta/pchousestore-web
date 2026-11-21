@@ -118,18 +118,6 @@ public sealed class EmployeeRecord
     public DateTime UpdatedAt { get; set; }
 }
 
-public sealed class EmployeeAdministrationEventRecord
-{
-    public long Id { get; set; }
-    public long CompanyId { get; set; }
-    public long? ActorEmployeeId { get; set; }
-    public string ActorType { get; set; } = "EMPLOYEE";
-    public string? ActorIdentifier { get; set; }
-    public long? TargetEmployeeId { get; set; }
-    public string ActionCode { get; set; } = string.Empty;
-    public DateTime OccurredAt { get; set; }
-}
-
 public sealed class EmployeeRoleAssignmentRecord
 {
     public long Id { get; set; }
