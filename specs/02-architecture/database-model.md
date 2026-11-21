@@ -57,6 +57,8 @@ The Shop access JWT carries `sub`, `client_id`, `iss`, `aud`, `iat`, `nbf`, `exp
 
 ### Employees and transaction-level authorization
 
+The `employee_role_assignment` table retains profile history, but only one profile may be active per Employee. Enforce this with the filtered unique index `uq_employee_one_active_profile` on `employee_id WHERE is_active = TRUE`; supported active role codes are `EMPLOYEE`, `MANAGER` and `ADMIN`. The reconciliation migration maps legacy `TECHNICIAN` assignments to `EMPLOYEE` and deactivates the old Technician assignment when the same employee already has an active `MANAGER` profile.
+
 | Table | Key columns / purpose | Important constraints |
 |---|---|---|
 | `person` | `id`, `company_id`, `first_name`, `last_name`, `contact_no`, optional `email` | Shared company-level person record. Customer email may repeat; no email unique constraint is enforced. |
