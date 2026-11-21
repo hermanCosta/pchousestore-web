@@ -168,6 +168,30 @@ This pattern is explicitly approved as a temporary credential only. It is predic
 - Once the operation has passed this authentication and authorization check, it may complete even if the employee is deactivated while the operation is in progress. Deactivation prevents new protected operations; it does not retroactively cancel an already-authorized in-flight operation.
 - The exact mapping of business operation to required profile is specified by each feature SPEC. This document does not invent that matrix.
 
+## 6.1 Implemented API request contract
+
+Every employee-protected write/read uses the authenticated Shop bearer token plus an `employeeChallenge` object in the JSON request body. The object contains the acting employee's `employeeCode` and `password`. The backend validates the employee directly against the existing credential at the start of the operation; it does not issue or consume a separate authorization token.
+
+Example:
+```json
+{
+  "firstName": "Alex",
+  "lastName": "Murphy",
+  "phone": "+353...",
+  "email": null,
+  "employeeChallenge": {
+    "employeeCode": "MGR001",
+    "password": "current-employee-password"
+  }
+}
+```
+
+- `POST /api/v1/employees/queries` remains ShopSession-only for directory search.
+- `POST /api/v1/employees/{employeeId}/query` reads an individual administrative profile and requires `employeeChallenge`.
+- Create, profile update, status change, role change, credential reset and self-password change include `employeeChallenge` in their respective request bodies.
+- Shop access-credential rotation/status changes also use direct employee challenge validation; no `X-Employee-Action-Authorization` header or challenge-token endpoint exists.
+- Passwords are transient request data only: never log, persist or return them. All protected operations remain atomic with their business writes.
+
 ## 7. Business history, administrative history and logs
 
 - When a protected business operation succeeds, its business `notes` history records the acting employee's name as a snapshot of the name at operation time.
