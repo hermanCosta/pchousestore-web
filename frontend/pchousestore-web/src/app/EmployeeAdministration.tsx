@@ -15,7 +15,6 @@ type Employee = {
 };
 
 type ShopContext = { companyId: string };
-type ActionAuthorization = { authorizationToken: string };
 export type EmployeeAdminPage = "employee-password-change" | "employee-directory-search" | "create-employee" | "employee-directory";
 type Props = ShopContext & { page: EmployeeAdminPage; getShopAccessToken: () => Promise<string | null> };
 type Profile = Pick<Employee, "firstName" | "lastName" | "phone" | "email">;
@@ -25,7 +24,7 @@ export default function EmployeeAdministration({ companyId, page, getShopAccessT
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [directoryLoaded, setDirectoryLoaded] = useState(false);
   const [search, setSearch] = useState("");
-  const [newEmployee, setNewEmployee] = useState({ employeeCode: "", firstName: "", lastName: "", phone: "", email: "", initialPassword: "", roles: ["TECHNICIAN"] });
+  const [newEmployee, setNewEmployee] = useState({ employeeCode: "", firstName: "", lastName: "", phone: "", email: "", initialPassword: "", roles: ["EMPLOYEE"] });
   const [initialPasswordCustomized, setInitialPasswordCustomized] = useState(false);
   const [selfChange, setSelfChange] = useState({ employeeCode: "", currentPassword: "", newPassword: "" });
   const [busyAction, setBusyAction] = useState<string | null>(null);
@@ -35,9 +34,6 @@ export default function EmployeeAdministration({ companyId, page, getShopAccessT
   const [notice, setNotice] = useState<string | null>(null);
 
   async function managerRequest<T>(
-    actionCode: string,
-    resourceType: "Company" | "Employee",
-    resourceId: string,
     path: string,
     method: string,
     body: unknown,
@@ -45,28 +41,13 @@ export default function EmployeeAdministration({ companyId, page, getShopAccessT
   ): Promise<T | null> {
     const token = await getShopAccessToken();
     if (!token) throw new Error("Your Shop session has expired. Sign in again.");
-    const challenge = await fetch(`${apiBaseUrl}/api/v1/employee-action-authorizations`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        employeeCode: credentials.employeeCode,
-        password: credentials.password,
-        actionCode,
-        resourceType,
-        resourceId,
-        targetShopId: null,
-      }),
-    });
-    if (!challenge.ok) throw await responseError(challenge);
-    const authorization = await challenge.json() as ActionAuthorization;
+    const requestBody = body && typeof body === "object"
+      ? { ...body, employeeChallenge: { employeeCode: credentials.employeeCode, password: credentials.password } }
+      : { employeeChallenge: { employeeCode: credentials.employeeCode, password: credentials.password } };
     const response = await fetch(`${apiBaseUrl}${path}`, {
       method,
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-        "X-Employee-Action-Authorization": authorization.authorizationToken,
-      },
-      body: body === undefined ? undefined : JSON.stringify(body),
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify(requestBody),
     });
     if (!response.ok) throw await responseError(response);
     if (response.status === 204) return null;
@@ -95,7 +76,7 @@ export default function EmployeeAdministration({ companyId, page, getShopAccessT
     event.preventDefault();
     requestManagerAction("employee-create", async credentials => {
       const response = await managerRequest<Employee>(
-        "EMPLOYEE_CREATE", "Company", companyId, "/api/v1/employees", "POST", newEmployee,
+        "/api/v1/employees", "POST", newEmployee,
         credentials,
       );
       if (response) setEmployees(current => [...current, response].sort((left, right) => left.employeeCode.localeCompare(right.employeeCode)));
@@ -108,8 +89,7 @@ export default function EmployeeAdministration({ companyId, page, getShopAccessT
   async function updateProfile(event: FormEvent<HTMLFormElement>, employee: Employee, profile: Profile) {
     event.preventDefault();
     requestManagerAction(`profile-${employee.employeeId}`, async credentials => {
-      await managerRequest<never>("EMPLOYEE_PROFILE_UPDATE", "Employee", employee.employeeId,
-        `/api/v1/employees/${encodeURIComponent(employee.employeeId)}`, "PUT", profile,
+      await managerRequest<never>(`/api/v1/employees/${encodeURIComponent(employee.employeeId)}`, "PUT", profile,
         credentials);
       setEmployees(current => current.map(item => item.employeeId === employee.employeeId ? { ...item, ...profile } : item));
       setNotice(`Updated ${employee.employeeCode}.`);
@@ -118,8 +98,7 @@ export default function EmployeeAdministration({ companyId, page, getShopAccessT
 
   async function updateStatus(employee: Employee) {
     requestManagerAction(`status-${employee.employeeId}`, async credentials => {
-      await managerRequest<never>("EMPLOYEE_STATUS_CHANGE", "Employee", employee.employeeId,
-        `/api/v1/employees/${encodeURIComponent(employee.employeeId)}/status`, "PATCH", { isActive: !employee.isActive },
+      await managerRequest<never>(`/api/v1/employees/${encodeURIComponent(employee.employeeId)}/status`, "PATCH", { isActive: !employee.isActive },
         credentials);
       setEmployees(current => current.map(item => item.employeeId === employee.employeeId ? { ...item, isActive: !item.isActive } : item));
       setNotice(`${employee.employeeCode} ${employee.isActive ? "deactivated" : "reactivated"}.`);
@@ -128,8 +107,7 @@ export default function EmployeeAdministration({ companyId, page, getShopAccessT
 
   async function updateRoles(employee: Employee, roles: string[]) {
     requestManagerAction(`roles-${employee.employeeId}`, async credentials => {
-      await managerRequest<never>("EMPLOYEE_ROLE_CHANGE", "Employee", employee.employeeId,
-        `/api/v1/employees/${encodeURIComponent(employee.employeeId)}/roles`, "PUT", { roles },
+      await managerRequest<never>(`/api/v1/employees/${encodeURIComponent(employee.employeeId)}/roles`, "PUT", { roles },
         credentials);
       setEmployees(current => current.map(item => item.employeeId === employee.employeeId ? { ...item, roles } : item));
       setNotice(`Updated roles for ${employee.employeeCode}.`);
@@ -139,8 +117,7 @@ export default function EmployeeAdministration({ companyId, page, getShopAccessT
   async function resetCredential(event: FormEvent<HTMLFormElement>, employee: Employee, newPassword: string) {
     event.preventDefault();
     requestManagerAction(`reset-${employee.employeeId}`, async credentials => {
-      await managerRequest<never>("EMPLOYEE_CREDENTIAL_RESET", "Employee", employee.employeeId,
-        `/api/v1/employees/${encodeURIComponent(employee.employeeId)}/credential-reset`, "POST", { newPassword },
+      await managerRequest<never>(`/api/v1/employees/${encodeURIComponent(employee.employeeId)}/credential-reset`, "POST", { newPassword },
         credentials);
       setEmployees(current => current.map(item => item.employeeId === employee.employeeId
         ? { ...item, mustChangePasswordAtNextUse: true } : item));
@@ -151,8 +128,7 @@ export default function EmployeeAdministration({ companyId, page, getShopAccessT
   async function changeOwnPassword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     await runAction("self-password-change", async () => {
-      await managerRequest<never>("EMPLOYEE_SELF_PASSWORD_CHANGE", "Employee", "self",
-        "/api/v1/employees/me/credential", "PUT", { newPassword: selfChange.newPassword },
+      await managerRequest<never>("/api/v1/employees/me/credential", "PUT", { newPassword: selfChange.newPassword },
         { employeeCode: selfChange.employeeCode, password: selfChange.currentPassword });
       setSelfChange({ employeeCode: "", currentPassword: "", newPassword: "" });
       setNotice("Your employee password has been changed.");
@@ -229,14 +205,14 @@ export default function EmployeeAdministration({ companyId, page, getShopAccessT
             <input required type="password" maxLength={128} autoComplete="current-password" value={selfChange.currentPassword} onChange={event => setSelfChange(current => ({ ...current, currentPassword: event.target.value }))} />
           </label>
           <label className="auth-field">New employee password
-            <input required type="password" minLength={12} maxLength={128} autoComplete="new-password" value={selfChange.newPassword} onChange={event => setSelfChange(current => ({ ...current, newPassword: event.target.value }))} />
+            <input required type="password" minLength={6} maxLength={128} autoComplete="new-password" value={selfChange.newPassword} onChange={event => setSelfChange(current => ({ ...current, newPassword: event.target.value }))} />
           </label>
         </div>
         <button disabled={busyAction !== null}>{busyAction === "self-password-change" ? "Changing…" : "Change employee password"}</button>
       </form>}
 
       {page === "employee-directory-search" && <form id="employee-directory-search" className="auth-form employee-action-form" onSubmit={loadDirectory}>
-        <p className="form-help">Search and view employee records. Manager credentials are requested when you load the directory.</p>
+        <p className="form-help">Search and view employee records. Directory search uses the authenticated Shop session; no employee challenge is required.</p>
         <div className="employee-form-grid">
           <label className="auth-field">Search employees
             <input maxLength={200} value={search} onChange={event => setSearch(event.target.value)} placeholder="Name, code, phone or email" />
@@ -263,12 +239,12 @@ export default function EmployeeAdministration({ companyId, page, getShopAccessT
             <input type="email" value={newEmployee.email} onChange={event => setNewEmployee(current => ({ ...current, email: event.target.value }))} />
           </label>
           <label className="auth-field">Initial password
-            <input type="password" required minLength={12} maxLength={128} autoComplete="new-password" value={newEmployee.initialPassword} onChange={event => { setInitialPasswordCustomized(true); setNewEmployee(current => ({ ...current, initialPassword: event.target.value })); }} />
+            <input type="password" required minLength={6} maxLength={128} autoComplete="new-password" value={newEmployee.initialPassword} onChange={event => { setInitialPasswordCustomized(true); setNewEmployee(current => ({ ...current, initialPassword: event.target.value })); }} />
           </label>
         </div>
-        <p className="form-help">Default: employee code + @pchouse. The password must be at least 12 characters; edit it if the generated value is shorter. The employee must change it before performing any protected action.</p>
+        <p className="form-help">Default: employee code + @pchouse. The password must contain at least 6 characters. The employee must change it before performing any protected action.</p>
         <RoleChecks roles={newEmployee.roles} onToggle={toggleNewRole} />
-        <p className="form-help">Manager credentials will be requested when you create this employee.</p>
+        <p className="form-help">Confirm creation with your employee code and password.</p>
         <button disabled={busyAction !== null}>{busyAction === "employee-create" ? "Creating…" : "Create employee"}</button>
       </form>}
 
@@ -354,7 +330,7 @@ function RoleChecks({ roles, onToggle }: { roles: string[]; onToggle: (role: str
   return (
     <fieldset className="employee-roles">
       <legend>Roles</legend>
-      {["MANAGER", "TECHNICIAN"].map(role => <label key={role}><input type="checkbox" checked={roles.includes(role)} onChange={() => onToggle(role)} />{role}</label>)}
+      {["EMPLOYEE", "MANAGER", "ADMIN"].map(role => <label key={role}><input type="checkbox" checked={roles.includes(role)} onChange={() => onToggle(role)} />{role}</label>)}
     </fieldset>
   );
 }
