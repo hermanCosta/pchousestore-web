@@ -74,7 +74,7 @@ The legacy repository is https://github.com/hermanCosta/pchousestoremvn, branch 
 | BR-01 | Each ServiceOrder belongs to exactly one Shop; derive ShopId from the active ShopSession, never from browser-supplied ownership. | domain-model.md; database-model.md | DECIDED |
 | BR-02 | The customer and catalogue definitions are Company-shared; all ServiceOrder writes must verify that the referenced customer/catalogue records belong to the Company that owns the active Shop. | product-owner-decisions.md; CAT-01 | DECIDED |
 | BR-03 | Each employee-protected command requires the acting employee's own fresh employee-code/password challenge. The backend validates active status, Company membership and action permission at the start of command processing. Do not cache/reuse employee authentication or issue/consume an EmployeeActionAuthorization token, entity or endpoint. Once authorized, an in-flight operation may complete if the employee is subsequently deactivated. | employee-management.md | DECIDED |
-| BR-04 | `EMPLOYEE` may create and edit ServiceOrders before the line/price lock, add operational notes, perform diagnosis and technical actions, manage part requirements, resume eligible orders, record `FIXED`/`NOT_FIXED` and hand over a `NOT_FIXED` device. `MANAGER` has full ServiceOrder access, including cancellation and ServiceOrder financial actions assigned to managers by FIN-01. `ADMIN` inherits the full `MANAGER` permission set. The retired `TECHNICIAN` profile is not used. | employee-management.md; product-owner decisions | DECIDED |
+| BR-04 | `EMPLOYEE`, `MANAGER` and `ADMIN` may perform ServiceOrder Pickup from either `FIXED` or `NOT_FIXED`. `EMPLOYEE` may perform the operational ServiceOrder actions defined here; `MANAGER` has the full ServiceOrder access, including cancellation and financial actions assigned to managers by FIN-01; `ADMIN` inherits the full `MANAGER` permission set. The retired `TECHNICIAN` profile is not used. | employee-management.md; Product-owner decision 2026-11-20 | DECIDED |
 | BR-05 | A part requirement is linked to a Product ServiceOrderItem and uses a positive whole-unit quantity. SERVICE catalogue lines never create stock requirements. | stock-and-refurbishment.md; ADR-013 | DECIDED |
 | BR-06 | If any blocking part requirement is not fully reserved, the ServiceOrder enters AWAITING_PARTS. It can originate during booking/diagnosis or later work. | ADR-013; domain-model.md | DECIDED |
 | BR-07 | An order in `AWAITING_PARTS` may return to `IN_PROGRESS` only when every blocking part requirement is fully reserved. The transition requires an explicit resume command with a fresh employee code/password challenge; receipt or reservation alone never restarts repair. Record the server-resolved employee in the immutable event and `Notes`. | Product-owner decision 2026-11-20; ADR-013 | DECIDED |
@@ -168,7 +168,7 @@ Use the logical entities already recorded in domain-model.md and database-model.
 
 Money uses C# decimal and PostgreSQL NUMERIC(19,2) in EUR. Store event timestamps in UTC. Allocate a sequential display number per Shop using a concurrency-safe mechanism; never reuse numbers after cancellation. Retain a globally unique internal identifier independently of the display number. Version 1 user-facing UI is English only, with centralized localization resources to support future translations. All Shop-scoped records must have same-Shop composite FK/integrity enforcement where specified by DATA-02.
 
-## 7. Candidate API contracts (not approved)
+## 7. API contracts
 
 | Method / route | Purpose | Authorization |
 |---|---|---|
@@ -180,8 +180,76 @@ Money uses C# decimal and PostgreSQL NUMERIC(19,2) in EUR. Store event timestamp
 | POST /api/v1/service-orders/{serviceOrderId}/notes | Add a technical/operational note | Fresh employee code/password; EMPLOYEE, MANAGER or ADMIN |
 | POST /api/v1/service-orders/{serviceOrderId}/part-requirements | Add/update required Product parts | Fresh employee code/password; EMPLOYEE, MANAGER or ADMIN |
 | POST /api/v1/service-orders/{serviceOrderId}/resume | Explicitly resume from AWAITING_PARTS | Fresh employee code/password; EMPLOYEE, MANAGER or ADMIN |
+| POST /api/v1/service-orders/{serviceOrderId}/pickup | Record physical customer handover from FIXED or NOT_FIXED | ShopSession plus fresh employee code/password in the request; EMPLOYEE, MANAGER or ADMIN; `Idempotency-Key` header required |
 
-These are route proposals only. FIN-01 owns payment/deposit/refund APIs; the Stock module owns inventory reservation, consumption and physical returns; SO-XFER-SPEC owns cross-Shop transfer. Request/response DTOs, pagination contract, error codes, idempotency and action codes must be finalized before implementation.
+All routes other than Pickup remain candidate routes. FIN-01 owns payment/deposit/refund APIs; the Stock module owns inventory reservation, consumption and physical returns; SO-XFER-SPEC owns cross-Shop transfer.
+
+### 7.1 Pickup HTTP contract — approved
+
+**Request**
+`POST /api/v1/service-orders/{serviceOrderId}/pickup`
+
+Headers:
+- `Authorization`: authenticated Shop session (required by `ShopApi`).
+- `Idempotency-Key`: required UUID string. The same key may be replayed only for the same Shop, operation, ServiceOrder and identical normalized request payload.
+
+JSON body:
+```json
+{
+  "employeeCode": "EMP001",
+  "employeePassword": "employee-secret",
+  "partsUsed": [
+    {
+      "reservationLineId": 123,
+      "usedQuantity": 1
+    }
+  ]
+}
+```
+
+- `employeeCode` and `employeePassword` are required for every attempt. The backend validates the employee directly against the existing employee credential, active status, Company membership and Pickup permission. Do not use an `EmployeeActionAuthorization` token or endpoint.
+- `partsUsed` is optional for `FIXED` and must be omitted or empty. A non-empty list for `FIXED` is rejected.
+- For `NOT_FIXED`, when active reservations exist, the request must include exactly one entry for every active reservation line, including lines with `usedQuantity: 0`. If no active reservations exist, an empty or omitted list is valid.
+- `reservationLineId` must identify an active reservation line belonging to this ServiceOrder and active Shop. Duplicate, missing, foreign, released or otherwise inactive reservation lines are rejected.
+- `usedQuantity` is an integer from zero through the currently active reserved quantity. The server calculates released quantity; clients cannot submit or override it.
+- The request cannot include Product IDs, ServiceOrder line IDs, arbitrary stock quantities, ShopId, CompanyId, EmployeeId, actor role, stock movement values or financial adjustments.
+
+**Successful response — HTTP 200**
+```json
+{
+  "serviceOrderId": 456,
+  "status": "PICKED",
+  "technicalOutcome": "NOT_FIXED",
+  "pickedAtUtc": "2026-11-21T12:00:00Z",
+  "eventType": "SERVICE_ORDER_PICKED_UP",
+  "note": "Service order picked up by Alex. Parts used: ... Parts released: ...",
+  "stockDisposition": [
+    {
+      "reservationLineId": 123,
+      "reservedQuantity": 2,
+      "usedQuantity": 1,
+      "releasedQuantity": 1
+    }
+  ]
+}
+```
+
+The response is the canonical committed result. A replay with the same key and identical request returns the original HTTP status and response body, without repeating side effects.
+
+**Error contract**
+- `400 invalid_request`: missing/invalid Idempotency-Key, malformed body, duplicate reservation line or invalid quantity shape.
+- `401 invalid_employee_credentials`: employee code/password invalid or employee inactive.
+- `403 action_not_permitted`: employee lacks Pickup permission or belongs to another Company.
+- `404 service_order_not_found`: order does not exist in the active Shop.
+- `409 service_order_pickup_conflict`: order is no longer eligible (including already PICKED) or another distinct Pickup command won the concurrency race; client must refresh.
+- `409 idempotency_key_reused`: key was previously committed for a different normalized request payload or resource scope.
+- `422 invalid_stock_disposition`: submitted reservation set is not exactly the current active set or used quantity exceeds the active reserved quantity.
+
+Credential failures and rejected/rolled-back commands create no ServiceOrder event or Note. Never echo or log the submitted password.
+
+### 7.2 Remaining contract work
+
+The list/search, create, edit, status, notes, part-requirement, resume, payment, refund and transfer DTOs and error contracts remain outside this Pickup contract and must be approved by their owning feature specifications before implementation.
 
 ## 8. UI authorization and command invariants
 
@@ -226,6 +294,13 @@ These are route proposals only. FIN-01 owns payment/deposit/refund APIs; the Sto
 - [ ] AC-20: Every successfully committed ServiceOrder action appends one chronological, employee-attributed `Notes` entry in the same transaction; failed or rolled-back actions do not create entries.
 - [ ] AC-21: During collection of a `NOT_FIXED` order, a `MANAGER` or `ADMIN` can execute an eligible partial/total refund of settled payments or refundable deposit balances through FIN-01; refunds are explicit, original-tender by default, capped by the unrefunded amount and are not automatic on pickup.
 - [ ] AC-22: Allow `FIXED` → `IN_PROGRESS` only when `balance_due > 0`; preserve active stock reservations and do not reverse payments or inventory postings. Reject the transition when `balance_due = 0` and reserved parts have been consumed. A later rework request after settlement must use a separate corrective workflow.
+- [ ] AC-23: Pickup is exposed as `POST /api/v1/service-orders/{serviceOrderId}/pickup`, requires an authenticated ShopSession, a fresh employee code/password challenge and a valid `Idempotency-Key`.
+- [ ] AC-24: For `FIXED`, Pickup accepts an empty stock-disposition list and leaves every reservation, stock balance and movement unchanged, regardless of financial balance.
+- [ ] AC-25: For `NOT_FIXED`, the request accounts for every currently active reservation line exactly once; only active reserved quantities may be used, unused quantities are released, and released quantity is calculated by the server.
+- [ ] AC-26: A committed idempotent replay with the same key and normalized payload returns the original status/body without repeating state, event, Note, reservation or movement writes. Reusing the key with a different payload or resource scope returns `409 idempotency_key_reused`.
+- [ ] AC-27: Two distinct concurrent Pickup commands for one ServiceOrder cannot both commit. Exactly one may transition the order to `PICKED`; the other receives `409 service_order_pickup_conflict`.
+- [ ] AC-28: Any failure in the Pickup transaction rolls back the status, `picked_at`, event, Note, idempotency record and all applicable stock/reservation effects.
+- [ ] AC-29: Pickup never changes payment, deposit, refund, balance-due, Customer, Device, Fault or ServiceOrder line data.
 
 ## 10. Test scenarios
 
@@ -236,7 +311,13 @@ These are route proposals only. FIN-01 owns payment/deposit/refund APIs; the Sto
 - Customer/device selection: existing customer, new customer, existing device by serial, changed device data and duplicate serial conflict.
 - Status concurrency: stale transition, duplicate request, illegal transition, CREATED to IN_PROGRESS only through explicit start-work, CREATED/IN_PROGRESS to AWAITING_PARTS with blocking shortage, resume before/after full reservation, `NOT_FIXED` to `IN_PROGRESS` before handover, `FIXED` to `IN_PROGRESS` before full settlement with reservations retained, rejection after full settlement/stock consumption, prohibition on resuming after pickup, `FINISHED` rejection and FIXED with blocked requirement.
 - Stock settlement: partial payment, explicitly applied deposit, zero balance, negative inventory balance, idempotent retry and reservation consumption exactly once.
-- Pickup: allow from `FIXED` and `NOT_FIXED`; preserve technical outcome; for `FIXED`, make no stock/reservation changes; for `NOT_FIXED`, consume only used quantities from active reservations and release the remainder atomically, including zero-use/no-reservation cases; verify balances do not block Pickup, fresh employee authentication, explicit confirmation, event/Notes, idempotent replay, concurrent conflict and no order-line mutation.
+- Pickup API: verify ShopSession authorization, route binding, required UUID `Idempotency-Key`, fresh employee code/password validation, permission matrix, request DTO validation and response contract.
+- Pickup from `FIXED`: allow with zero, partial or outstanding balance; reject non-empty `partsUsed`; verify no reservation changes and no stock movements.
+- Pickup from `NOT_FIXED`: test every active reservation line exactly once, used quantity at zero, partial and full reserved amount, release calculation, zero-use release-all, no active reservations, and rejection of missing/duplicate/foreign/released/unreserved reservation lines or over-quantity.
+- Pickup atomicity: inject failures at status update, event insert, Note insert, stock movement, reservation update and idempotency persistence; verify complete rollback.
+- Pickup idempotency: same key/same payload returns original response; same key/different payload or resource returns `409 idempotency_key_reused`; rolled-back request can be retried.
+- Pickup concurrency: distinct keys racing on one order yield exactly one committed Pickup and one `409 service_order_pickup_conflict`; verify the loser refreshes.
+- Pickup invariants: financial balance/deposit do not block Pickup; no payment/refund/balance mutation; explicit confirmation; technical outcome preserved; no direct undo; event/Note actor attribution; no order detail mutation.
 - Notes traceability: verify creation, editing, diagnosis, status, parts, payment, deposit, refund, handover, cancellation and transfer actions each append one actor/time/action entry; verify entries are immutable and not created for failed/rolled-back commands.
 - NOT_FIXED collection refunds: validate partial/full refund of eligible settled payments and held refundable deposits through FIN-01, `MANAGER`/`ADMIN` challenge, original-tender allocation, deposit/payment refundable caps, duplicate prevention and no automatic refund when status becomes PICKED.
 - Authorization: EMPLOYEE/MANAGER/ADMIN profile matrix per action; fresh employee code/password challenge for every protected command; inactive/wrong-Company employee rejection; no cached authentication or EmployeeActionAuthorization token; server-resolved actor attribution; ShopSession-only reads.
