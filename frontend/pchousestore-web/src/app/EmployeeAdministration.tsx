@@ -80,7 +80,7 @@ export default function EmployeeAdministration({ companyId, page, getShopAccessT
         credentials,
       );
       if (response) setEmployees(current => [...current, response].sort((left, right) => left.employeeCode.localeCompare(right.employeeCode)));
-      setNewEmployee({ employeeCode: "", firstName: "", lastName: "", phone: "", email: "", initialPassword: "", roles: ["TECHNICIAN"] });
+      setNewEmployee({ employeeCode: "", firstName: "", lastName: "", phone: "", email: "", initialPassword: "", roles: ["EMPLOYEE"] });
       setInitialPasswordCustomized(false);
       setNotice("Employee created. Share the initial password securely; the employee must change it before their first protected action.");
     });
