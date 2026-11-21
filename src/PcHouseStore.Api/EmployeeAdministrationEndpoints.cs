@@ -54,15 +54,6 @@ public static class EmployeeAdministrationEndpoints
                      person.ContactNo.ToLower().Contains(term) || (person.Email != null && person.Email.ToLower().Contains(term)))));
         var employees = await query.OrderBy(x => x.EmployeeCode).ToListAsync(cancellationToken);
         var dtos = await ToDtosAsync(db, employees, cancellationToken);
-        db.EmployeeAdministrationEvents.Add(new EmployeeAdministrationEventRecord
-        {
-            CompanyId = companyId,
-            ActorType = "SHOP_SESSION",
-            ActorIdentifier = sessionId.ToString(CultureInfo.InvariantCulture),
-            ActionCode = "EMPLOYEE_DIRECTORY_READ",
-            OccurredAt = now
-        });
-        await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return Results.Ok(new EmployeeDirectoryResponse(dtos));
     }
@@ -129,8 +120,6 @@ public static class EmployeeAdministrationEndpoints
                 AssignedAt = now,
                 AssignedByEmployeeId = actor.Id
             });
-        db.EmployeeAdministrationEvents.Add(NewEvent(actor.CompanyId, actor.Id, employee.Id, "EMPLOYEE_CREATED"));
-        await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
         var dto = (await ToDtosAsync(db, [employee], cancellationToken)).Single();
@@ -154,8 +143,6 @@ public static class EmployeeAdministrationEndpoints
             x.Id == employeeId && x.CompanyId == actor.CompanyId, cancellationToken);
         if (employee is null) return Problem(context, 404, "employee_not_found", "The Employee was not found.");
         var dto = (await ToDtosAsync(db, [employee], cancellationToken)).Single();
-        db.EmployeeAdministrationEvents.Add(NewEvent(actor.CompanyId, actor.Id, employeeId, "EMPLOYEE_READ"));
-        await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return Results.Ok(dto);
     }
@@ -197,7 +184,6 @@ public static class EmployeeAdministrationEndpoints
         person.ContactNo = request.Phone.Trim();
         person.Email = NormalizeEmail(request.Email);
         employee.UpdatedAt = DateTime.UtcNow;
-        db.EmployeeAdministrationEvents.Add(NewEvent(actor.CompanyId, actor.Id, employeeId, "EMPLOYEE_PROFILE_UPDATED"));
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return Results.NoContent();
@@ -233,8 +219,6 @@ public static class EmployeeAdministrationEndpoints
             return Problem(context, 409, "last_management_user", "The Company must retain at least one active MANAGER or ADMIN.");
         employee.IsActive = request.IsActive;
         employee.UpdatedAt = DateTime.UtcNow;
-        db.EmployeeAdministrationEvents.Add(NewEvent(actor.CompanyId, actor.Id, employeeId,
-            request.IsActive ? "EMPLOYEE_REACTIVATED" : "EMPLOYEE_DEACTIVATED"));
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return Results.NoContent();
@@ -300,7 +284,6 @@ public static class EmployeeAdministrationEndpoints
                     .SetProperty(x => x.AssignedAt, now)
                     .SetProperty(x => x.AssignedByEmployeeId, actor.Id), cancellationToken);
         employee.UpdatedAt = now;
-        db.EmployeeAdministrationEvents.Add(NewEvent(actor.CompanyId, actor.Id, employeeId, "EMPLOYEE_ROLES_CHANGED"));
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return Results.NoContent();
@@ -330,7 +313,6 @@ public static class EmployeeAdministrationEndpoints
         employee.MustChangePasswordAtNextUse = true;
         employee.CredentialVersion++;
         employee.UpdatedAt = now;
-        db.EmployeeAdministrationEvents.Add(NewEvent(actor.CompanyId, actor.Id, employeeId, "EMPLOYEE_CREDENTIAL_RESET"));
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return Results.NoContent();
@@ -357,7 +339,6 @@ public static class EmployeeAdministrationEndpoints
         actor.MustChangePasswordAtNextUse = false;
         actor.CredentialVersion++;
         actor.UpdatedAt = now;
-        db.EmployeeAdministrationEvents.Add(NewEvent(actor.CompanyId, actor.Id, actor.Id, "EMPLOYEE_PASSWORD_CHANGED"));
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return Results.NoContent();
@@ -451,16 +432,6 @@ public static class EmployeeAdministrationEndpoints
                 employee.MustChangePasswordAtNextUse);
         }).ToArray();
     }
-
-    private static EmployeeAdministrationEventRecord NewEvent(long companyId, long actorEmployeeId, long? targetEmployeeId, string actionCode) => new()
-    {
-        CompanyId = companyId,
-        ActorEmployeeId = actorEmployeeId,
-        ActorType = "EMPLOYEE",
-        TargetEmployeeId = targetEmployeeId,
-        ActionCode = actionCode,
-        OccurredAt = DateTime.UtcNow
-    };
 
     private static string? ValidateProfile(string? firstName, string? lastName, string? phone, string? email)
     {
