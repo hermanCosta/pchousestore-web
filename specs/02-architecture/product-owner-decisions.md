@@ -1,6 +1,6 @@
 # Product-owner Decisions and Remaining Questions — pcHouseStore Web
 
-**Revision:** v49 · 20 November 2026
+**Revision:** v50 · 21 November 2026
 **Status:** Confirmed product decisions are incorporated. A small set of commercial/legal details remains explicitly proposed or deferred; the model is not a production-approved DDL.
 
 ## Confirmed decisions
@@ -18,11 +18,11 @@
 | Employee identity | One Company-wide employee identity works in every Shop. Each feature-defined protected operation requires fresh direct backend validation of the acting employee's own password; no employee authorization token is issued or reused. |
 | Customer/catalogue operations | Customer, Product, Service, product-category and Fault create/edit/deactivate/reactivate operations require an active Shop session and Company scope, but no individual employee credential challenge. Attribute their audit events to the authenticated ShopSession. |
 | Customer duplicates and phone entry | A Company must not contain duplicate customer records for the same phone number. A match is a hard block on create, not a warning or automatic merge. Phone entry defaults to Ireland; an “International number” checkbox switches the text field to international input. Store/compare the canonical phone in E.164 format. A customer's phone remains reserved while its soft-deleted record exists. |
-| Customer directory and email | TECHNICIAN may read the Company customer directory. Customer email is optional and may repeat; do not enforce a unique email constraint. |
+| Customer directory and email | Employee customer-directory access is defined by the approved Customer/Catalogue feature SPEC and Employee Management; do not use the retired TECHNICIAN profile. Customer email is optional and may repeat; do not enforce a unique email constraint. |
 | Product/Service kind and SKU | Catalogue items are only `PRODUCT` or `SERVICE`; remove legacy `OTHER` from the target UI/model. SKU is optional. When present it must match `SKU-[A-Z0-9]{8}`, is normalized to uppercase, unique per Company and remains reserved after deactivation. |
 | Fault catalogue | Fault description remains the primary value used to display/select/search faults. Fault records also include an immutable Company-unique code generated automatically as `FLT-` plus a Company sequence, zero-padded to at least 6 digits (for example `FLT-000001`). Codes are never reused. |
 | Catalogue stock quantity | `qty` represents physical on-hand stock (`quantity_on_hand`) per Shop. There is no `min_qty`, minimum-stock threshold, reorder threshold or low-stock alert based on a minimum. Reserved quantity is tracked separately and reduces availability, not physical on-hand. |
-| Catalogue deactivation and legacy OTHER | Deactivated customers/catalogue entries remain visible in existing histories but are unavailable for new operations. Existing drafts may display existing references but may not add another reference to an inactive record. MANAGER and TECHNICIAN may reactivate records. Legacy `OTHER` catalogue records are excluded from the target catalogue and are not migrated. |
+| Catalogue deactivation and legacy OTHER | Deactivated customers/catalogue entries remain visible in existing histories but are unavailable for new operations. Existing drafts may display existing references but may not add another reference to an inactive record. MANAGER and ADMIN may reactivate records, subject to the owning feature's permission rules. Legacy `OTHER` catalogue records are excluded from the target catalogue and are not migrated. |
 | Roles | Active profiles are `EMPLOYEE`, `MANAGER` and `ADMIN`. All profiles access every Shop in the Company. `MANAGER` administers employee/manager accounts but cannot grant `ADMIN`; `ADMIN` has full Company-wide administrative authority. No dual-role assignment. Business-operation permission matrices remain in their feature SPECs. |
 | Authentication credential operations | `MANAGER` and `ADMIN` provision, disable and reset employee credentials using the existing `EmployeeCredential` and reset flow. Employee reset forces a password change before protected operations. Employee recovery is administrative only. Shop credential bootstrap remains governed by the Shop authentication process. |
 | Employee initial credential | Generate `<normalized-first-name>@pchouse` for creation/reset. Normalize by removing accents, spaces and special characters. Display once to the authorized Manager/Admin; require change before protected operations. The pattern is temporary only and must be reconciled with the permanent-password minimum-length policy before implementation. |
@@ -108,7 +108,7 @@ Image retention is tied to the business record. Deletion is initially soft/audit
 4. **Deposit contract wording:** operational default is defined above, but the final written terms/non-refundable special-order wording must be reviewed for fairness and Irish consumer-law compliance.
 5. **Refurbished commercial guarantee:** 12 months is confirmed; the detailed coverage/exclusions below are a proposed default and require owner/legal review before publishing to customers.
 6. **Customer data/image retention:** image storage is PostgreSQL-only, but exact business-record retention period and lawful purge schedule remain to be approved. Soft delete is used in v1.
-7. **Employee access:** the current Company-wide `EMPLOYEE`, `MANAGER` and `ADMIN` profiles, their permissions and direct employee credential challenge are defined in `employee-management.md`. The former `TECHNICIAN` profile and its legacy permission matrix are retired.
+7. **Employee access:** the current Company-wide `EMPLOYEE`, `MANAGER` and `ADMIN` profiles are defined in [Employee Management](../04-features/employee-management.md). Feature-specific permissions are defined by each owning SPEC. The former `TECHNICIAN` profile and its legacy permission matrix are retired.
 8. **Sale lifecycle matrix and executable production DDL/EF Core migration review.** ServiceOrder lifecycle transitions and owner business rules are approved in `service-orders.md`; Sale lifecycle transitions still require completion.
 9. **Shop authentication operations:** employee credential administration, password policy, failed-attempt throttling and role authorization are defined in `employee-management.md`. ShopSession timeout values and multi-device/sign-out policy remain configurable and must be decided before production.
 10. **Service-order transfer details:** Device custody, service-part inventory attribution, transfer authorization and final audit fields remain to define. The financial handling is decided: preserve already-settled transactions against the source Shop; transfer the outstanding balance and held/unapplied deposit liability to the destination through an auditable internal event; all post-transfer transactions use the destination.
@@ -175,7 +175,7 @@ The detailed approved requirements are maintained in [Employee Management](../04
 - Remove `EmployeeActionAuthorization` token/entity/endpoint from the target design. Keep employee identity out of ShopSession and Shop OIDC tokens.
 - Deactivation blocks further employee operations immediately but does not revoke the shared ShopSession. Reactivation preserves the credential and any pending password-change requirement.
 - Successful protected business operations record the employee name as an immutable snapshot in business `notes`. Employee-administration operations and failed challenges create no `notes` entries; no dedicated employee-administration audit log is added.
-- The operation-to-profile matrix for business workflows remains defined by each feature SPEC. The legacy TECHNICIAN matrix is historical until explicitly reconciled.
+- The operation-to-profile matrix for business workflows remains defined by each feature SPEC. The legacy TECHNICIAN matrix is historical and is not an authorization source.
 - Employee passwords have a minimum length of 6 characters; accept at least 128 characters and support password managers/paste. Do not require arbitrary periodic expiry.
 - The Company-wide employee directory is available to any authenticated Shop session and shows only name, email, profile and active/inactive status. Search by name or email is case-insensitive, results are alphabetical by name, and status filtering is supported.
 - Editing an employee's email or profile does not invalidate or change the password and does not force a password change.
@@ -217,3 +217,14 @@ The owner has replaced the earlier supplier-procurement workflow with a simple *
 - State, timestamp, `SERVICE_ORDER_PICKED_UP` event, Note and applicable stock effects commit in one transaction. Require `IdempotencyKey`; committed replay returns the original result, while concurrent distinct commands for the same order produce one success and one conflict.
 - Pickup has no direct undo/cancel. Any correction is a separate auditable operation and does not automatically reactivate reservations.
 - Notes: `Service order picked up by {Employee}.`; append `Parts used: {details}. Parts released: {details}.` for `NOT_FIXED` with usage, or `All reserved parts released.` when active reservations exist but usage is zero. If no active reservations exist, use only the general Note. Timestamp is metadata.
+
+
+## Documentation authority and supersession — 2026-11-21
+
+This decision register is the current product-owner summary, but feature-specific contracts remain authoritative for their operations. Apply these rules when reading older sections or linked historical material:
+
+- Active profiles are exactly `EMPLOYEE`, `MANAGER` and `ADMIN`; no dual-role assignment. `ADMIN` inherits `MANAGER` except where a feature-specific rule explicitly restricts the action.
+- Each protected operation validates the acting employee's code/password directly in the backend for that request. Do not issue, persist, consume or replay an `EmployeeActionAuthorization` token.
+- Payment refunds and deposit refunds are available to `MANAGER` and `ADMIN`; deposit forfeiture remains `MANAGER`-only. Refunds use the original tender in v1; alternative-tender refunds are disabled.
+- The former supplier-procurement workflow and its request rounds, supplier purchases, allocations, ETA/tracking, reference images and receipts are superseded. The current Parts to Buy list is informational, with calculated ServiceOrder demand kept separate from manual reminders.
+- Historical decision notes that mention TECHNICIAN, one-use employee authorization or supplier procurement are retained only as a record of earlier decisions; they do not override this section or the current feature SPECs.
