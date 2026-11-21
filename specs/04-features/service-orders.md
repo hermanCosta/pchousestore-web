@@ -234,7 +234,7 @@ JSON body:
 }
 ```
 
-The response is the canonical committed result. A replay with the same key and identical request returns the original HTTP status and response body, without repeating side effects.
+The response is the canonical committed result. Before returning a stored result for any replay, the backend must revalidate the current employee code/password, active status, Company membership and Pickup permission; a prior successful request does not bypass current authentication or authorization. A replay with the same key and identical normalized business payload then returns the original HTTP status and response body, without repeating side effects. Employee credentials are excluded from the normalized request hash and request snapshot, and raw credentials must never be persisted or logged.
 
 **Error contract**
 - `400 invalid_request`: missing/invalid Idempotency-Key, malformed body, duplicate reservation line or invalid quantity shape.
@@ -297,7 +297,7 @@ The list/search, create, edit, status, notes, part-requirement, resume, payment,
 - [ ] AC-23: Pickup is exposed as `POST /api/v1/service-orders/{serviceOrderId}/pickup`, requires an authenticated ShopSession, a fresh employee code/password challenge and a valid `Idempotency-Key`.
 - [ ] AC-24: For `FIXED`, Pickup accepts an empty stock-disposition list and leaves every reservation, stock balance and movement unchanged, regardless of financial balance.
 - [ ] AC-25: For `NOT_FIXED`, the request accounts for every currently active reservation line exactly once; only active reserved quantities may be used, unused quantities are released, and released quantity is calculated by the server.
-- [ ] AC-26: A committed idempotent replay with the same key and normalized payload returns the original status/body without repeating state, event, Note, reservation or movement writes. Reusing the key with a different payload or resource scope returns `409 idempotency_key_reused`.
+- [ ] AC-26: Before a committed idempotent replay returns the original status/body, current employee credentials, active status, Company membership and Pickup permission are revalidated. The normalized business-payload hash and stored request snapshot exclude employee credentials; raw credentials are never persisted or logged. Reusing the key with a different business payload or resource scope returns `409 idempotency_key_reused`.
 - [ ] AC-27: Two distinct concurrent Pickup commands for one ServiceOrder cannot both commit. Exactly one may transition the order to `PICKED`; the other receives `409 service_order_pickup_conflict`.
 - [ ] AC-28: Any failure in the Pickup transaction rolls back the status, `picked_at`, event, Note, idempotency record and all applicable stock/reservation effects.
 - [ ] AC-29: Pickup never changes payment, deposit, refund, balance-due, Customer, Device, Fault or ServiceOrder line data.
