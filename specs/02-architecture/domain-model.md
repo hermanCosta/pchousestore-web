@@ -1,6 +1,6 @@
 # Target Domain Model — pcHouseStore Web
 
-**Status:** DRAFT based on ADR-001 through ADR-025 and the consolidated product-owner decision register.  
+**Status:** DRAFT based on the current approved architecture decisions and consolidated product-owner decision register.  
 **Purpose:** Define the conceptual model and domain invariants before implementation and physical DDL approval.
 
 ## 1. Domain boundaries
@@ -121,8 +121,8 @@
 - A service booking may create a `ServiceDeposit` and record its receipt immediately. Deposit purpose distinguishes parts pre-order, booking advance, security deposit and other reasons.
 - A deposit remains held until explicitly applied to the ServiceOrder, refunded or forfeited. A security deposit is not automatically revenue or invoice payment. `DepositApplication` is non-cash credit against the order and is separately audited.
 - Refurbished sales can have a weekly `InstallmentPlan` with dated `InstallmentSchedule` rows and `InstallmentSettlement` allocations. Layaway is the default; early handover / credit sale remains gated on Irish legal/compliance review.
-- Refunds can be partial or total. Each refund is a positive-magnitude `PaymentTransaction` linked to the original settled payment; repeated partial refunds cannot cumulatively exceed the unrefunded amount.
-- Optional `PaymentRefundLine` records attribute a refund to specific sale/service lines. Monetary refund remains separate from physical `StockReturn`.
+- Refunds can be partial or total. Each refund is a positive-magnitude `PaymentTransaction` linked to the original settled payment; repeated partial refunds cannot cumulatively exceed the unrefunded amount. Payment refunds and deposit refunds require a fresh employee code/password challenge from `MANAGER` or `ADMIN`; deposit forfeiture is a separate operation restricted to `MANAGER`.
+- Optional `PaymentRefundLine` records attribute a refund to specific sale/service lines. Monetary refund remains separate from physical `StockReturn`. Refund authorization is feature-specific and checked directly against the employee's active profile; no separate employee-action authorization token or approval record is used.
 
 
 ### Cash management and closing
@@ -179,10 +179,11 @@
 | CustomerComplaintCase | CustomerComplaintCaseEvent, CustomerComplaintCaseAttachment, CustomerComplaintResolution | Register and track statutory/commercial/service complaints; preserve evidence, inspection, communications and remedy trail |
 | DailyClosing | DailyClosingCashCount, DailyClosingCorrection | Open with counted opening float; calculate expected drawer; count and close once per Shop/date; preserve later corrections separately |
 | Sale | SaleItem, PaymentTransaction, InventoryReservation, StockReturn | Settle sale and consume stock atomically; release on cancellation; record selected return |
-| ServiceOrder | ServiceOrderItem, ServiceOrderEvent, PaymentTransaction, InventoryReservation, StockReturn | Mark FIXED without consumption; consume FIXED-order stock at full settlement; on NOT_FIXED handover consume explicitly recorded used quantities and release unused reservations; release on cancellation; record selected return |
+| ServiceOrder | ServiceOrderItem, ServiceOrderEvent, ServicePartRequirement, BusinessNote | Own the service workflow, order lines/requirements, lifecycle events and employee-attributed Notes. Mark FIXED without consumption; coordinate full-settlement stock consumption; on NOT_FIXED handover consume explicitly recorded used quantities and release unused reservations; release on cancellation. Finance transactions/deposits and Stock reservations/returns remain owned by their respective modules and are linked to the order rather than becoming ServiceOrder-owned aggregates |
 | ServicePartRequirement | ServiceOrderItem and InventoryReservationLine | Track required Product quantities, calculate uncovered demand for the Parts to Buy list and keep the order awaiting parts until blocking requirements are fully reserved |
 | ManualPartToBuy | Shop, optional Product and ManualPartToBuyReference | Maintain an additional Shop-scoped part reminder independent of ServiceOrders; Product-backed entries reuse catalogue references, while free-text entries own multiple informational URLs. Removal permanently deletes the manual entry and its entry-owned reference URLs; no removal history or restoration feature is required |
-| PaymentTransaction | PaymentAllocation | Persist one payment/refund with allocations and enforce aggregate invariants |
+| PaymentTransaction | PaymentAllocation | Finance-owned aggregate for one payment/refund and its tender allocations; enforce original-transaction refund caps and allocation reconciliation |
+| ServiceDeposit | DepositApplication, ServiceDepositEvent | Finance-owned deposit lifecycle; receive, apply, refund, forfeit or release held funds with immutable events and reconciliation. The deposit references one ServiceOrder but is not a child owned by the ServiceOrder aggregate |
 | DailyClosing | Closing snapshots | Reconcile one Shop/business date |
 
 ## 5. Open decisions
@@ -191,7 +192,7 @@
 
 **Still open:**
 
-- v1 tender methods are CASH/CARD only; card processor integration is deferred. Manager-only refunds use original tender. Deposit terms and 90-day review/no-auto-forfeit policy are documented in `financial-model.md`.
+- v1 tender methods are CASH/CARD only; card processor integration is deferred. Payment/deposit refunds require MANAGER or ADMIN; deposit forfeiture is MANAGER-only. Refunds use original tender by default. Deposit terms and 90-day review/no-auto-forfeit policy are documented in `financial-model.md`.
 - Company's legal VAT registration/status and correct tax treatment in Ireland. The software starts with VAT disabled/no VAT amount added, but this is not a legal exemption; review is a production go-live gate.
 - Refurbished 12-month commercial guarantee duration is decided; proposed coverage/exclusions are documented and remain subject to owner/legal review. A/B/C condition, inspection and complaint workflow are specified in [Refurbished Condition Grades and Customer Complaint Workflow](refurbished-condition-and-complaints.md).
 - Required serial-number/serial-uniqueness rules by category and acquisition/source details for refurbished units.
