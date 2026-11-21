@@ -242,7 +242,7 @@ export default function EmployeeAdministration({ companyId, page, getShopAccessT
             <input type="password" required minLength={6} maxLength={128} autoComplete="new-password" value={newEmployee.initialPassword} onChange={event => { setInitialPasswordCustomized(true); setNewEmployee(current => ({ ...current, initialPassword: event.target.value })); }} />
           </label>
         </div>
-        <p className="form-help">Default: employee code + @pchouse. The password must contain at least 6 characters. The employee must change it before performing any protected action.</p>
+        <p className="form-help">Default: normalized first name + @pchouse. The password must contain at least 6 characters. The employee must change it before performing any protected action.</p>
         <RoleChecks roles={newEmployee.roles} onToggle={toggleNewRole} />
         <p className="form-help">Confirm creation with your employee code and password.</p>
         <button disabled={busyAction !== null}>{busyAction === "employee-create" ? "Creating…" : "Create employee"}</button>
