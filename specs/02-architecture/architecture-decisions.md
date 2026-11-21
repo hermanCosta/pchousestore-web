@@ -1,4 +1,6 @@
-> **EMPLOYEE-MANAGEMENT SUPERSESSION (2026-11-20):** Older ADR statements in this file that describe `TECHNICIAN`, dual-role permission unions, `EmployeeActionAuthorization`, one-use employee authorization tokens, employee-authentication audit logging, or employee role details are historical and superseded. The authoritative current rules are in [Employee Management](../04-features/employee-management.md). The Shop-only `ShopSession` and OIDC identity boundary remains valid. Reconcile business-operation permissions in the relevant feature SPECs before implementation.
+> **EMPLOYEE-MANAGEMENT SUPERSESSION (2026-11-20):** Older ADR statements in this file that describe `TECHNICIAN`, dual-role permission unions, `EmployeeActionAuthorization`, one-use employee authorization tokens, employee-authentication audit logging, or employee role details are historical and superseded. The authoritative current rules are in [Employee Management](../04-features/employee-management.md). The Shop-only `ShopSession` and OIDC identity boundary remains valid.
+>
+> **REFUND-PERMISSION SUPERSESSION (2026-11-21):** Older statements that make all refunds Manager-only are superseded by ADR-038. Payment refunds and deposit refunds require fresh credentials from `MANAGER` or `ADMIN`; deposit forfeiture remains `MANAGER`-only. No second approver or persisted employee-action authorization is required for these standard operations.
 
 # Architecture Decision Records — pcHouseStore Web
 
@@ -223,6 +225,8 @@ The Central Bank of Ireland confirms that cash rounding is voluntary, applies on
 
 ## ADR-012 — Partial and total refunds
 
+**Status:** REFUND PERMISSION RULE SUPERSEDED BY ADR-038; the transaction and refund-cap design remains valid.
+
 **Decision:** Monetary refunds may be partial or total and are recorded as separate positive-magnitude `REFUND` PaymentTransactions linked to the original settled payment transaction.
 
 ### Consequences
@@ -232,7 +236,7 @@ The Central Bank of Ireland confirms that cash rounding is voluntary, applies on
 - Refund tender allocations record the channel used to return money. Default policy should prefer the original tender, but an authorized alternative channel may be allowed by Shop policy and must be audited.
 - An optional `PaymentRefundLine` links refunded amounts/quantities to the relevant SaleItem or ServiceOrderItem. An order-level refund without a line allocation is also possible when its reason is documented.
 - Financial refunds do not automatically restock products. Physical stock return continues through selected `StockReturnLine` records only.
-- v1 refunds require one fresh Manager authorization at every amount and default to the original tender. Alternative tender and second-approver flows are disabled; the approval rule is not configurable by Shop or amount.
+- Refund permission is governed by ADR-038: payment and deposit refunds require fresh `MANAGER` or `ADMIN` credentials. Refunds default to the original tender. Alternative tender and second-approver flows are disabled; the approval rule is not configurable by Shop or amount.
 
 ## Decision register
 
@@ -249,7 +253,7 @@ The Central Bank of Ireland confirms that cash rounding is voluntary, applies on
 | ADR-009 | Ireland monetary baseline | EUR, Europe/Dublin, decimal currency, optional cash-only €0.05 rounding | DECIDED |
 | ADR-010 | Service deposits | Record at booking; purpose and held/applied/refunded/forfeited lifecycle | DECIDED |
 | ADR-011 | Refurbished-sale instalments | Weekly schedule; layaway default; credit-sale handover gated by Irish compliance review | DECIDED WITH LEGAL GATE |
-| ADR-012 | Refunds | Partial or total, linked to original transaction, capped by refundable balance; Manager-only, original tender by default, no amount threshold or second approver | DECIDED |
+| ADR-012 | Refunds | Partial or total, linked to original transaction and capped by refundable balance; permission superseded by ADR-038 | DECIDED / PARTIALLY SUPERSEDED |
 
 ## Non-decisions — must not be inferred
 
@@ -466,16 +470,18 @@ See [Image Upload Policy](image-upload-policy.md). Limits are configurable and c
 - Never store PAN, CVV, PIN or card credentials.
 - Processor fees, payout matching and chargeback APIs are deferred.
 
-## ADR-027 — Manager-only partial/total refunds to original tender
+## ADR-027 — Partial/total refunds to original tender
 
-**Decision:** All refunds require one fresh `MANAGER` employee password challenge, regardless of amount. A second Manager approver is not required. Partial and full refunds are supported; original tender is the v1 default and alternative tender is disabled.
+**Status:** REFUND PERMISSION RULE SUPERSEDED BY ADR-038; the original-tender and transaction controls remain valid.
+
+**Decision:** Partial and full refunds are supported; original tender is the v1 default and alternative tender is disabled. Current role permissions are defined by ADR-038.
 
 ### Consequences
 
 - Lock the original settled transaction/allocations and enforce cumulative refund caps.
 - A split CASH/CARD payment can be refunded using allocations tied to the original tender components, each bounded by that component's refundable remainder.
 - Card refund is carried out on the original external terminal/provider and recorded with its confirmation/reference.
-- TECHNICIAN cannot execute refunds. Refunds never restock inventory automatically; physical returns use separate StockReturn records.
+- Refunds never restock inventory automatically; physical returns use separate StockReturn records.
 
 ## ADR-028 — Deposit no-auto-expiry and cancellation controls
 
@@ -652,3 +658,15 @@ DATA-05 must review provider-specific migrations, generated columns, byte-array 
 - A committed replay returns the original result; a distinct concurrent Pickup for the same order receives a conflict if another command commits first. Pickup has no direct undo/cancel. Corrections are separate auditable operations and do not automatically reactivate reservations.
 
 **Notes:** General text is `Service order picked up by {Employee}.`. For `NOT_FIXED` with used parts append `Parts used: {details}. Parts released: {details}.`; for active reservations with zero usage append `All reserved parts released.`; when there are no active reservations, use only the general Note. Timestamp remains structured metadata.
+
+## ADR-038 — Refund and deposit-forfeiture permission reconciliation
+
+**Status:** DECIDED — product-owner confirmation 2026-11-21; supersedes the refund-role rules in ADR-012 and ADR-027.
+
+**Decision:** Payment refunds (`REFUND`) and service-deposit refunds (`DEPOSIT_REFUND`) may be executed by `MANAGER` or `ADMIN`. Each operation requires a fresh employee code/password challenge, direct validation of the employee's active Company-wide profile and the feature-specific permission. `ADMIN` is permitted for both refund operations. Deposit forfeiture remains a separate operation restricted to `MANAGER` only and also requires fresh credentials. No second approver or persisted `EmployeeActionAuthorization` is used for these standard operations.
+
+**Consequences:**
+- Keep payment refund and deposit refund as distinct financial operations with their existing eligibility, balance and concurrency controls.
+- Deposit forfeiture is not a refund and must not inherit the `ADMIN` permission for refunds.
+- Refunds do not create stock returns or restock inventory; physical returns remain a separate Stock operation.
+- Any historical Manager-only wording in ADR-012/ADR-027 is superseded only for role permission; original-tender policy, refund caps and transaction structure remain in force.
