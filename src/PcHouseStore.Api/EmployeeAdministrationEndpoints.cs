@@ -1,6 +1,5 @@
 using System.Globalization;
 using System.Security.Claims;
-using System.Security.Cryptography;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -11,19 +10,12 @@ namespace PcHouseStore.Api;
 
 public static class EmployeeAdministrationEndpoints
 {
-    private const string AuthorizationHeader = "X-Employee-Action-Authorization";
-    private static readonly string[] ManagerActions =
-    [
-        "EMPLOYEE_READ", "EMPLOYEE_CREATE", "EMPLOYEE_PROFILE_UPDATE",
-        "EMPLOYEE_STATUS_CHANGE", "EMPLOYEE_ROLE_CHANGE", "EMPLOYEE_CREDENTIAL_RESET"
-    ];
-
     public static IEndpointRouteBuilder MapEmployeeAdministrationEndpoints(this IEndpointRouteBuilder routes)
     {
         var group = routes.MapGroup("/api/v1/employees").RequireAuthorization("ShopApi");
         group.MapPost("/queries", SearchAsync);
         group.MapPost("", CreateAsync);
-        group.MapGet("/{employeeId:long}", GetAsync);
+        group.MapPost("/{employeeId:long}/query", GetAsync);
         group.MapPut("/{employeeId:long}", UpdateAsync);
         group.MapPatch("/{employeeId:long}/status", ChangeStatusAsync);
         group.MapPut("/{employeeId:long}/roles", ChangeRolesAsync);
@@ -91,18 +83,18 @@ public static class EmployeeAdministrationEndpoints
         if (!ValidRoles(request.Roles)) return Problem(context, 400, "invalid_roles", "Assign one or both supported employee roles.");
 
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        var result = await ConsumeAuthorizationAsync(principal, db, context, cancellationToken,
-            "EMPLOYEE_CREATE", "Company", GetCompanyId(principal).ToString(CultureInfo.InvariantCulture), managerOnly: true);
+        var result = await AuthenticateManagerAsync(request.EmployeeChallenge, principal, db, hasher, context, cancellationToken);
         if (result.Error is not null) return result.Error;
 
-        var authorization = result.Authorization!;
-        var exists = await db.Employees.AnyAsync(x => x.CompanyId == authorization.CompanyId && x.EmployeeCode == employeeCode, cancellationToken);
+        var actor = result.Employee!;
+        var companyId = actor.CompanyId;
+        var exists = await db.Employees.AnyAsync(x => x.CompanyId == actor.CompanyId && x.EmployeeCode == employeeCode, cancellationToken);
         if (exists) return Problem(context, 409, "employee_code_conflict", "An employee with this code already exists in the Company.");
 
         var now = DateTime.UtcNow;
         var person = new PersonRecord
         {
-            CompanyId = authorization.CompanyId,
+            CompanyId = actor.CompanyId,
             FirstName = request.FirstName.Trim(),
             LastName = request.LastName.Trim(),
             ContactNo = request.Phone.Trim(),
@@ -113,7 +105,7 @@ public static class EmployeeAdministrationEndpoints
 
         var employee = new EmployeeRecord
         {
-            CompanyId = authorization.CompanyId,
+            CompanyId = actor.CompanyId,
             PersonId = person.Id,
             EmployeeCode = employeeCode,
             IsActive = true,
@@ -128,14 +120,14 @@ public static class EmployeeAdministrationEndpoints
         foreach (var roleCode in request.Roles.Select(NormalizeRole).Distinct(StringComparer.Ordinal))
             db.EmployeeRoleAssignments.Add(new EmployeeRoleAssignmentRecord
             {
-                CompanyId = authorization.CompanyId,
+                CompanyId = actor.CompanyId,
                 EmployeeId = employee.Id,
                 RoleCode = roleCode,
                 IsActive = true,
                 AssignedAt = now,
-                AssignedByEmployeeId = authorization.EmployeeId
+                AssignedByEmployeeId = actor.Id
             });
-        db.EmployeeAdministrationEvents.Add(NewEvent(authorization.CompanyId, authorization.EmployeeId, employee.Id, "EMPLOYEE_CREATED"));
+        db.EmployeeAdministrationEvents.Add(NewEvent(actor.CompanyId, actor.Id, employee.Id, "EMPLOYEE_CREATED"));
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
@@ -147,19 +139,19 @@ public static class EmployeeAdministrationEndpoints
         long employeeId,
         ClaimsPrincipal principal,
         PcHouseStoreDbContext db,
+        IPasswordHasher<EmployeeRecord> hasher,
         HttpContext context,
         CancellationToken cancellationToken)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        var result = await ConsumeAuthorizationAsync(principal, db, context, cancellationToken,
-            "EMPLOYEE_READ", "Employee", employeeId.ToString(CultureInfo.InvariantCulture), managerOnly: true);
+        var result = await AuthenticateManagerAsync(request.EmployeeChallenge, principal, db, hasher, context, cancellationToken);
         if (result.Error is not null) return result.Error;
-        var authorization = result.Authorization!;
+        var actor = result.Employee!;
         var employee = await db.Employees.AsNoTracking().SingleOrDefaultAsync(x =>
-            x.Id == employeeId && x.CompanyId == authorization.CompanyId, cancellationToken);
+            x.Id == employeeId && x.CompanyId == actor.CompanyId, cancellationToken);
         if (employee is null) return Problem(context, 404, "employee_not_found", "The Employee was not found.");
         var dto = (await ToDtosAsync(db, [employee], cancellationToken)).Single();
-        db.EmployeeAdministrationEvents.Add(NewEvent(authorization.CompanyId, authorization.EmployeeId, employeeId, "EMPLOYEE_READ"));
+        db.EmployeeAdministrationEvents.Add(NewEvent(actor.CompanyId, actor.Id, employeeId, "EMPLOYEE_READ"));
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return Results.Ok(dto);
@@ -170,6 +162,7 @@ public static class EmployeeAdministrationEndpoints
         EmployeeProfileUpdateRequest request,
         ClaimsPrincipal principal,
         PcHouseStoreDbContext db,
+        IPasswordHasher<EmployeeRecord> hasher,
         HttpContext context,
         CancellationToken cancellationToken)
     {
@@ -177,19 +170,18 @@ public static class EmployeeAdministrationEndpoints
         if (validation is not null) return Problem(context, 400, "invalid_request", validation);
 
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        var result = await ConsumeAuthorizationAsync(principal, db, context, cancellationToken,
-            "EMPLOYEE_PROFILE_UPDATE", "Employee", employeeId.ToString(CultureInfo.InvariantCulture), managerOnly: true);
+        var result = await AuthenticateManagerAsync(request.EmployeeChallenge, principal, db, hasher, context, cancellationToken);
         if (result.Error is not null) return result.Error;
-        var authorization = result.Authorization!;
-        var employee = await LockEmployeeAsync(db, employeeId, authorization.CompanyId, cancellationToken);
+        var actor = result.Employee!;
+        var employee = await LockEmployeeAsync(db, employeeId, actor.CompanyId, cancellationToken);
         if (employee is null) return Problem(context, 404, "employee_not_found", "The Employee was not found.");
 
         var person = employee.PersonId is long personId
-            ? await db.People.SingleOrDefaultAsync(x => x.Id == personId && x.CompanyId == authorization.CompanyId, cancellationToken)
+            ? await db.People.SingleOrDefaultAsync(x => x.Id == personId && x.CompanyId == actor.CompanyId, cancellationToken)
             : null;
         if (person is null)
         {
-            person = new PersonRecord { CompanyId = authorization.CompanyId };
+            person = new PersonRecord { CompanyId = actor.CompanyId };
             db.People.Add(person);
             await db.SaveChangesAsync(cancellationToken);
             employee.PersonId = person.Id;
@@ -199,7 +191,7 @@ public static class EmployeeAdministrationEndpoints
         person.ContactNo = request.Phone.Trim();
         person.Email = NormalizeEmail(request.Email);
         employee.UpdatedAt = DateTime.UtcNow;
-        db.EmployeeAdministrationEvents.Add(NewEvent(authorization.CompanyId, authorization.EmployeeId, employeeId, "EMPLOYEE_PROFILE_UPDATED"));
+        db.EmployeeAdministrationEvents.Add(NewEvent(actor.CompanyId, actor.Id, employeeId, "EMPLOYEE_PROFILE_UPDATED"));
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return Results.NoContent();
@@ -210,19 +202,19 @@ public static class EmployeeAdministrationEndpoints
         EmployeeStatusChangeRequest request,
         ClaimsPrincipal principal,
         PcHouseStoreDbContext db,
+        IPasswordHasher<EmployeeRecord> hasher,
         HttpContext context,
         CancellationToken cancellationToken)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        var result = await ConsumeAuthorizationAsync(principal, db, context, cancellationToken,
-            "EMPLOYEE_STATUS_CHANGE", "Employee", employeeId.ToString(CultureInfo.InvariantCulture), managerOnly: true);
+        var result = await AuthenticateManagerAsync(request.EmployeeChallenge, principal, db, hasher, context, cancellationToken);
         if (result.Error is not null) return result.Error;
-        var authorization = result.Authorization!;
-        var employee = await LockEmployeeAsync(db, employeeId, authorization.CompanyId, cancellationToken);
+        var actor = result.Employee!;
+        var employee = await LockEmployeeAsync(db, employeeId, actor.CompanyId, cancellationToken);
         if (employee is null) return Problem(context, 404, "employee_not_found", "The Employee was not found.");
         employee.IsActive = request.IsActive;
         employee.UpdatedAt = DateTime.UtcNow;
-        db.EmployeeAdministrationEvents.Add(NewEvent(authorization.CompanyId, authorization.EmployeeId, employeeId,
+        db.EmployeeAdministrationEvents.Add(NewEvent(actor.CompanyId, actor.Id, employeeId,
             request.IsActive ? "EMPLOYEE_REACTIVATED" : "EMPLOYEE_DEACTIVATED"));
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
@@ -234,20 +226,20 @@ public static class EmployeeAdministrationEndpoints
         EmployeeRoleChangeRequest request,
         ClaimsPrincipal principal,
         PcHouseStoreDbContext db,
+        IPasswordHasher<EmployeeRecord> hasher,
         HttpContext context,
         CancellationToken cancellationToken)
     {
         if (!ValidRoles(request.Roles)) return Problem(context, 400, "invalid_roles", "Assign one or both supported employee roles.");
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        var result = await ConsumeAuthorizationAsync(principal, db, context, cancellationToken,
-            "EMPLOYEE_ROLE_CHANGE", "Employee", employeeId.ToString(CultureInfo.InvariantCulture), managerOnly: true);
+        var result = await AuthenticateManagerAsync(request.EmployeeChallenge, principal, db, hasher, context, cancellationToken);
         if (result.Error is not null) return result.Error;
-        var authorization = result.Authorization!;
-        var employee = await LockEmployeeAsync(db, employeeId, authorization.CompanyId, cancellationToken);
+        var actor = result.Employee!;
+        var employee = await LockEmployeeAsync(db, employeeId, actor.CompanyId, cancellationToken);
         if (employee is null) return Problem(context, 404, "employee_not_found", "The Employee was not found.");
 
         var now = DateTime.UtcNow;
-        var assignments = await db.EmployeeRoleAssignments.Where(x => x.CompanyId == authorization.CompanyId && x.EmployeeId == employeeId)
+        var assignments = await db.EmployeeRoleAssignments.Where(x => x.CompanyId == actor.CompanyId && x.EmployeeId == employeeId)
             .ToListAsync(cancellationToken);
         var desired = request.Roles.Select(NormalizeRole).ToHashSet(StringComparer.Ordinal);
         foreach (var assignment in assignments)
@@ -259,22 +251,22 @@ public static class EmployeeAdministrationEndpoints
                 if (shouldBeActive)
                 {
                     assignment.AssignedAt = now;
-                    assignment.AssignedByEmployeeId = authorization.EmployeeId;
+                    assignment.AssignedByEmployeeId = actor.Id;
                 }
             }
         }
         foreach (var missingRole in desired.Except(assignments.Select(x => x.RoleCode), StringComparer.Ordinal))
             db.EmployeeRoleAssignments.Add(new EmployeeRoleAssignmentRecord
             {
-                CompanyId = authorization.CompanyId,
+                CompanyId = actor.CompanyId,
                 EmployeeId = employeeId,
                 RoleCode = missingRole,
                 IsActive = true,
                 AssignedAt = now,
-                AssignedByEmployeeId = authorization.EmployeeId
+                AssignedByEmployeeId = actor.Id
             });
         employee.UpdatedAt = now;
-        db.EmployeeAdministrationEvents.Add(NewEvent(authorization.CompanyId, authorization.EmployeeId, employeeId, "EMPLOYEE_ROLES_CHANGED"));
+        db.EmployeeAdministrationEvents.Add(NewEvent(actor.CompanyId, actor.Id, employeeId, "EMPLOYEE_ROLES_CHANGED"));
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return Results.NoContent();
@@ -291,18 +283,17 @@ public static class EmployeeAdministrationEndpoints
     {
         if (!ValidPassword(request.NewPassword)) return PasswordProblem(context);
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        var result = await ConsumeAuthorizationAsync(principal, db, context, cancellationToken,
-            "EMPLOYEE_CREDENTIAL_RESET", "Employee", employeeId.ToString(CultureInfo.InvariantCulture), managerOnly: true);
+        var result = await AuthenticateManagerAsync(request.EmployeeChallenge, principal, db, hasher, context, cancellationToken);
         if (result.Error is not null) return result.Error;
-        var authorization = result.Authorization!;
-        var employee = await LockEmployeeAsync(db, employeeId, authorization.CompanyId, cancellationToken);
+        var actor = result.Employee!;
+        var employee = await LockEmployeeAsync(db, employeeId, actor.CompanyId, cancellationToken);
         if (employee is null) return Problem(context, 404, "employee_not_found", "The Employee was not found.");
         var now = DateTime.UtcNow;
         employee.PasswordHash = hasher.HashPassword(employee, request.NewPassword);
         employee.MustChangePasswordAtNextUse = true;
         employee.CredentialVersion++;
         employee.UpdatedAt = now;
-        db.EmployeeAdministrationEvents.Add(NewEvent(authorization.CompanyId, authorization.EmployeeId, employeeId, "EMPLOYEE_CREDENTIAL_RESET"));
+        db.EmployeeAdministrationEvents.Add(NewEvent(actor.CompanyId, actor.Id, employeeId, "EMPLOYEE_CREDENTIAL_RESET"));
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return Results.NoContent();
@@ -317,105 +308,84 @@ public static class EmployeeAdministrationEndpoints
         CancellationToken cancellationToken)
     {
         if (!ValidPassword(request.NewPassword)) return PasswordProblem(context);
-        if (!TryReadShopContext(principal, out var sessionId, out var shopId, out var companyId))
-            return Problem(context, 401, "invalid_shop_token", "Shop authentication is required.");
-        var authorizationResourceId = context.Request.Headers[AuthorizationHeader].ToString();
-        if (!TryDecodeToken(authorizationResourceId, out var decodedToken))
-            return Problem(context, 401, "invalid_employee_action_authorization", "A valid employee action authorization is required.");
 
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        var tokenHash = SHA256.HashData(decodedToken);
-        var authorization = await db.EmployeeActionAuthorizations.SingleOrDefaultAsync(x => x.AuthorizationTokenHash == tokenHash, cancellationToken);
-        if (authorization is null || authorization.CompanyId != companyId || authorization.ActionCode != "EMPLOYEE_SELF_PASSWORD_CHANGE" ||
-            authorization.ResourceType != "Employee" || authorization.ResourceId != authorization.EmployeeId.ToString(CultureInfo.InvariantCulture))
-            return Problem(context, 403, "action_not_permitted", "The employee authorization does not permit this password change.");
-        if (authorization.ConsumedAt is not null) return Problem(context, 409, "authorization_replayed", "This employee action authorization has already been consumed.");
+        var result = await AuthenticateEmployeeAsync(request.EmployeeChallenge, principal, db, hasher,
+            context, cancellationToken, managerOnly: false, allowMandatoryPasswordChange: true);
+        if (result.Error is not null) return result.Error;
+
+        var actor = result.Employee!;
         var now = DateTime.UtcNow;
-        if (authorization.ExpiresAt <= now) return Problem(context, 410, "authorization_expired", "This employee action authorization has expired.");
-        var lockedSession = await db.ShopSessions.FromSqlInterpolated($"SELECT * FROM shop_session WHERE id = {sessionId} FOR UPDATE")
-            .SingleOrDefaultAsync(cancellationToken);
-        if (!IsSessionActive(lockedSession, companyId, shopId, now) ||
-            !await db.Shops.AnyAsync(x => x.Id == shopId && x.CompanyId == companyId && x.IsActive, cancellationToken) ||
-            !await db.Companies.AnyAsync(x => x.Id == companyId && x.IsActive, cancellationToken))
-            return Problem(context, 401, "shop_session_revoked", "The Shop session is no longer active.");
-        if (authorization.ShopSessionId != sessionId || authorization.ShopId != shopId)
-            return Problem(context, 403, "action_not_permitted", "The employee authorization belongs to another Shop session.");
-
-        var employee = await LockEmployeeAsync(db, authorization.EmployeeId, companyId, cancellationToken);
-        if (employee is null || !employee.IsActive) return Problem(context, 401, "invalid_employee_credentials", "Employee credentials are invalid.");
-        var consumed = await db.EmployeeActionAuthorizations.Where(x => x.Id == authorization.Id && x.ConsumedAt == null && x.ExpiresAt > now)
-            .ExecuteUpdateAsync(update => update.SetProperty(x => x.ConsumedAt, now), cancellationToken);
-        if (consumed != 1) return Problem(context, 409, "authorization_replayed", "This employee action authorization is no longer available.");
-
-        employee.PasswordHash = hasher.HashPassword(employee, request.NewPassword);
-        employee.MustChangePasswordAtNextUse = false;
-        employee.CredentialVersion++;
-        employee.UpdatedAt = now;
-        db.EmployeeAdministrationEvents.Add(NewEvent(companyId, employee.Id, employee.Id, "EMPLOYEE_PASSWORD_CHANGED"));
+        actor.PasswordHash = hasher.HashPassword(actor, request.NewPassword);
+        actor.MustChangePasswordAtNextUse = false;
+        actor.CredentialVersion++;
+        actor.UpdatedAt = now;
+        db.EmployeeAdministrationEvents.Add(NewEvent(actor.CompanyId, actor.Id, actor.Id, "EMPLOYEE_PASSWORD_CHANGED"));
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return Results.NoContent();
     }
 
-    internal static async Task<AuthorizationResult> ConsumeAuthorizationAsync(
+    internal static Task<EmployeeAuthenticationResult> AuthenticateManagerAsync(
+        EmployeeChallengeRequest challenge,
         ClaimsPrincipal principal,
         PcHouseStoreDbContext db,
+        IPasswordHasher<EmployeeRecord> hasher,
+        HttpContext context,
+        CancellationToken cancellationToken) =>
+        AuthenticateEmployeeAsync(challenge, principal, db, hasher, context, cancellationToken,
+            managerOnly: true, allowMandatoryPasswordChange: false);
+
+    private static async Task<EmployeeAuthenticationResult> AuthenticateEmployeeAsync(
+        EmployeeChallengeRequest challenge,
+        ClaimsPrincipal principal,
+        PcHouseStoreDbContext db,
+        IPasswordHasher<EmployeeRecord> hasher,
         HttpContext context,
         CancellationToken cancellationToken,
-        string expectedAction,
-        string expectedResourceType,
-        string expectedResourceId,
         bool managerOnly,
-        IReadOnlyCollection<string>? allowedRoles = null)
+        bool allowMandatoryPasswordChange)
     {
         if (!TryReadShopContext(principal, out var sessionId, out var shopId, out var companyId))
-            return Failure(Problem(context, 401, "invalid_shop_token", "Shop authentication is required."));
-        if (!TryDecodeToken(context.Request.Headers[AuthorizationHeader].ToString(), out var token))
-            return Failure(Problem(context, 401, "invalid_employee_action_authorization", "A valid employee action authorization is required."));
+            return new EmployeeAuthenticationResult(null,
+                Problem(context, 401, "invalid_shop_token", "Shop authentication is required."));
+
+        var employeeCode = challenge.EmployeeCode?.Trim().ToUpperInvariant();
+        var password = challenge.Password;
+        if (string.IsNullOrWhiteSpace(employeeCode) || employeeCode.Length > 40 ||
+            string.IsNullOrWhiteSpace(password) || password.Length > 128)
+            return new EmployeeAuthenticationResult(null,
+                Problem(context, 400, "invalid_employee_challenge", "Employee code and password are required."));
 
         var now = DateTime.UtcNow;
-        var session = await db.ShopSessions.FromSqlInterpolated($"SELECT * FROM shop_session WHERE id = {sessionId} FOR UPDATE")
+        var session = await db.ShopSessions
+            .FromSqlInterpolated($"SELECT * FROM shop_session WHERE id = {sessionId} FOR UPDATE")
             .SingleOrDefaultAsync(cancellationToken);
         if (!IsSessionActive(session, companyId, shopId, now) ||
             !await db.Shops.AnyAsync(x => x.Id == shopId && x.CompanyId == companyId && x.IsActive, cancellationToken) ||
             !await db.Companies.AnyAsync(x => x.Id == companyId && x.IsActive, cancellationToken))
-            return Failure(Problem(context, 401, "shop_session_revoked", "The Shop session is no longer active."));
+            return new EmployeeAuthenticationResult(null,
+                Problem(context, 401, "shop_session_revoked", "The Shop session is no longer active."));
 
-        var hash = SHA256.HashData(token);
-        var authorization = await db.EmployeeActionAuthorizations.SingleOrDefaultAsync(x => x.AuthorizationTokenHash == hash, cancellationToken);
-        if (authorization is null) return Failure(Problem(context, 401, "invalid_employee_action_authorization", "A valid employee action authorization is required."));
-        if (authorization.ConsumedAt is not null) return Failure(Problem(context, 409, "authorization_replayed", "This employee action authorization has already been consumed."));
-        if (authorization.ExpiresAt <= now) return Failure(Problem(context, 410, "authorization_expired", "This employee action authorization has expired."));
-        if (authorization.ShopSessionId != sessionId || authorization.ShopId != shopId || authorization.CompanyId != companyId ||
-            authorization.TargetShopId is not null || authorization.ActionCode != expectedAction ||
-            authorization.ResourceType != expectedResourceType || authorization.ResourceId != expectedResourceId)
-            return Failure(Problem(context, 403, "action_not_permitted", "The employee authorization does not permit this action or resource."));
+        var actor = await db.Employees
+            .FromSqlInterpolated($"SELECT * FROM employee WHERE company_id = {companyId} AND employee_code = {employeeCode} FOR UPDATE")
+            .SingleOrDefaultAsync(cancellationToken);
+        if (actor is null || !actor.IsActive ||
+            hasher.VerifyHashedPassword(actor, actor.PasswordHash, password) == PasswordVerificationResult.Failed)
+            return new EmployeeAuthenticationResult(null,
+                Problem(context, 401, "invalid_employee_credentials", "Employee credentials are invalid."));
 
-        var actor = await db.Employees.SingleOrDefaultAsync(x => x.Id == authorization.EmployeeId && x.CompanyId == companyId && x.IsActive, cancellationToken);
-        if (actor is null) return Failure(Problem(context, 403, "action_not_permitted", "The employee is no longer active."));
-        if (actor.MustChangePasswordAtNextUse && expectedAction != "EMPLOYEE_SELF_PASSWORD_CHANGE")
-            return Failure(Problem(context, 403, "employee_password_change_required", "Change the employee password before performing another protected action."));
+        if (!allowMandatoryPasswordChange && actor.MustChangePasswordAtNextUse)
+            return new EmployeeAuthenticationResult(null,
+                Problem(context, 403, "employee_password_change_required", "Change the employee password before performing another protected action."));
+
         if (managerOnly && !await db.EmployeeRoleAssignments.AnyAsync(x =>
-                x.CompanyId == companyId && x.EmployeeId == actor.Id && x.IsActive && x.RoleCode == "MANAGER", cancellationToken))
-            return Failure(Problem(context, 403, "action_not_permitted", "The employee is not permitted to perform this action."));
-        if (allowedRoles is not null && !await db.EmployeeRoleAssignments.AnyAsync(x =>
-                x.CompanyId == companyId && x.EmployeeId == actor.Id && x.IsActive && allowedRoles.Contains(x.RoleCode), cancellationToken))
-            return Failure(Problem(context, 403, "action_not_permitted", "The employee is not permitted to perform this action."));
-        if (expectedResourceType == "Employee" &&
-            !long.TryParse(expectedResourceId, NumberStyles.None, CultureInfo.InvariantCulture, out var targetEmployeeId))
-            return Failure(Problem(context, 400, "invalid_request", "The target Employee resource is invalid."));
-        if (expectedResourceType == "Employee" &&
-            !await db.Employees.AnyAsync(x => x.Id == long.Parse(expectedResourceId, CultureInfo.InvariantCulture) && x.CompanyId == companyId, cancellationToken))
-            return Failure(Problem(context, 404, "employee_not_found", "The Employee was not found."));
-        if (expectedAction == "EMPLOYEE_SELF_PASSWORD_CHANGE" && expectedResourceId != actor.Id.ToString(CultureInfo.InvariantCulture))
-            return Failure(Problem(context, 403, "action_not_permitted", "An employee may change only their own password."));
+                x.CompanyId == companyId && x.EmployeeId == actor.Id && x.IsActive &&
+                (x.RoleCode == "MANAGER" || x.RoleCode == "ADMIN"), cancellationToken))
+            return new EmployeeAuthenticationResult(null,
+                Problem(context, 403, "action_not_permitted", "The employee is not permitted to perform this action."));
 
-        var consumed = await db.EmployeeActionAuthorizations
-            .Where(x => x.Id == authorization.Id && x.ConsumedAt == null && x.ExpiresAt > now)
-            .ExecuteUpdateAsync(update => update.SetProperty(x => x.ConsumedAt, now), cancellationToken);
-        return consumed == 1
-            ? new AuthorizationResult(authorization, null)
-            : Failure(Problem(context, 409, "authorization_replayed", "This employee action authorization is no longer available."));
+        return new EmployeeAuthenticationResult(actor, null);
     }
 
     private static async Task<EmployeeRecord?> LockEmployeeAsync(PcHouseStoreDbContext db, long employeeId, long companyId, CancellationToken cancellationToken) =>
@@ -474,26 +444,10 @@ public static class EmployeeAdministrationEndpoints
             long.TryParse(principal.FindFirstValue("company_id"), out companyId);
     }
 
-    private static long GetCompanyId(ClaimsPrincipal principal) =>
-        long.TryParse(principal.FindFirstValue("company_id"), out var companyId) ? companyId : 0;
-
     private static bool IsSessionActive(ShopSessionRecord? session, long companyId, long shopId, DateTime now) =>
         session is not null && session.CompanyId == companyId && session.ShopId == shopId && session.RevokedAt is null &&
         (session.IdleExpiresAt is null || session.IdleExpiresAt > now) &&
         (session.AbsoluteExpiresAt is null || session.AbsoluteExpiresAt > now);
-
-    private static bool TryDecodeToken(string value, out byte[] token)
-    {
-        token = [];
-        if (value.Length != 43 || value.Any(character =>
-            !(character is >= 'A' and <= 'Z' or >= 'a' and <= 'z' or >= '0' and <= '9' or '-' or '_'))) return false;
-        try
-        {
-            token = Convert.FromBase64String(value.Replace('-', '+').Replace('_', '/') + "=");
-            return token.Length == 32;
-        }
-        catch (FormatException) { return false; }
-    }
 
     private static IResult PasswordProblem(HttpContext context) =>
         Problem(context, 400, "password_policy_failed", "The password must contain between 12 and 128 characters.");
@@ -505,16 +459,17 @@ public static class EmployeeAdministrationEndpoints
         extensions: new Dictionary<string, object?> { ["code"] = code, ["traceId"] = context.TraceIdentifier });
 
     private static AuthorizationResult Failure(IResult error) => new(null, error);
-    internal sealed record AuthorizationResult(EmployeeActionAuthorizationRecord? Authorization, IResult? Error);
+    internal sealed record EmployeeAuthenticationResult(EmployeeRecord? Employee, IResult? Error);
 }
 
 public sealed record EmployeeDirectoryQuery(string? Search);
 public sealed record EmployeeDirectoryResponse(IReadOnlyList<EmployeeDto> Items);
-public sealed record EmployeeCreateRequest(string EmployeeCode, string FirstName, string LastName, string Phone, string? Email, string InitialPassword, string[] Roles);
-public sealed record EmployeeProfileUpdateRequest(string FirstName, string LastName, string Phone, string? Email);
-public sealed record EmployeeStatusChangeRequest(bool IsActive);
-public sealed record EmployeeRoleChangeRequest(string[] Roles);
-public sealed record EmployeeCredentialResetRequest(string NewPassword);
-public sealed record EmployeeCredentialChangeRequest(string NewPassword);
+public sealed record EmployeeChallengeRequest(string EmployeeCode, string Password);
+public sealed record EmployeeCreateRequest(string EmployeeCode, string FirstName, string LastName, string Phone, string? Email, string InitialPassword, string[] Roles, EmployeeChallengeRequest EmployeeChallenge);
+public sealed record EmployeeProfileUpdateRequest(string FirstName, string LastName, string Phone, string? Email, EmployeeChallengeRequest EmployeeChallenge);
+public sealed record EmployeeStatusChangeRequest(bool IsActive, EmployeeChallengeRequest EmployeeChallenge);
+public sealed record EmployeeRoleChangeRequest(string[] Roles, EmployeeChallengeRequest EmployeeChallenge);
+public sealed record EmployeeCredentialResetRequest(string NewPassword, EmployeeChallengeRequest EmployeeChallenge);
+public sealed record EmployeeCredentialChangeRequest(string NewPassword, EmployeeChallengeRequest EmployeeChallenge);
 public sealed record EmployeeDto(string EmployeeId, string EmployeeCode, string? FirstName, string? LastName,
     string? Phone, string? Email, bool IsActive, IReadOnlyList<string> Roles, bool MustChangePasswordAtNextUse);
