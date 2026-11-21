@@ -143,15 +143,6 @@ if (operation == "ResetEmployeeCredential")
     target.MustChangePasswordAtNextUse = true;
     target.CredentialVersion++;
     target.UpdatedAt = resetAt;
-    db.EmployeeAdministrationEvents.Add(new EmployeeAdministrationEventRecord
-    {
-        CompanyId = companyId.Value,
-        ActorType = "DEPLOYMENT_OPERATOR",
-        ActorIdentifier = $"{Environment.UserDomainName}\\{Environment.UserName}@{Environment.MachineName}",
-        TargetEmployeeId = target.Id,
-        ActionCode = "EMPLOYEE_CREDENTIAL_RESET_BY_DEPLOYMENT_OPERATOR",
-        OccurredAt = resetAt
-    });
     await db.SaveChangesAsync();
     await transaction.CommitAsync();
     Console.WriteLine($"Credential reset for employee {target.EmployeeCode}. They must change it before any protected action.");
@@ -201,15 +192,6 @@ db.EmployeeRoleAssignments.Add(new EmployeeRoleAssignmentRecord
     RoleCode = "ADMIN",
     IsActive = true,
     AssignedAt = now
-});
-db.EmployeeAdministrationEvents.Add(new EmployeeAdministrationEventRecord
-{
-    CompanyId = companyIdValue,
-    ActorType = "DEPLOYMENT_OPERATOR",
-    ActorIdentifier = $"{Environment.UserDomainName}\\{Environment.UserName}@{Environment.MachineName}",
-    TargetEmployeeId = employee.Id,
-    ActionCode = "EMPLOYEE_BOOTSTRAP_ADMIN_CREATED",
-    OccurredAt = now
 });
 await db.SaveChangesAsync();
 await transaction.CommitAsync();
