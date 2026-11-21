@@ -289,7 +289,7 @@ export default function App() {
             </form>
           )}
           {shop && (activePage === "employee-password-change" || activePage === "employee-directory-search" || activePage === "create-employee" || activePage === "employee-directory") &&
-            <EmployeeAdministration page={activePage} companyId={shop.companyId} getShopAccessToken={getShopAccessToken} />}
+            <EmployeeAdministration page={activePage} getShopAccessToken={getShopAccessToken} />}
           {shop && (activePage === "customer-directory" || activePage === "catalog-items" || activePage === "product-categories" || activePage === "fault-catalogue") &&
             <CatalogueAdministration page={activePage} getShopAccessToken={getShopAccessToken} />}
           <div className="auth-actions">
