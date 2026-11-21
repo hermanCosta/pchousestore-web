@@ -87,6 +87,9 @@ public static class EmployeeAdministrationEndpoints
         if (result.Error is not null) return result.Error;
 
         var actor = result.Employee!;
+        if (request.Roles.Contains("ADMIN", StringComparer.Ordinal) &&
+            !await HasRoleAsync(db, actor.Id, actor.CompanyId, "ADMIN", cancellationToken))
+            return Problem(context, 403, "action_not_permitted", "Only an ADMIN may create another ADMIN account.");
         var exists = await db.Employees.AnyAsync(x => x.CompanyId == actor.CompanyId && x.EmployeeCode == employeeCode, cancellationToken);
         if (exists) return Problem(context, 409, "employee_code_conflict", "An employee with this code already exists in the Company.");
 
@@ -175,6 +178,9 @@ public static class EmployeeAdministrationEndpoints
         var actor = result.Employee!;
         var employee = await LockEmployeeAsync(db, employeeId, actor.CompanyId, cancellationToken);
         if (employee is null) return Problem(context, 404, "employee_not_found", "The Employee was not found.");
+        if (await HasRoleAsync(db, employeeId, actor.CompanyId, "ADMIN", cancellationToken) &&
+            !await HasRoleAsync(db, actor.Id, actor.CompanyId, "ADMIN", cancellationToken))
+            return Problem(context, 403, "action_not_permitted", "Only an ADMIN may edit an ADMIN account.");
 
         var person = employee.PersonId is long personId
             ? await db.People.SingleOrDefaultAsync(x => x.Id == personId && x.CompanyId == actor.CompanyId, cancellationToken)
@@ -212,6 +218,19 @@ public static class EmployeeAdministrationEndpoints
         var actor = result.Employee!;
         var employee = await LockEmployeeAsync(db, employeeId, actor.CompanyId, cancellationToken);
         if (employee is null) return Problem(context, 404, "employee_not_found", "The Employee was not found.");
+        var actorIsAdmin = await HasRoleAsync(db, actor.Id, actor.CompanyId, "ADMIN", cancellationToken);
+        var targetIsAdmin = await HasRoleAsync(db, employeeId, actor.CompanyId, "ADMIN", cancellationToken);
+        var targetIsManager = await HasRoleAsync(db, employeeId, actor.CompanyId, "MANAGER", cancellationToken);
+        if (targetIsAdmin && !actorIsAdmin)
+            return Problem(context, 403, "action_not_permitted", "Only an ADMIN may change another ADMIN account's status.");
+        if (!request.IsActive && targetIsAdmin &&
+            !await db.EmployeeRoleAssignments.AnyAsync(x => x.CompanyId == actor.CompanyId && x.EmployeeId != employeeId &&
+                x.RoleCode == "ADMIN" && x.IsActive && db.Employees.Any(e => e.Id == x.EmployeeId && e.CompanyId == actor.CompanyId && e.IsActive), cancellationToken))
+            return Problem(context, 409, "last_active_admin", "The Company must retain at least one active ADMIN.");
+        if (!request.IsActive && targetIsManager &&
+            !await db.EmployeeRoleAssignments.AnyAsync(x => x.CompanyId == actor.CompanyId && x.EmployeeId != employeeId &&
+                (x.RoleCode == "MANAGER" || x.RoleCode == "ADMIN") && x.IsActive && db.Employees.Any(e => e.Id == x.EmployeeId && e.CompanyId == actor.CompanyId && e.IsActive), cancellationToken))
+            return Problem(context, 409, "last_management_user", "The Company must retain at least one active MANAGER or ADMIN.");
         employee.IsActive = request.IsActive;
         employee.UpdatedAt = DateTime.UtcNow;
         db.EmployeeAdministrationEvents.Add(NewEvent(actor.CompanyId, actor.Id, employeeId,
@@ -237,6 +256,20 @@ public static class EmployeeAdministrationEndpoints
         var actor = result.Employee!;
         var employee = await LockEmployeeAsync(db, employeeId, actor.CompanyId, cancellationToken);
         if (employee is null) return Problem(context, 404, "employee_not_found", "The Employee was not found.");
+        var actorIsAdmin = await HasRoleAsync(db, actor.Id, actor.CompanyId, "ADMIN", cancellationToken);
+        var targetIsAdmin = await HasRoleAsync(db, employeeId, actor.CompanyId, "ADMIN", cancellationToken);
+        var targetIsManager = await HasRoleAsync(db, employeeId, actor.CompanyId, "MANAGER", cancellationToken);
+        var desiredRole = request.Roles[0];
+        if ((targetIsAdmin || desiredRole == "ADMIN") && !actorIsAdmin)
+            return Problem(context, 403, "action_not_permitted", "Only an ADMIN may grant ADMIN or change an ADMIN profile.");
+        if (targetIsAdmin && desiredRole != "ADMIN" &&
+            !await db.EmployeeRoleAssignments.AnyAsync(x => x.CompanyId == actor.CompanyId && x.EmployeeId != employeeId &&
+                x.RoleCode == "ADMIN" && x.IsActive && db.Employees.Any(e => e.Id == x.EmployeeId && e.CompanyId == actor.CompanyId && e.IsActive), cancellationToken))
+            return Problem(context, 409, "last_active_admin", "The Company must retain at least one active ADMIN.");
+        if (targetIsManager && desiredRole == "EMPLOYEE" &&
+            !await db.EmployeeRoleAssignments.AnyAsync(x => x.CompanyId == actor.CompanyId && x.EmployeeId != employeeId &&
+                (x.RoleCode == "MANAGER" || x.RoleCode == "ADMIN") && x.IsActive && db.Employees.Any(e => e.Id == x.EmployeeId && e.CompanyId == actor.CompanyId && e.IsActive), cancellationToken))
+            return Problem(context, 409, "last_management_user", "The Company must retain at least one active MANAGER or ADMIN.");
 
         var now = DateTime.UtcNow;
         var assignments = await db.EmployeeRoleAssignments.Where(x => x.CompanyId == actor.CompanyId && x.EmployeeId == employeeId)
@@ -288,6 +321,9 @@ public static class EmployeeAdministrationEndpoints
         var actor = result.Employee!;
         var employee = await LockEmployeeAsync(db, employeeId, actor.CompanyId, cancellationToken);
         if (employee is null) return Problem(context, 404, "employee_not_found", "The Employee was not found.");
+        if (await HasRoleAsync(db, employeeId, actor.CompanyId, "ADMIN", cancellationToken) &&
+            !await HasRoleAsync(db, actor.Id, actor.CompanyId, "ADMIN", cancellationToken))
+            return Problem(context, 403, "action_not_permitted", "Only an ADMIN may reset an ADMIN account's password.");
         var now = DateTime.UtcNow;
         employee.PasswordHash = hasher.HashPassword(employee, request.NewPassword);
         employee.MustChangePasswordAtNextUse = true;
@@ -387,6 +423,11 @@ public static class EmployeeAdministrationEndpoints
 
         return new EmployeeAuthenticationResult(actor, null);
     }
+
+    private static Task<bool> HasRoleAsync(
+        PcHouseStoreDbContext db, long employeeId, long companyId, string roleCode, CancellationToken cancellationToken) =>
+        db.EmployeeRoleAssignments.AnyAsync(x => x.CompanyId == companyId && x.EmployeeId == employeeId &&
+            x.RoleCode == roleCode && x.IsActive, cancellationToken);
 
     private static async Task<EmployeeRecord?> LockEmployeeAsync(PcHouseStoreDbContext db, long employeeId, long companyId, CancellationToken cancellationToken) =>
         await db.Employees.FromSqlInterpolated($"SELECT * FROM employee WHERE id = {employeeId} AND company_id = {companyId} FOR UPDATE")
