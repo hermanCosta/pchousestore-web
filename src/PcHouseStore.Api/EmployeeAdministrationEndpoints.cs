@@ -249,7 +249,7 @@ public static class EmployeeAdministrationEndpoints
         HttpContext context,
         CancellationToken cancellationToken)
     {
-        if (!ValidRoles(request.Roles)) return Problem(context, 400, "invalid_roles", "Assign one or both supported employee roles.");
+        if (!EmployeeCredentialPolicy.IsValidProfile(request.Roles)) return Problem(context, 400, "invalid_roles", "Select exactly one employee profile.");
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         var result = await AuthenticateManagerAsync(request.EmployeeChallenge, principal, db, hasher, context, cancellationToken);
         if (result.Error is not null) return result.Error;
@@ -343,7 +343,7 @@ public static class EmployeeAdministrationEndpoints
         HttpContext context,
         CancellationToken cancellationToken)
     {
-        if (!ValidPassword(request.NewPassword)) return PasswordProblem(context);
+        if (!EmployeeCredentialPolicy.IsValidPassword(request.NewPassword)) return PasswordProblem(context);
 
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         var result = await AuthenticateEmployeeAsync(request.EmployeeChallenge, principal, db, hasher,
