@@ -182,25 +182,6 @@ public sealed class ShopSessionRecord
     public long RowVersion { get; set; }
 }
 
-public sealed class EmployeeActionAuthorizationRecord
-{
-    public long Id { get; set; }
-    public byte[] AuthorizationTokenHash { get; set; } = [];
-    public long ShopSessionId { get; set; }
-    public long CompanyId { get; set; }
-    public long ShopId { get; set; }
-    public long? TargetShopId { get; set; }
-    public long EmployeeId { get; set; }
-    public string ActionCode { get; set; } = string.Empty;
-    public string? ResourceType { get; set; }
-    public string? ResourceId { get; set; }
-    public byte[]? OperationContextHash { get; set; }
-    public DateTime AuthenticatedAt { get; set; }
-    public DateTime ExpiresAt { get; set; }
-    public DateTime? ConsumedAt { get; set; }
-    public long RowVersion { get; set; }
-}
-
 public sealed class SystemServiceSigningKeyRecord
 {
     public long Id { get; set; }
