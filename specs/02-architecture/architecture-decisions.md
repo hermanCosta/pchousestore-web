@@ -637,3 +637,18 @@ DATA-05 must review provider-specific migrations, generated columns, byte-array 
 - Module boundaries are enforced by code ownership and application contracts, with a single database transaction available to straightforward cross-module use cases.
 - The architecture remains deployable as one application without introducing distributed systems infrastructure.
 - Phase 2 can create the approved solution and project structure using these rules. This ADR does not authorize implementing feature workflows before their approved specifications.
+
+
+## ADR-037 — ServiceOrder Pickup is independent of technical outcome and payment
+
+**Status:** DECIDED — product-owner confirmation 2026-11-20.
+
+**Decision:** Physical Pickup is allowed from both `FIXED` and `NOT_FIXED`. It changes lifecycle status to `PICKED`, records `picked_at`, and preserves technical outcome independently. An outstanding balance or held deposit does not block Pickup; Pickup never settles, waives or refunds financial amounts.
+
+**Stock consequences:**
+- For `FIXED`, Pickup has no stock or reservation side effects. Active reservations remain until the normal full-settlement transaction consumes them.
+- For `NOT_FIXED`, the employee records integer used quantities for each active reservation (default zero). Used quantity is bounded by the active reserved quantity; only reserved quantities may be consumed. Consume used quantities and release the unused remainder atomically. Zero usage releases all active reservations; no active reservations skips disposition. No unreserved parts may be added.
+- The state transition, timestamp, `SERVICE_ORDER_PICKED_UP` event, append-only Note and applicable `NOT_FIXED` stock effects commit in one transaction. Require fresh employee code/password authentication, explicit confirmation, an idempotency key and concurrency protection.
+- A committed replay returns the original result; a distinct concurrent Pickup for the same order receives a conflict if another command commits first. Pickup has no direct undo/cancel. Corrections are separate auditable operations and do not automatically reactivate reservations.
+
+**Notes:** General text is `Service order picked up by {Employee}.`. For `NOT_FIXED` with used parts append `Parts used: {details}. Parts released: {details}.`; for active reservations with zero usage append `All reserved parts released.`; when there are no active reservations, use only the general Note. Timestamp remains structured metadata.
