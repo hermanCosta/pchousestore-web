@@ -2,7 +2,7 @@
 
 # Authentication and Signing-Key Persistence — DATA-05 Slice
 
-**Status:** PARTIALLY SUPERSEDED — Shop/OIDC persistence remains applicable; employee one-use authorization design below is retired by the 2026-11-20 product-owner decision. The initial development migration predates that decision and requires a reviewed reconciliation migration before implementation approval.
+**Status:** PARTIALLY SUPERSEDED — Shop/OIDC persistence remains applicable; employee one-use authorization design is retired by the 2026-11-20 product-owner decision. Reconciliation migration `20261121153000_RemoveEmployeeActionAuthorization` has been added to the branch but has not yet been applied to any database. Apply it through the normal EF Core migration workflow after review.
 **Scope:** DATA-05 authentication tables only. This is a design artifact; do not apply it to a live database before review and migration generation.
 
 The authentication foundation includes the approved Company, Shop, Person and Employee identity/profile columns plus credential/session and OpenIddict records. Migration `20261112005610_AuthenticationFoundationInitial` is applied only to the isolated local development database; this is not production approval. Company legal registration fields and Employee status vocabulary remain open and are not guessed here.
