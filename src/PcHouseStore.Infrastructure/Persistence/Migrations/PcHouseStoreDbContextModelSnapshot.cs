@@ -521,63 +521,6 @@ namespace PcHouseStore.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("PcHouseStore.Infrastructure.Persistence.Entities.EmployeeAdministrationEventRecord", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<string>("ActionCode")
-                        .IsRequired()
-                        .HasMaxLength(80)
-                        .HasColumnType("character varying(80)")
-                        .HasColumnName("action_code");
-
-                    b.Property<long?>("ActorEmployeeId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("actor_employee_id");
-
-                    b.Property<string>("ActorIdentifier")
-                        .HasMaxLength(240)
-                        .HasColumnType("character varying(240)")
-                        .HasColumnName("actor_identifier");
-
-                    b.Property<string>("ActorType")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
-                        .HasColumnName("actor_type");
-
-                    b.Property<long>("CompanyId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("company_id");
-
-                    b.Property<DateTime>("OccurredAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("occurred_at");
-
-                    b.Property<long?>("TargetEmployeeId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("target_employee_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ActorEmployeeId", "CompanyId");
-
-                    b.HasIndex("CompanyId", "OccurredAt")
-                        .HasDatabaseName("ix_employee_administration_event_company_time");
-
-                    b.HasIndex("TargetEmployeeId", "CompanyId");
-
-                    b.HasIndex("TargetEmployeeId", "OccurredAt")
-                        .HasDatabaseName("ix_employee_administration_event_target_time");
-
-                    b.ToTable("employee_administration_event", (string)null);
-                });
-
             modelBuilder.Entity("PcHouseStore.Infrastructure.Persistence.Entities.EmployeeRecord", b =>
                 {
                     b.Property<long>("Id")
@@ -1383,27 +1326,6 @@ namespace PcHouseStore.Infrastructure.Persistence.Migrations
                         .HasPrincipalKey("Id", "CompanyId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-                });
-
-            modelBuilder.Entity("PcHouseStore.Infrastructure.Persistence.Entities.EmployeeAdministrationEventRecord", b =>
-                {
-                    b.HasOne("PcHouseStore.Infrastructure.Persistence.Entities.CompanyRecord", null)
-                        .WithMany()
-                        .HasForeignKey("CompanyId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("PcHouseStore.Infrastructure.Persistence.Entities.EmployeeRecord", null)
-                        .WithMany()
-                        .HasForeignKey("ActorEmployeeId", "CompanyId")
-                        .HasPrincipalKey("Id", "CompanyId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("PcHouseStore.Infrastructure.Persistence.Entities.EmployeeRecord", null)
-                        .WithMany()
-                        .HasForeignKey("TargetEmployeeId", "CompanyId")
-                        .HasPrincipalKey("Id", "CompanyId")
-                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("PcHouseStore.Infrastructure.Persistence.Entities.EmployeeRecord", b =>
