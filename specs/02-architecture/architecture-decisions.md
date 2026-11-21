@@ -241,7 +241,7 @@ The Central Bank of Ireland confirms that cash rounding is voluntary, applies on
 
 - Multiple partial refunds may be issued against one original payment until its refundable balance reaches zero.
 - A refund amount cannot exceed the unrefunded settled amount of its original transaction; the check must be concurrency-safe.
-- Refund tender allocations record the channel used to return money. Default policy should prefer the original tender, but an authorized alternative channel may be allowed by Shop policy and must be audited.
+- Refund tender allocations return funds through the original tender only. Alternative tender is disabled in v1 and cannot be enabled by Shop policy.
 - An optional `PaymentRefundLine` links refunded amounts/quantities to the relevant SaleItem or ServiceOrderItem. An order-level refund without a line allocation is also possible when its reason is documented.
 - Financial refunds do not automatically restock products. Physical stock return continues through selected `StockReturnLine` records only.
 - Refund permission is governed by ADR-038: payment and deposit refunds require fresh `MANAGER` or `ADMIN` credentials. Refunds default to the original tender. Alternative tender and second-approver flows are disabled; the approval rule is not configurable by Shop or amount.
@@ -265,7 +265,7 @@ The Central Bank of Ireland confirms that cash rounding is voluntary, applies on
 
 ## Non-decisions — must not be inferred
 
-The following remain open: customer/device visibility; refurbished-unit acquisition/source fields; commercial-guarantee coverage/exclusions; enabled payment methods/provider settlement/fees; refund thresholds/alternative-tender policy; deposit expiry/forfeiture terms; VAT registration/status/rates/pricing/tax posting pending Irish tax review; instalment late-payment policy and any future CREDIT_SALE handover (disabled pending legal review); complete Sale/ServiceOrder transition matrix. Reservation expiry and multiple stock locations are intentionally out of initial scope; one stock pool per Shop and explicit release/consumption are the baseline. Condition grades A/B/C, Company-unique asset codes and normalized manufacturer+serial uniqueness, complaint workflow, approved return disposition, role matrix, image limits and daily cash-close formula are specified in their linked documents.
+The following remain open: customer/device visibility; refurbished-unit acquisition/source fields; commercial-guarantee coverage/exclusions; enabled payment methods/provider settlement/fees; refund thresholds/alternative-tender policy; deposit expiry/forfeiture terms; VAT registration/status/rates/pricing/tax posting pending Irish tax review; instalment late-payment policy and any future CREDIT_SALE handover (disabled pending legal review); complete Sale/ServiceOrder transition matrix. Reservation expiry and multiple stock locations are intentionally out of initial scope; one stock pool per Shop and explicit release/consumption are the baseline. Condition grades A/B/C, Company-unique asset codes and normalized manufacturer+serial uniqueness, complaint workflow, approved return disposition, feature-specific employee permissions, image limits and daily cash-close formula are specified in their linked documents.
 
 ## ADR-013 — Supplier procurement and parts-waiting service workflow
 
