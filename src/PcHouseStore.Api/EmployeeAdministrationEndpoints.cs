@@ -87,7 +87,6 @@ public static class EmployeeAdministrationEndpoints
         if (result.Error is not null) return result.Error;
 
         var actor = result.Employee!;
-        var companyId = actor.CompanyId;
         var exists = await db.Employees.AnyAsync(x => x.CompanyId == actor.CompanyId && x.EmployeeCode == employeeCode, cancellationToken);
         if (exists) return Problem(context, 409, "employee_code_conflict", "An employee with this code already exists in the Company.");
 
@@ -145,7 +144,7 @@ public static class EmployeeAdministrationEndpoints
         CancellationToken cancellationToken)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        var result = await AuthenticateManagerAsync(request.EmployeeChallenge, principal, db, hasher, context, cancellationToken);
+        var result = await AuthenticateManagerAsync(request, principal, db, hasher, context, cancellationToken);
         if (result.Error is not null) return result.Error;
         var actor = result.Employee!;
         var employee = await db.Employees.AsNoTracking().SingleOrDefaultAsync(x =>
@@ -430,7 +429,7 @@ public static class EmployeeAdministrationEndpoints
     }
 
     private static string? NormalizeEmail(string? email) => string.IsNullOrWhiteSpace(email) ? null : email.Trim().ToLowerInvariant();
-    private static bool ValidPassword(string? password) => !string.IsNullOrEmpty(password) && password.Length is >= 12 and <= 128;
+    private static bool ValidPassword(string? password) => !string.IsNullOrEmpty(password) && password.Length is >= 6 and <= 128;
     private static bool ValidRoles(IReadOnlyCollection<string>? roles) => roles is { Count: > 0 and <= 3 } &&
         roles.All(x => x is "EMPLOYEE" or "MANAGER" or "ADMIN") && roles.Distinct(StringComparer.Ordinal).Count() == roles.Count;
     private static string NormalizeRole(string role) => role.Trim().ToUpperInvariant();
