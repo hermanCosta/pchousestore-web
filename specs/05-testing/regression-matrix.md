@@ -34,6 +34,8 @@
 | Service order | Pickup from FIXED after full settlement | Lifecycle becomes PICKED; technical outcome remains FIXED; no second stock movement or reservation mutation |
 | Service order | Pickup from FIXED with outstanding balance | Pickup succeeds; financial balance and active reservations remain unchanged |
 | Service order | Pickup from NOT_FIXED with used and unused reserved parts | Used quantity posts SERVICE_ORDER_OUT; unused reservation is released without movement; all effects are atomic |
+| Service order | Pickup from NOT_FIXED with zero parts used | All active reservations are released; no stock movement is posted |
+| Service order | Pickup from NOT_FIXED with no active reservations | Pickup succeeds without a stock-disposition step or stock writes |
 | Inventory | Reserve a whole product quantity | Reserved increases, on-hand stays unchanged, available decreases |
 | Inventory | Try fractional product quantity | Rejected by API/domain validation |
 | Inventory | Cancel/release reservation | Reserved decreases, on-hand unchanged; no inbound movement |
@@ -63,7 +65,7 @@
 
 - **OAuth/OIDC Shop API security:** React completes Authorization Code + PKCE S256 using a registered redirect URI; wrong verifier, replayed code, wrong issuer/audience/signature, expired/not-yet-valid token or missing `shop.api` scope is rejected.
 - **Shop-only token identity:** access/ID tokens contain the Shop principal and active ShopSession context but no EmployeeId, employee code or employee role; a revoked ShopSession is rejected before token expiry.
-- **Employee challenge isolation:** a valid Shop bearer token alone cannot commit a protected business operation; the operation requires a fresh employee code/password challenge and a one-time authorization. An employee challenge cannot be reused for another action or operation context.
+- **Employee challenge isolation:** a valid Shop bearer token alone cannot commit a protected business operation. Every protected command requires a fresh employee code/password challenge validated directly against `EmployeeCredential`; no one-use authorization token/entity/endpoint is issued, persisted, consumed or reused.
 - **OAuth prohibited flows:** Implicit and Resource Owner Password Credentials grants are unavailable; no client secret or raw token is present in the React bundle, storage, logs or analytics.
 - **Refresh-token rotation:** if refresh tokens are enabled, each successful refresh invalidates the prior token; reuse of an invalidated token revokes the token family.
 
@@ -73,9 +75,10 @@
 - FIXED Pickup with zero, partial or outstanding balance succeeds and does not alter stock reservations, on-hand quantity or inventory movements.
 - FIXED Pickup rejects any non-empty stock-disposition payload.
 - NOT_FIXED Pickup accepts a complete disposition for every active reservation line; zero use releases all; partial use consumes only the used amount and releases the remainder; full use consumes the full active reservation.
-- NOT_FIXED Pickup with no active reservations succeeds without stock writes.
+- NOT_FIXED Pickup with every active reservation used at zero releases all reservations and creates no stock movement.
+- NOT_FIXED Pickup with no active reservations succeeds without a stock-disposition step or stock writes.
 - Reject unreserved Product quantities and reservation lines that are foreign, inactive, released, duplicated, omitted or outside the ServiceOrder/Shop.
-- Require a fresh employee code/password challenge; reject invalid/inactive/wrong-Company employees and unauthorized profiles without creating business Notes/events.
+- Require a fresh employee code/password challenge; reject invalid/inactive/wrong-Company employees and unauthorized profiles without creating business Notes/events. Confirm no employee authorization token/entity/endpoint is created or consumed.
 - Require an Idempotency-Key. Same key and same normalized payload returns the original committed response; same key with changed payload or resource scope returns conflict.
 - A rolled-back Pickup leaves no idempotency record or business effects and can be retried.
 - Distinct concurrent Pickup keys on one ServiceOrder produce one success and one conflict; no duplicate movements, reservation disposition, event or Note.
@@ -102,7 +105,7 @@
 - **Refurbished inventory:** categories are configurable, attribute definitions drive technical fields, and each physical refurbished unit is uniquely serialized/tracked; transfer/sale/return use the exact unit identity.
 - **Transaction payments:** a mixed cash/card event is persisted as one PaymentTransaction with two allocations; transaction gross is counted once; sum of applied allocations equals transaction amount; change is not revenue.
 - **Refunds:** refund transaction stores positive magnitude, references original transaction, reduces net by its kind and cannot exceed the remaining refundable amount under concurrent requests.
-- **Shop authentication / employee attribution:** a Shop login creates a ShopSession with no EmployeeId; the same Company-wide employee password works in all Shops; MANAGER/TECHNICIAN roles are global; two employees can complete separate operations within the same ShopSession; each operation consumes a new authorization matching active Shop, Company, role and action; replay, expiry and wrong-action use are rejected.
+- **Shop authentication / employee attribution:** a Shop login creates a ShopSession with no EmployeeId; the same Company-wide employee credentials work in all Shops; profiles are `EMPLOYEE`, `MANAGER` and `ADMIN`; two employees can complete separate operations within the same ShopSession; each protected operation validates a fresh employee code/password directly against the active employee, Company membership and action permission. No employee authorization token is issued or replayed.
 - **Shop/date closing:** enforce `UNIQUE(ShopId, BusinessDate)`; the same date can be closed once in each Shop. Test concurrent attempts to close the same Shop/date (exactly one succeeds), successful closes for two different Shops on the same date, and exclusion of transactions/cash movements from other Shops.
 
 
@@ -125,7 +128,7 @@
 - Supplier purchase and tracking URLs are treated as external references only; no credentials or payment card data can be stored in link fields.
 - A single ServiceOrder can create multiple procurement request rounds at different times; all rounds remain searchable by ServiceOrder ID and independent histories are preserved.
 - Request creation from the ServiceOrder screen and the purchase queue produces the same Shop-scoped model; cross-Shop ServiceOrder IDs are rejected.
-- Request edits, line updates, buyer assignment, priority changes and image actions append an immutable `ServiceProcurementRequestEvent` attributed to the employee authorization used.
+- Request edits, line updates, buyer assignment, priority changes and image actions append an immutable `ServiceProcurementRequestEvent` attributed to the employee resolved by the fresh code/password challenge.
 - Line status transitions are calculated from purchase allocations, accepted receipts and cancellation; header status aggregates active lines and cannot be manually forced to `FULFILLED`.
 - Soft-deleting a reference image preserves the image metadata, uploader and deletion event; the file is no longer exposed in the normal active gallery but remains in authorized audit history.
 - Each request can include multiple product requirement lines and multiple reference images per line; thumbnails/full-size views are authorized and cannot be accessed from another Shop.
@@ -151,20 +154,20 @@
 ## New decision-specific tests — v11
 
 - One Company-wide Employee record/password can authorize actions in every Shop; no per-Shop employee duplicate is created.
-- `MANAGER` and `TECHNICIAN` roles are company-wide; API authorization is evaluated per action and the role matrix rejects disallowed actions.
+- `EMPLOYEE`, `MANAGER` and `ADMIN` are Company-wide single profiles; API authorization is evaluated per action and the approved feature permission matrix rejects disallowed actions.
 - Quantity-tracked `quantity_on_hand` accepts negative signed values; `quantity_reserved` cannot be negative; available quantity may be negative; negative deficits are visible in stock/purchasing reports.
 - Reservation creation only reserves currently positive available units; a subsequent fully settled sale/service may drive the same product balance below zero without deleting existing reservation history.
 - A Sale or ServiceOrder with partial payments posts no stock movement; when the balance reaches zero, full product quantities are posted once in the same settlement transaction. For a ServiceOrder the deduction is not blocked on later `PICKED`/collection.
 - Serialized refurbished units cannot be sold/transferred as phantom negative stock.
 - Each sold refurbished unit creates a 12-calendar-month commercial warranty starting at recorded customer handover; the customer-facing terms explicitly state that statutory rights are unaffected.
-- Procurement purchase creation, supplier linking and receipt do not require a separate manager approval record; each action still requires employee password authorization and immutable actor audit.
+- Procurement purchase creation, supplier linking and receipt do not require a separate manager approval record; each protected action still requires a fresh employee code/password challenge and immutable actor audit.
 - VAT toggle is Company-scoped. `NOT_REVIEWED` tax setup blocks production tax-document finalization; enabling VAT requires active effective-dated tax codes/rates; flag/rate changes do not alter historical tax snapshots.
 - Procurement request and refurbished-unit image uploads support multiple files and enforce private, Shop-authorized access, content validation, configurable size/count limits and audit events.
 
 ## Product-owner confirmations — v11
 
 - An employee can enter the same password and authorize an allowed operation in any Shop of the Company; the persistent ShopSession contains no employee identity.
-- `MANAGER` and `TECHNICIAN` are Company-wide roles. A user with an allowed role can act in every Shop; an action outside the role policy is rejected. Detailed per-action permissions remain a separate approval item.
+- `EMPLOYEE`, `MANAGER` and `ADMIN` are Company-wide single profiles. A user with an allowed profile can act in every Shop; an action outside the approved feature permission policy is rejected. `ADMIN` inherits the full `MANAGER` permission set.
 - Payment completion is the inventory posting trigger: partial receipts do not deduct quantity-tracked stock; the command that reduces the Sale/ServiceOrder balance to zero posts the product deduction once. The later service `PICKED` action does not post a second deduction.
 - A quantity-tracked Product balance may become negative after a completed sale/service settlement; it must be persisted and appear as a visible deficit. Reservation quantity remains non-negative; serialized refurbished units cannot be negative.
 - `vat_enabled` can be toggled at Company level. The default is false and tax setup remains `NOT_REVIEWED` until configured and reviewed. No production tax document can be finalized with `NOT_REVIEWED`; changing the flag does not rewrite historical tax snapshots.
@@ -177,7 +180,7 @@
 
 - Employee authorization resolves a Company-wide employee using the configured employee identifier plus password; password-only lookup must not attribute an action to an ambiguous employee.
 - The same active employee identity/password and Company-wide role assignment works across all Shops; `ShopSession` stores no employee identity.
-- MANAGER/TECHNICIAN role names are recognized globally; until the action-permission matrix is approved, do not ship guessed permissions.
+- `EMPLOYEE`/`MANAGER`/`ADMIN` profile names are recognized globally; enforce the approved feature-specific action permissions and do not infer permissions from UI visibility.
 - Supplier purchase creation, linking, update and receipt do not trigger a second-person approval workflow; the acting employee must still be authorized and audited.
 - Multiple images per procurement request line and refurbished unit are supported; file limits, storage retention and allowed formats are configuration/security tests.
 - Each sold refurbished unit snapshots a 12-calendar-month commercial guarantee from actual handover; customer wording and receipts must not imply that the guarantee replaces Irish statutory rights.
