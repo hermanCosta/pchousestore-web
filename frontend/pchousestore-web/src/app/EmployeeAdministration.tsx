@@ -186,7 +186,7 @@ export default function EmployeeAdministration({ companyId, page, getShopAccessT
   function toggleNewRole(role: string) {
     setNewEmployee(current => ({
       ...current,
-      roles: current.roles.includes(role) ? current.roles.filter(value => value !== role) : [...current.roles, role],
+      roles: [role],
     }));
   }
 
@@ -285,7 +285,7 @@ function EmployeeCard({
   const [resetPassword, setResetPassword] = useState("");
 
   function toggleRole(role: string) {
-    setRoles(current => current.includes(role) ? current.filter(value => value !== role) : [...current, role]);
+    setRoles([role]);
   }
 
   return (
@@ -314,7 +314,7 @@ function EmployeeCard({
         </form>
         <form className="auth-form" onSubmit={event => void onResetCredential(event, employee, resetPassword).finally(() => setResetPassword(""))}>
           <h4>Reset employee password</h4>
-          <label className="auth-field">New temporary password<input type="password" required minLength={12} maxLength={128} autoComplete="new-password" value={resetPassword} onChange={event => setResetPassword(event.target.value)} /></label>
+          <label className="auth-field">New temporary password<input type="password" required minLength={6} maxLength={128} autoComplete="new-password" value={resetPassword} onChange={event => setResetPassword(event.target.value)} /></label>
           <button disabled={busy}>Reset password</button>
         </form>
         <div className="employee-status-action">
@@ -330,7 +330,7 @@ function RoleChecks({ roles, onToggle }: { roles: string[]; onToggle: (role: str
   return (
     <fieldset className="employee-roles">
       <legend>Roles</legend>
-      {["EMPLOYEE", "MANAGER", "ADMIN"].map(role => <label key={role}><input type="checkbox" checked={roles.includes(role)} onChange={() => onToggle(role)} />{role}</label>)}
+      {["EMPLOYEE", "MANAGER", "ADMIN"].map(role => <label key={role}><input type="radio" name="employee-profile" checked={roles[0] === role} onChange={() => onToggle(role)} />{role}</label>)}
     </fieldset>
   );
 }
