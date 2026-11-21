@@ -340,3 +340,16 @@ The document module uses versioned application templates and immutable render sn
 
 See [Reports, Receipts and Document Printing](reports-and-document-printing.md) and [focused document ERD](er-diagram-documents.svg).
 
+
+
+## ServiceOrder Pickup persistence requirements (2026-11-20)
+
+The Pickup command must persist the following within one PostgreSQL transaction:
+- Update `service_order.status` to `PICKED` and set non-null `picked_at`; retain the independent technical outcome (`FIXED` or `NOT_FIXED`).
+- Insert one immutable `ServiceOrderEvent` with event type `SERVICE_ORDER_PICKED_UP`, server-resolved employee attribution, timestamp, and outcome-specific payload.
+- Insert the append-only human-readable ServiceOrder Note in the same transaction.
+- For `FIXED`, do not write stock movements or reservation changes. The normal full-settlement transaction remains responsible for consuming active reservations.
+- For `NOT_FIXED`, persist each active reservation's used/released disposition; create `SERVICE_ORDER_OUT` movements only for used quantities, and release unused quantities without an inventory movement. Used quantity must be bounded by active reserved quantity. No unreserved line may be inserted by Pickup.
+- Persist/claim a unique `IdempotencyKey` for the Pickup command, scoped to the operation and Shop/order. A committed replay returns the stored original result. The idempotency record and business effects commit or roll back together.
+- Lock or concurrency-check the ServiceOrder and its active reservations so concurrent distinct Pickup commands cannot both commit. The losing command returns a conflict and the client refreshes.
+- Do not model a direct undo/cancel transition. A future correction must be a separate auditable operation and must not automatically reactivate reservations.
