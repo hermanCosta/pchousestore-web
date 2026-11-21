@@ -106,8 +106,12 @@ builder.Services.AddRateLimiter(options =>
     options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
     {
         var path = context.Request.Path.Value ?? string.Empty;
+        var isEmployeeChallengeEndpoint =
+            path.StartsWith("/api/v1/employees", StringComparison.OrdinalIgnoreCase) ||
+            path.EndsWith("/access-credential", StringComparison.OrdinalIgnoreCase);
         if (!path.StartsWith("/connect/", StringComparison.OrdinalIgnoreCase) &&
-            !path.StartsWith("/account/login", StringComparison.OrdinalIgnoreCase))
+            !path.StartsWith("/account/login", StringComparison.OrdinalIgnoreCase) &&
+            !isEmployeeChallengeEndpoint)
             return RateLimitPartition.GetNoLimiter("non-authentication");
 
         var key = $"{context.Connection.RemoteIpAddress?.ToString() ?? "unknown"}:{path}";
