@@ -79,6 +79,8 @@
 - NOT_FIXED Pickup with no active reservations succeeds without a stock-disposition step or stock writes.
 - Reject unreserved Product quantities and reservation lines that are foreign, inactive, released, duplicated, omitted or outside the ServiceOrder/Shop.
 - Require a fresh employee code/password challenge; reject invalid/inactive/wrong-Company employees and unauthorized profiles without creating business Notes/events. Confirm no employee authorization token/entity/endpoint is created or consumed.
+- Verify `EMPLOYEE`, `MANAGER` and `ADMIN` can perform Pickup from both `FIXED` and `NOT_FIXED`; reject any profile not granted Pickup by the approved employee access matrix.
+- Verify the generated Note text for `FIXED`, `NOT_FIXED` with used parts, `NOT_FIXED` with zero use, and `NOT_FIXED` without active reservations; timestamp remains structured metadata.
 - Require an Idempotency-Key. Same key and same normalized payload returns the original committed response; same key with changed payload or resource scope returns conflict.
 - A rolled-back Pickup leaves no idempotency record or business effects and can be retried.
 - Distinct concurrent Pickup keys on one ServiceOrder produce one success and one conflict; no duplicate movements, reservation disposition, event or Note.
@@ -99,7 +101,7 @@
 - **One Company / multiple Shops:** all Shops belong to the provisioned Company; each persistent session has one Shop context; operational lookups, searches and mutations remain within that Shop; tampered Shop IDs are rejected. Shared master data remains company-wide.
 - **Product-only stock:** Product has a separate integer balance per Shop; Service has no stock balance and cannot be passed to inventory movement operations. No fractional product quantity is accepted.
 - **Reservations:** reserve/release affects availability but not on-hand; release creates no inbound movement; consumption updates reservation counter, balance and movement atomically.
-- **Sale/service stock timing:** a completed payment means the balance due reaches zero through settled payments (and explicitly applied deposits for service orders). Partial payment does not consume stock. A ServiceOrder in FIXED preserves reservations until full settlement consumes them; later PICKED records handover only. Test idempotent retries and negative stock balances.
+- **Sale/service stock timing:** partial payment never consumes stock. Sale settlement and `FIXED` ServiceOrder settlement consume the applicable stock exactly once when the balance reaches zero; a later `PICKED` event creates no second movement. `NOT_FIXED` ServiceOrder settlement never consumes or releases reservations: Pickup consumes only explicitly recorded used quantities from active reservations and releases the unused remainder, even if a balance remains due. Test idempotent retries and negative quantity-tracked balances only where the relevant settlement rule permits them.
 - **Selected stock return:** REFUNDED/CANCELLED exposes a selected-return workflow; only selected consumed product quantities are restocked, and a refund transaction alone does not move stock.
 - **Inter-Shop transfer:** dispatch removes source stock, received quantities add destination stock, in-transit stock is unavailable, only same-Company distinct Shops are allowed.
 - **Refurbished inventory:** categories are configurable, attribute definitions drive technical fields, and each physical refurbished unit is uniquely serialized/tracked; transfer/sale/return use the exact unit identity.
@@ -157,7 +159,7 @@
 - `EMPLOYEE`, `MANAGER` and `ADMIN` are Company-wide single profiles; API authorization is evaluated per action and the approved feature permission matrix rejects disallowed actions.
 - Quantity-tracked `quantity_on_hand` accepts negative signed values; `quantity_reserved` cannot be negative; available quantity may be negative; negative deficits are visible in stock/purchasing reports.
 - Reservation creation only reserves currently positive available units; a subsequent fully settled sale/service may drive the same product balance below zero without deleting existing reservation history.
-- A Sale or ServiceOrder with partial payments posts no stock movement; when the balance reaches zero, full product quantities are posted once in the same settlement transaction. For a ServiceOrder the deduction is not blocked on later `PICKED`/collection.
+- A Sale or `FIXED` ServiceOrder with partial payments posts no stock movement; when the balance reaches zero, applicable product quantities are posted once in the settlement transaction. For `NOT_FIXED` ServiceOrders, payment settlement never consumes or releases reservations; Pickup consumes only explicitly used reserved quantities and releases unused reservations, independently of balance due.
 - Serialized refurbished units cannot be sold/transferred as phantom negative stock.
 - Each sold refurbished unit creates a 12-calendar-month commercial warranty starting at recorded customer handover; the customer-facing terms explicitly state that statutory rights are unaffected.
 - Procurement purchase creation, supplier linking and receipt do not require a separate manager approval record; each protected action still requires a fresh employee code/password challenge and immutable actor audit.
@@ -168,7 +170,7 @@
 
 - An employee can enter the same password and authorize an allowed operation in any Shop of the Company; the persistent ShopSession contains no employee identity.
 - `EMPLOYEE`, `MANAGER` and `ADMIN` are Company-wide single profiles. A user with an allowed profile can act in every Shop; an action outside the approved feature permission policy is rejected. `ADMIN` inherits the full `MANAGER` permission set.
-- Payment completion is the inventory posting trigger: partial receipts do not deduct quantity-tracked stock; the command that reduces the Sale/ServiceOrder balance to zero posts the product deduction once. The later service `PICKED` action does not post a second deduction.
+- Payment completion is the inventory posting trigger for Sales and `FIXED` ServiceOrders: partial receipts do not deduct quantity-tracked stock; the command that reduces the balance to zero posts applicable deductions once. `NOT_FIXED` ServiceOrders are the exception: payment settlement does not consume/release reservations; physical Pickup posts only used reserved quantities and releases the rest.
 - A quantity-tracked Product balance may become negative after a completed sale/service settlement; it must be persisted and appear as a visible deficit. Reservation quantity remains non-negative; serialized refurbished units cannot be negative.
 - `vat_enabled` can be toggled at Company level. The default is false and tax setup remains `NOT_REVIEWED` until configured and reviewed. No production tax document can be finalized with `NOT_REVIEWED`; changing the flag does not rewrite historical tax snapshots.
 - Every sold refurbished physical unit receives a 12-month commercial guarantee starting on actual handover. Customer terms do not present this guarantee as replacing or limiting Irish statutory rights.
