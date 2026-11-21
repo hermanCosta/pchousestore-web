@@ -22,7 +22,9 @@
 
 ## ADR-002 — Shop session, employee authorization per action
 
-**Decision:** The persistent application session represents the authenticated shop, not an employee. Employees authenticate individually when they execute a business operation that requires attribution.
+**Status:** PARTIALLY SUPERSEDED (2026-11-20). The Shop-only session identity boundary remains valid. The employee authorization mechanism and action flow below are historical; current direct credential validation is defined by [Employee Management](../04-features/employee-management.md) and [API Authentication and Token Security](api-authentication-and-token-security.md). Do not implement `EmployeeActionAuthorization`.
+
+**Decision (historical):** The persistent application session represents the authenticated shop, not an employee. Employees authenticate individually when they execute a business operation that requires attribution.
 
 ### Session and operation flow
 
@@ -59,12 +61,14 @@
 
 ## ADR-004 — Payment transaction with allocations
 
+**Status:** FINANCIAL STRUCTURE RETAINED; employee authorization and role wording superseded by Employee Management and ADR-038 (2026-11-21).
+
 **Decision:** `transaction` — one financial transaction represents one payment/deposit/refund event and can contain multiple tender allocations. Financial details and Ireland localization are in [Financial Model](financial-model.md).
 
 ### Consequences
 
-- `PaymentTransaction` stores the financial amount once and belongs to exactly one Sale or ServiceOrder.
-- Each `PaymentTransaction` is attributed to the active `Shop` and the employee whose one-time authorization was consumed.
+- `PaymentTransaction` stores the financial amount once and references exactly one financial target: Sale, ServiceOrder or ServiceDeposit, according to the transaction kind and Finance model.
+- Each `PaymentTransaction` is attributed to the active `Shop`; when the operation requires employee authorization, the backend resolves the acting employee after fresh direct credential validation.
 - `PaymentAllocation` stores tender components through a configurable `PaymentMethod` catalogue. Initial enabled methods for the Irish deployment are CASH and CARD only. Card is recorded after approval on an external terminal; processor API integration is deferred.
 - A combined €100 payment (€60 cash + €40 card) is one transaction with two allocations, not two duplicated €100 transactions.
 - Partial payments are separate transactions against the same Sale or ServiceOrder.
@@ -81,10 +85,12 @@
 
 - Enabled tenders: CASH and CARD only.
 - Card processing occurs on an external terminal. The employee records approval/reference; no processor integration is selected or implemented.
-- Refunds are Manager-only, partial or total, and return to original tender by default. No amount threshold or second Manager approval is used.
+- Refund permission is governed by ADR-038: `MANAGER` or `ADMIN` may perform payment/deposit refunds; deposit forfeiture remains `MANAGER`-only. Partial/total refund and original-tender rules remain as specified in the Financial Model.
 - See [Financial Model](financial-model.md) for deposit expiry/cancellation/forfeiture policy and card-tender handling.
 
 ## ADR-005 — Daily closing per Shop and business date
+
+**Status:** CLOSING STRUCTURE RETAINED; employee authorization reference superseded (2026-11-21). See [Cash Closing Policy](cash-closing-policy.md) and [Employee Management](../04-features/employee-management.md).
 
 **Decision:** `shop_date` — each Shop has at most one `DailyClosing` for each business date, unique on `(ShopId, BusinessDate)`.
 
@@ -93,7 +99,7 @@
 - A Shop closes and reconciles only its own sales, payment allocations, refunds and cash movements for that Shop's business date.
 - A different Shop may close the same business date independently. A Shop cannot create a second close for the same business date.
 - `DailyClosing` references `shop_id`; it does not need a direct `company_id`, because the owning Company is reached through Shop.
-- The closing employee and `EmployeeActionAuthorization` must belong to the same Shop and the authorization is consumed once for the close operation.
+- The closing operation is scoped to the active Shop and attributed to the employee resolved by fresh direct credential validation; do not create or consume an employee action-authorization token.
 - The business date is calculated using the Shop's configured time zone. Event timestamps remain stored consistently (UTC).
 - Company-wide reporting may aggregate completed Shop closings, but this must not create a consolidated company-wide `DailyClosing` or mix the cash drawers.
 
@@ -140,13 +146,15 @@ The v1 operational formula, opening-float capture, refund/change/cash-movement t
 
 ## ADR-007 — Inter-shop product transfers
 
+**Status:** PRODUCT TRANSFER LIFECYCLE RETAINED; employee authorization mechanism superseded (2026-11-21). Action-level permission for transfer discrepancies remains open in [Stock and Refurbishment](stock-and-refurbishment.md); do not infer it from the superseded employee-role matrix.
+
 **Decision:** Products can be transferred between Shops belonging to the same Company using an explicit transfer document.
 
 ### Lifecycle
 
 1. Create a `StockTransfer` in `DRAFT` with source Shop, destination Shop and integer product lines.
-2. At dispatch, require an employee authorization from the source Shop, validate unreserved available stock, post outbound movements and change status to `IN_TRANSIT`.
-3. At receipt, require an employee authorization from the destination Shop, record the actual received quantities and post inbound movements to the destination inventory.
+2. At dispatch, require fresh direct employee credential validation and the approved source-Shop permission, validate unreserved available stock, post outbound movements and change status to `IN_TRANSIT`.
+3. At receipt, require fresh direct employee credential validation and the approved destination-Shop permission, record the actual received quantities and post inbound movements to the destination inventory.
 4. Support partial receipt with `PARTIALLY_RECEIVED`; finish as `RECEIVED` when all dispatched quantities are accounted for.
 5. A transfer can be cancelled without stock movement only before dispatch. After dispatch, it cannot be simply cancelled; a corrective return/reverse transfer must be recorded.
 
@@ -155,7 +163,7 @@ The v1 operational formula, opening-float capture, refund/change/cash-movement t
 - `StockTransfer` must reference two distinct Shops belonging to the same Company.
 - Stock leaves the source only at dispatch and becomes available at the destination only at receipt. In-transit quantities are not available at either Shop.
 - Serialized refurbished units are transferred by exact `RefurbishedUnit` identity with quantity one.
-- Dispatch and receipt are separate protected actions and are attributed to different employee authorizations when performed by different Shops.
+- Dispatch and receipt are separate protected actions and are attributed to the employees resolved by the respective source/destination Shop credential validations. No persisted employee authorization token is used.
 - The initial model assumes one stock pool per Shop. Multiple warehouses/shelves/stock locations inside a Shop are not introduced in this decision.
 - Only verified, acceptable quantities up to the dispatched amount are received into destination stock. Short/damaged quantities remain outstanding; overages are excluded and require a separate document. Log discrepancies and keep unresolved shortages open; do not write off or close them automatically.
 
@@ -261,7 +269,9 @@ The following remain open: customer/device visibility; refurbished-unit acquisit
 
 ## ADR-013 — Supplier procurement and parts-waiting service workflow
 
-**Decision:** A ServiceOrder may be placed in `AWAITING_PARTS` when a required product part is not fully available/reserved. The application will provide an auditable procurement tracker for external supplier purchases, including source/order links, expected delivery dates, tracking details and partial receipts.
+**Status:** SUPERSEDED (2026-11-19) by the simplified Parts to Buy model in [Product Owner Decisions](product-owner-decisions.md), [Database Model](database-model.md) and [Migration Backlog](../06-migration/migration-backlog.md). Retained solely as historical discovery; do not implement supplier procurement entities, purchase rounds, receipts or allocations from this ADR.
+
+**Historical decision:** A ServiceOrder may be placed in `AWAITING_PARTS` when a required product part is not fully available/reserved. The application will provide an auditable procurement tracker for external supplier purchases, including source/order links, expected delivery dates, tracking details and partial receipts.
 
 ### Workflow
 
@@ -294,7 +304,9 @@ The following remain open: customer/device visibility; refurbished-unit acquisit
 
 ## ADR-014 — Service parts purchase queue with request rounds and reference images
 
-**Decision:** The application will provide a dedicated Shop-scoped **Service Parts Purchase Queue**. Each queue request belongs to exactly one ServiceOrder and represents one purchasing/sourcing round. A ServiceOrder may have multiple procurement requests created at different moments in its lifecycle. Each request contains one or more request lines linked to durable ServicePartRequirement records and supports multiple private reference images per line.
+**Status:** SUPERSEDED (2026-11-19) by Parts to Buy. The request-round, supplier-purchase, procurement-image and allocation workflow below is historical and must not be implemented. See the current Parts to Buy rules in [Product Owner Decisions](product-owner-decisions.md) and [Database Model](database-model.md).
+
+**Historical decision:** The application will provide a dedicated Shop-scoped **Service Parts Purchase Queue**. Each queue request belongs to exactly one ServiceOrder and represents one purchasing/sourcing round. A ServiceOrder may have multiple procurement requests created at different moments in its lifecycle. Each request contains one or more request lines linked to durable ServicePartRequirement records and supports multiple private reference images per line.
 
 ### Workflow and consequences
 
@@ -320,7 +332,9 @@ Image limits are specified in [Image Upload Policy](image-upload-policy.md). MAN
 
 ## ADR-015 — Company-wide employee password and role names across all Shops
 
-**Decision:** Each employee has one Company-wide account authenticated by employee code + password. The same employee credentials work in every Shop belonging to the Company. The persistent ShopSession still identifies only the active Shop; each protected operation requires a fresh password challenge from the acting employee. `MANAGER` has full access across all Shops. `TECHNICIAN` has partial access under the product-owner-approved v1 action matrix in [Employee Access and Roles](employee-access-and-roles.md).
+**Status:** PARTIALLY SUPERSEDED (2026-11-20). Company-wide employee identity and the Shop-only session boundary remain valid. Role names, profile assignment and authorization rules below are historical; [Employee Management](../04-features/employee-management.md) is authoritative for `EMPLOYEE`, `MANAGER`, `ADMIN` and direct per-operation credential validation.
+
+**Historical decision:** Each employee has one Company-wide account authenticated by employee code + password. The same employee credentials work in every Shop belonging to the Company. The persistent ShopSession still identifies only the active Shop; each protected operation requires a fresh password challenge from the acting employee. `MANAGER` has full access across all Shops. `TECHNICIAN` has partial access under the product-owner-approved v1 action matrix in [Employee Access and Roles](employee-access-and-roles.md).
 
 ### Roles
 
@@ -375,7 +389,9 @@ Image limits are specified in [Image Upload Policy](image-upload-policy.md). MAN
 
 ## ADR-019 — Supplier purchases do not require a second approval
 
-**Decision:** Creating, linking, updating or receiving supplier purchases for service parts does not require a separate manager approval or `BusinessActionApproval` workflow.
+**Status:** SUPERSEDED with the supplier-purchase workflow by Parts to Buy (2026-11-19). No supplier purchase/receipt workflow is part of the current target scope.
+
+**Historical decision:** Creating, linking, updating or receiving supplier purchases for service parts does not require a separate manager approval or `BusinessActionApproval` workflow.
 
 ### Consequences
 
@@ -387,7 +403,9 @@ Image limits are specified in [Image Upload Policy](image-upload-policy.md). MAN
 
 ## ADR-020 — Refurbished-unit image uploads and purchase approval policy confirmed
 
-**Decision:** Refurbished physical units support multiple image uploads, in addition to the existing multiple reference-image uploads on service-part procurement request lines. Supplier purchases for service parts do not require a second manager approval.
+**Status:** PARTIALLY SUPERSEDED (2026-11-19). Refurbished-unit image evidence remains in scope under [Image Upload Policy](image-upload-policy.md); all service-procurement image and supplier-purchase workflow statements below are superseded by Parts to Buy. The old MySQL/object-storage details are superseded by ADR-036 and the PostgreSQL image policy.
+
+**Historical decision:** Refurbished physical units support multiple image uploads, in addition to the existing multiple reference-image uploads on service-part procurement request lines. Supplier purchases for service parts do not require a second manager approval.
 
 ### Consequences
 
@@ -430,7 +448,9 @@ See the [consolidated product-owner decision register](product-owner-decisions.m
 
 ## ADR-021 — MANAGER full access and TECHNICIAN partial access
 
-**Decision:** `MANAGER` has full access across all Shops. The product owner specified that `TECHNICIAN` has partial access and approved the detailed first-release allow/deny matrix on 2026-11-10. An employee may hold both roles; effective permissions are the union, so MANAGER grants full access.
+**Status:** SUPERSEDED (2026-11-20) by [Employee Management](../04-features/employee-management.md). `TECHNICIAN`, dual-role assignment and permission-union rules are not part of the current target model. Use `EMPLOYEE`, `MANAGER`, `ADMIN` and the feature-specific permission rules.
+
+**Historical decision:** `MANAGER` has full access across all Shops. The product owner specified that `TECHNICIAN` has partial access and approved the detailed first-release allow/deny matrix on 2026-11-10. An employee may hold both roles; effective permissions are the union, so MANAGER grants full access.
 
 The approved matrix and employee-code + password challenge are specified in [Employee Access and Roles](employee-access-and-roles.md). A supplier purchase for service parts does not require a second manager approval, but the acting role and employee authorization are still checked.
 
@@ -497,7 +517,7 @@ See [Image Upload Policy](image-upload-policy.md). Limits are configurable and c
 
 ## ADR-029 — MySQL-only binary image storage
 
-**Status:** SUPERSEDED BY ADR-036 — retained as a historical record of the earlier storage choice.
+**Status:** SUPERSEDED BY ADR-036 and [Image Upload Policy](image-upload-policy.md) — retained as a historical record of the earlier storage choice. The old service-procurement image scope is also superseded by Parts to Buy.
 
 **Decision:** All service procurement, refurbished-unit and complaint images are stored in MySQL. `stored_image.content` uses `MEDIUMBLOB`; a compact thumbnail uses `BLOB`; owner-specific attachment tables reference the common record. No external object storage or filesystem path is used.
 
@@ -520,6 +540,8 @@ See [Image Upload Policy](image-upload-policy.md). Limits are configurable and c
 
 ## ADR-032 — OAuth 2.0 / OpenID Connect for the Shop API session
 
+**Status:** OIDC/Shop identity boundary remains current; employee one-use authorization statements are superseded by [Employee Management](../04-features/employee-management.md) and [API Authentication and Token Security](api-authentication-and-token-security.md).
+
 **Decision:** Protect the ASP.NET Core API with OAuth 2.0 access tokens. Use OpenID Connect for Shop sign-in, Authorization Code + PKCE (`S256`) for the React SPA, and JWT Bearer validation for `/api/v1/**`. OpenIddict Server with EF Core persistence is the default self-hosted authorization-server implementation direction.
 
 ### Identity boundary
@@ -527,7 +549,7 @@ See [Image Upload Policy](image-upload-policy.md). Limits are configurable and c
 - The token principal is the Shop access credential/Shop context, not an employee. `sub` identifies the stable Shop access principal; the access token carries `company_id`, `shop_id` and `shop_session_id`.
 - The access token contains no EmployeeId, employee code, employee name or MANAGER/TECHNICIAN role.
 - The API resolves the operational Shop from verified token claims and confirms the referenced ShopSession is active. Client-supplied ShopId is never an authorization source.
-- Employee code/password remains a separate, fresh, one-use action authorization for protected business commands; OAuth does not replace actor attribution.
+- For feature-protected commands, the backend freshly validates the acting employee's code/password, active status, Company membership and feature-specific permission. No employee authorization token/entity/endpoint is issued or consumed; OAuth does not replace actor attribution.
 
 ### Required safeguards
 
