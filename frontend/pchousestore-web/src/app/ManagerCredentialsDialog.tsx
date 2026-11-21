@@ -6,12 +6,12 @@ type Props = {
   open: boolean;
   busy: boolean;
   error: string | null;
-  credentialRole?: "Manager" | "Employee";
+  credentialRole?: "Manager or Admin" | "Employee";
   onCancel: () => void;
   onSubmit: (credentials: ManagerCredentials) => Promise<boolean>;
 };
 
-export default function ManagerCredentialsDialog({ open, busy, error, onCancel, onSubmit, credentialRole = "Manager" }: Props) {
+export default function ManagerCredentialsDialog({ open, busy, error, onCancel, onSubmit, credentialRole = "Manager or Admin" }: Props) {
   const [employeeCode, setEmployeeCode] = useState("");
   const [password, setPassword] = useState("");
 
