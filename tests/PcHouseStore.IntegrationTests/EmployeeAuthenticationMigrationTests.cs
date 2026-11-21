@@ -52,6 +52,8 @@ public sealed class EmployeeAuthenticationMigrationTests
         Assert.Contains(builder.Operations, operation =>
             operation is DropTableOperation table && table.Name == "employee_action_authorization");
         Assert.Contains(builder.Operations, operation =>
+            operation is DropTableOperation table && table.Name == "employee_administration_event");
+        Assert.Contains(builder.Operations, operation =>
             operation is AddCheckConstraintOperation check &&
             check.Name == "ck_employee_role_code" &&
             check.Sql.Contains("'EMPLOYEE'", StringComparison.Ordinal) &&
@@ -60,5 +62,14 @@ public sealed class EmployeeAuthenticationMigrationTests
             operation is CreateIndexOperation index &&
             index.Name == "uq_employee_one_active_profile" &&
             index.IsUnique);
+
+        var downBuilder = new MigrationBuilder("Npgsql.EntityFrameworkCore.PostgreSQL");
+        var down = typeof(RemoveEmployeeActionAuthorization).GetMethod(
+            "Down", BindingFlags.Instance | BindingFlags.NonPublic);
+
+        Assert.NotNull(down);
+        down!.Invoke(migration, [downBuilder]);
+        Assert.Contains(downBuilder.Operations, operation =>
+            operation is CreateTableOperation table && table.Name == "employee_administration_event");
     }
 }
