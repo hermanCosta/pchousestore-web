@@ -2,7 +2,7 @@
 
 # Authentication and Signing-Key Persistence — DATA-05 Slice
 
-**Status:** APPROVED FOR IMPLEMENTATION — initial EF Core migration applied to local development database on 2026-11-12; PostgreSQL concurrency/auth integration validation remains
+**Status:** PARTIALLY SUPERSEDED — Shop/OIDC persistence remains applicable; employee one-use authorization design below is retired by the 2026-11-20 product-owner decision. The initial development migration predates that decision and requires a reviewed reconciliation migration before implementation approval.
 **Scope:** DATA-05 authentication tables only. This is a design artifact; do not apply it to a live database before review and migration generation.
 
 The authentication foundation includes the approved Company, Shop, Person and Employee identity/profile columns plus credential/session and OpenIddict records. Migration `20261112005610_AuthenticationFoundationInitial` is applied only to the isolated local development database; this is not production approval. Company legal registration fields and Employee status vocabulary remain open and are not guessed here.
@@ -18,7 +18,7 @@ The authentication foundation includes the approved Company, Shop, Person and Em
 ## Decisions carried in
 
 - One Company owns multiple Shops. `ShopSession` represents one active Shop and contains no Employee identity.
-- A protected business command consumes one short-lived `EmployeeActionAuthorization` atomically with its business write.
+- Each protected business command validates the submitted employee code/password directly against the existing employee credential, active status, Company membership and feature permission at command start. No employee authorization token, entity, endpoint, table or authorization foreign key is used.
 - Shop credential bootstrap and no-Manager recovery use the audited deployment-controlled process. Normal credential administration is Manager-authorized.
 - Failed login/challenge attempts never lock or disable a credential.
 - OpenIddict owns its application/authorization/token schema. Application rows correlate ShopSession to OpenIddict authorization identifiers but do not depend on undocumented provider columns.
@@ -73,42 +73,13 @@ Indexes: `UNIQUE(id, shop_id)` for composite authorization FKs and `(shop_id, re
 
 No single-active-session-per-Shop constraint is used. Idle/absolute expiry values and simultaneous-device policy remain configurable/deferred.
 
-### `employee_action_authorization`
+### Retired employee action authorization
 
-| Column | Type | Constraints / purpose |
-|---|---|---|
-| `id` | `BIGINT` | PK |
-| `authorization_token_hash` | `BYTEA (length 32 bytes)` | Required unique SHA-256 hash of a random 256-bit opaque authorization token; never store the raw token |
-| `shop_session_id` | `BIGINT` | Required; ShopSession FK with Shop scope |
-| `company_id` | `BIGINT` | Required tenant key |
-| `shop_id` | `BIGINT` | Required active Shop; FK `(shop_id,company_id)` to `shop` |
-| `target_shop_id` | `BIGINT` | Nullable resource Shop for Company-wide Manager actions; if present, must belong to the same Company |
-| `employee_id` | `BIGINT` | Required; composite FK `(employee_id,company_id)` to `employee` |
-| `action_code` | `VARCHAR(100)` | Required stable action identifier |
-| `resource_type` | `VARCHAR(80)` | Nullable target type |
-| `resource_id` | `VARCHAR(100)` | Nullable target identifier |
-| `operation_context_hash` | `BYTEA (length 32 bytes)` | Nullable SHA-256 of server-canonicalized command context, where the feature defines one |
-| `authenticated_at` | `TIMESTAMPTZ` | Required UTC |
-| `expires_at` | `TIMESTAMPTZ` | Required UTC; default authorization lifetime 2 minutes, configurable |
-| `consumed_at` | `TIMESTAMPTZ` | Nullable UTC; one-use state |
-| `row_version` | `BIGINT` | Required concurrency token |
+The `employee_action_authorization` table and its one-use token protocol are **not part of the target schema**. Do not create the table, issue tokens, expose an endpoint, add authorization foreign keys or require token consumption in protected command transactions.
 
-Indexes: unique `authorization_token_hash`; `(shop_session_id, shop_id, consumed_at, expires_at)`; `(employee_id, authenticated_at)` for audit. Keep consumed records for audit; purge policy is a separate retention decision.
+The 2026-11-20 decision requires direct per-operation employee credential validation using the existing employee credential record. The server resolves the employee from the submitted employee code, validates the password, active status, Company membership and feature-specific permission, then executes and attributes the command to that employee. The password is never persisted or logged. Employee identity is not added to ShopSession or the Shop OIDC token.
 
-Atomic consumption is a conditional update inside the same transaction as the protected command:
-
-```sql
-UPDATE employee_action_authorization
-SET consumed_at = statement_timestamp(), row_version = row_version + 1
-WHERE authorization_token_hash = @token_hash
-  AND shop_session_id = @session_id
-  AND shop_id = @active_shop_id
-  AND action_code = @action_code
-  AND consumed_at IS NULL
-  AND expires_at > statement_timestamp();
-```
-
-Exactly one affected row is required. The transaction also locks/revalidates the active `shop_session` row before consuming the authorization. A concurrent second command then observes the consumed state; if the business write fails, transaction rollback leaves the authorization unconsumed.
+The initial local-development migration was applied before this decision and may still contain the retired table and related code. Reconcile it through a reviewed EF Core migration after the implementation inventory is complete; do not manually drop the table or delete dependent code in isolation.
 
 ### `system_services` — signing-key registry
 
@@ -142,8 +113,8 @@ Rotation: stage and validate a new key, activate it with a recorded event, publi
 ## Concurrency and revocation protocol
 
 1. Every protected mutation begins a PostgreSQL transaction and re-reads/locks its ShopSession row (`SELECT ... FOR UPDATE` or provider-equivalent) to confirm it remains active.
-2. It conditionally consumes the authorization token using the atomic update above.
-3. It writes the business change and audit event, then commits once.
+2. The command validates the submitted employee code/password directly against the existing employee credential, and checks active status, Company membership and feature-specific permission before any business write. No employee action-authorization token is issued or consumed.
+3. It writes the business change and its immutable event/Notes, then commits once. Any failure rolls back all business effects.
 4. Logout/credential rotation locks the same ShopSession rows before marking them revoked. Once logout/rotation returns successfully, no later command can pass the transactional active-session check.
 5. API bearer-token validation checks session status on every request (or uses a cache with a bounded invalidation strategy that preserves immediate revocation). Protected writes always recheck inside the transaction.
 
