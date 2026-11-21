@@ -14,13 +14,12 @@ type Employee = {
   mustChangePasswordAtNextUse: boolean;
 };
 
-type ShopContext = { companyId: string };
 export type EmployeeAdminPage = "employee-password-change" | "employee-directory-search" | "create-employee" | "employee-directory";
-type Props = ShopContext & { page: EmployeeAdminPage; getShopAccessToken: () => Promise<string | null> };
+type Props = { page: EmployeeAdminPage; getShopAccessToken: () => Promise<string | null> };
 type Profile = Pick<Employee, "firstName" | "lastName" | "phone" | "email">;
 type PendingManagerAction = { key: string; action: (credentials: ManagerCredentials) => Promise<void> };
 
-export default function EmployeeAdministration({ companyId, page, getShopAccessToken }: Props) {
+export default function EmployeeAdministration({ page, getShopAccessToken }: Props) {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [directoryLoaded, setDirectoryLoaded] = useState(false);
   const [search, setSearch] = useState("");
