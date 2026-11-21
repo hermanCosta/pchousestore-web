@@ -136,7 +136,7 @@ Minimum metadata:
 - `DocumentType`, `DocumentNumber` (when a customer-facing sequence is required)
 - `SourceType`, `SourceId`, `SourceVersion`
 - `TemplateKey`, `TemplateVersion`, `LayoutCode` (`A4` / `THERMAL_80MM`)
-- `IssuedAtUtc`, `IssuedByEmployeeId`
+- `IssuedAtUtc`, `IssuedByShopSessionId`, optional `IssuedByEmployeeId` when the originating action requires an employee challenge
 - `SnapshotJson` (immutable render payload, including Shop name, address and phone as available at issue time, approved logo reference, customer-facing values, financial/tax snapshots and line descriptions)
 - `ContentHash` (integrity/checksum for the rendered payload or output)
 - `Status` (`ISSUED`, `VOIDED`); corrections create a replacement/correction document instead of editing an issued document.
@@ -177,10 +177,10 @@ The preview must display document type, number, Shop, issue date and selected la
 
 - Every document query and generation is scoped to the active ShopSession and the source record's Company/Shop ownership.
 - Customer-facing documents may be generated only from a valid business record; users cannot post financial effects through a print endpoint.
-- `IssuedByShopSessionId`, optional `IssuedByEmployeeId` when the source action requires an employee challenge and `PrintedByEmployeeId` identify the employee who performed the action, not the ShopSession owner.
-- Manager-restricted document actions (e.g. refund authorization and void/correction) require `MANAGER` or `ADMIN` authorization with fresh employee credentials; `ADMIN` inherits `MANAGER` permissions unless a feature-specific exception is defined. Other document access follows the relevant feature's authorization rules and the active ShopSession. No `TECHNICIAN` role is defined in the current role model.
+- ShopSession is the authenticated actor context for document generation and reprinting. Where the originating business action requires fresh employee credentials, the backend resolves and records that employee as an additional actor; employee identity is not inferred from ShopSession.
+- Manager-restricted document actions (e.g. refund authorization and void/correction) require `MANAGER` or `ADMIN` authorization with fresh employee credentials; `ADMIN` inherits `MANAGER` permissions unless a feature-specific exception is defined. Other document access follows the relevant feature's authorization rules and the active ShopSession.
 - Reprinting is auditable; it must not duplicate document numbering, payments, stock or refund events.
-- Do not expose internal diagnostic notes, passwords, security tokens, private procurement credentials or private complaint notes on customer-facing documents.
+- Do not expose internal diagnostic notes, passwords, security tokens, private external-service credentials or private complaint notes on customer-facing documents.
 
 ## 9. Acceptance criteria
 
