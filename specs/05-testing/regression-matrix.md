@@ -144,10 +144,16 @@
 
 - A `DEPOSIT_RECEIPT` during ServiceOrder booking is recorded under the current Shop and employee; it is not automatically a service payment or stock movement.
 - A `DepositApplication` is a non-cash credit to its own ServiceOrder and cannot exceed the available held balance.
+- A settled payment or explicit `DepositApplication` that reduces a `FIXED` ServiceOrder balance to zero atomically persists the financial record, balance update, Stock domain consumption, `InventoryMovement`, events, employee-attributed `BusinessNote` and committed idempotency result in one PostgreSQL transaction; fault injection at each boundary rolls back every effect.
+- Partial payment and unapplied deposit do not consume stock. `NOT_FIXED` payment settlement or deposit application never consumes/releases reservations; only Pickup performs its approved stock disposition.
+- Every committed ServiceOrder financial action (payment, deposit receipt/application, payment refund, deposit refund) appends exactly one employee-attributed `BusinessNote` in the same transaction; rollback/rejection leaves no Note.
+- Payment settlement and deposit application idempotent replay returns the original committed response without duplicating ledger, stock, event or Note effects; rolled-back attempts can be retried.
 - `SECURITY` deposits do not become revenue or order payment automatically; refund/forfeiture must be separately authorized.
 - Every `InstallmentSettlement` references a settled payment and the same Sale as its InstallmentPlan. Schedule and sale balances reconcile without duplicate gross revenue.
 - `LAYAWAY` is the default plan fulfillment behavior. `CREDIT_SALE` is blocked unless an explicit deployment compliance feature flag and approved policy are in place.
-- A `REFUND` references an original settled incoming transaction; refunds can be partial/multiple but not exceed the original refundable balance under concurrency.
+- A `REFUND` references an original settled incoming `PAYMENT`; refunds can be partial/multiple but not exceed the original refundable balance under concurrency. A ServiceOrder payment refund is exposed/accepted only when a settled payment exists, refundable remainder is positive, technical outcome is `NOT_FIXED`, and lifecycle status is `NOT_FIXED` or `PICKED`.
+- A `DEPOSIT_REFUND` references the original deposit receipt and is validated against the deposit's refundable held balance/lifecycle; it is not treated as a `REFUND` or deducted from a payment's refundable remainder.
+- `MANAGER` and `ADMIN` can execute eligible payment and deposit refunds using fresh credentials; `EMPLOYEE` cannot. Deposit forfeiture remains `MANAGER`-only; verify that `ADMIN` is rejected for forfeiture despite inheriting the general Manager permission set.
 - Refund allocation to a different tender than the original is only accepted when Shop policy and approval permit it.
 - EUR amount persistence uses decimal arithmetic and two decimal currency precision. Cash rounding is a separate signed adjustment, voluntary/Shop-configured and only for eligible final cash amounts. VAT tests cover Company feature toggle, tax setup READY gate, effective-date selection and historical tax snapshots.
 - Cash drawer calculations include cash deposit receipts/refunds; electronic tender and provider payout/fees are reconciled separately.
