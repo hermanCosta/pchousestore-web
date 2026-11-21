@@ -78,9 +78,9 @@ public static class EmployeeAdministrationEndpoints
         var validation = ValidateProfile(request.FirstName, request.LastName, request.Phone, request.Email);
         if (validation is not null) return Problem(context, 400, "invalid_request", validation);
         var employeeCode = request.EmployeeCode?.Trim().ToUpperInvariant();
-        if (string.IsNullOrWhiteSpace(employeeCode) || employeeCode.Length > 40 || !ValidPassword(request.InitialPassword))
+        if (string.IsNullOrWhiteSpace(employeeCode) || employeeCode.Length > 40 || !EmployeeCredentialPolicy.IsValidPassword(request.InitialPassword))
             return Problem(context, 400, "invalid_request", "Employee code or initial password is invalid.");
-        if (!ValidRoles(request.Roles)) return Problem(context, 400, "invalid_roles", "Select exactly one employee profile.");
+        if (!EmployeeCredentialPolicy.IsValidProfile(request.Roles)) return Problem(context, 400, "invalid_roles", "Select exactly one employee profile.");
 
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         var result = await AuthenticateManagerAsync(request.EmployeeChallenge, principal, db, hasher, context, cancellationToken);
@@ -314,7 +314,7 @@ public static class EmployeeAdministrationEndpoints
         HttpContext context,
         CancellationToken cancellationToken)
     {
-        if (!ValidPassword(request.NewPassword)) return PasswordProblem(context);
+        if (!EmployeeCredentialPolicy.IsValidPassword(request.NewPassword)) return PasswordProblem(context);
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         var result = await AuthenticateManagerAsync(request.EmployeeChallenge, principal, db, hasher, context, cancellationToken);
         if (result.Error is not null) return result.Error;
@@ -470,9 +470,6 @@ public static class EmployeeAdministrationEndpoints
     }
 
     private static string? NormalizeEmail(string? email) => string.IsNullOrWhiteSpace(email) ? null : email.Trim().ToLowerInvariant();
-    private static bool ValidPassword(string? password) => !string.IsNullOrEmpty(password) && password.Length is >= 6 and <= 128;
-    private static bool ValidRoles(IReadOnlyCollection<string>? roles) => roles is { Count: 1 } &&
-        roles.All(x => x is "EMPLOYEE" or "MANAGER" or "ADMIN") && roles.Distinct(StringComparer.Ordinal).Count() == roles.Count;
     private static string NormalizeRole(string role) => role.Trim().ToUpperInvariant();
 
     private static bool TryReadShopContext(ClaimsPrincipal principal, out long sessionId, out long shopId, out long companyId)
