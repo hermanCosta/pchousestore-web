@@ -80,7 +80,7 @@ public static class EmployeeAdministrationEndpoints
         var employeeCode = request.EmployeeCode?.Trim().ToUpperInvariant();
         if (string.IsNullOrWhiteSpace(employeeCode) || employeeCode.Length > 40 || !ValidPassword(request.InitialPassword))
             return Problem(context, 400, "invalid_request", "Employee code or initial password is invalid.");
-        if (!ValidRoles(request.Roles)) return Problem(context, 400, "invalid_roles", "Assign one or both supported employee roles.");
+        if (!ValidRoles(request.Roles)) return Problem(context, 400, "invalid_roles", "Select exactly one employee profile.");
 
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         var result = await AuthenticateManagerAsync(request.EmployeeChallenge, principal, db, hasher, context, cancellationToken);
