@@ -245,6 +245,7 @@ Example:
 - **IMPLEMENTED IN MIGRATION — 2026-11-21:** Replace `TECHNICIAN` with `EMPLOYEE`, preserve `MANAGER` precedence where legacy dual assignments exist, and enforce one active profile per employee with a filtered unique index.
 - Apply the approved six-character minimum consistently to employee password validation in the API, UI and tests.
 - **IMPLEMENTED — 2026-11-21:** Employee administration and Shop credential operations now submit a fresh `employeeChallenge` in each protected request body. Added policy/migration tests; full build and database integration execution remain to be run.
+- **IMPLEMENTED — 2026-11-21:** The deployment bootstrap now provisions the initial `ADMIN` profile (`BootstrapAdmin`); the legacy `BootstrapManager` operation name remains as a compatibility alias but also creates an `ADMIN`.
 - Keep Shop OIDC/session/token identity unchanged.
 - Inspect the legacy Java Swing employee screens, controller, DAO, model, password-reset and role checks. Record source references and distinguish confirmed legacy behavior from this approved redesign, per `AGENTS.md`.
 
