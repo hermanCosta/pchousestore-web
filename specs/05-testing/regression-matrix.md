@@ -65,7 +65,7 @@
 
 - **OAuth/OIDC Shop API security:** React completes Authorization Code + PKCE S256 using a registered redirect URI; wrong verifier, replayed code, wrong issuer/audience/signature, expired/not-yet-valid token or missing `shop.api` scope is rejected.
 - **Shop-only token identity:** access/ID tokens contain the Shop principal and active ShopSession context but no EmployeeId, employee code or employee role; a revoked ShopSession is rejected before token expiry.
-- **Employee challenge isolation:** a valid Shop bearer token alone cannot commit a protected business operation. Every protected command requires a fresh employee code/password challenge validated directly against `EmployeeCredential`; no one-use authorization token/entity/endpoint is issued, persisted, consumed or reused.
+- **Employee challenge isolation:** a valid Shop bearer token alone cannot commit a feature-protected business operation. The backend freshly validates the acting employee's code/password, active status, Company membership and feature-specific permission for each operation; no one-use authorization token/entity/endpoint is issued, persisted, consumed or reused. Raw credentials never enter logs, request hashes, idempotency snapshots or audit payloads.
 - **OAuth prohibited flows:** Implicit and Resource Owner Password Credentials grants are unavailable; no client secret or raw token is present in the React bundle, storage, logs or analytics.
 - **Refresh-token rotation:** if refresh tokens are enabled, each successful refresh invalidates the prior token; reuse of an invalidated token revokes the token family.
 
@@ -191,3 +191,15 @@
 - Reprinting a voided/corrected document shows the correct copy/void status and cannot mutate the original snapshot.
 - VAT-off rendering omits tax calculation and does not assert legal exemption; VAT-on rendering requires a valid effective-dated tax snapshot.
 - PDF generation uses `Europe/Dublin`, `en-IE` formatting and EUR currency.
+
+
+## Approved cash-closing policy tests
+
+- Expected physical cash equals opening float plus settled cash receipts net of change, plus posted cash-in, minus posted cash-out, settled cash refunds, settled deposit refunds and safe drops.
+- Card, online, bank-transfer and store-credit allocations never affect physical drawer cash; electronic tender is reported separately.
+- A settled cash refund is deducted once through its refund allocation and is not also recorded as a duplicate cash-out movement.
+- Deposit receipt is counted when cash is actually received; applying an existing deposit to an order balance creates no second cash receipt.
+- Cash rounding uses actual tender less change; the separate rounding adjustment is not applied to the drawer formula a second time.
+- Only `MANAGER` and `ADMIN` can open/close the cash day and create/approve closing corrections, using fresh employee credentials; `EMPLOYEE` is rejected.
+- Enforce one `DailyClosing` per Shop/business date. Concurrent close attempts for the same Shop/date produce exactly one successful close; another Shop can close independently.
+- A non-zero variance requires a reason. Closing preserves the original expected/count/variance snapshot; corrections append a separately visible record and never rewrite the original close.
