@@ -110,7 +110,7 @@ Dispatch is an employee-authorized action in the source Shop session. Receipt is
 - If more units arrive than were dispatched, do not post the excess to inventory or alter the dispatch record. Record the overage and handle the extra units through a separately authorized transfer/document.
 - For serialized units, reconcile the exact dispatched unit IDs. A damaged unit stays unavailable until the receiving Shop records its disposition; an unaccounted unit keeps the transfer open.
 
-Each discrepancy action requires employee authorization; the specific action-level role remains subject to the open role matrix.
+Each discrepancy action requires fresh direct employee credential validation, including active status and Company membership. The permitted profile for this specific discrepancy action has not yet been approved in this feature specification; do not infer it from the superseded `employee-access-and-roles.md` matrix. Resolve and document the action-level permission before implementation.
 
 Serialized refurbished devices transfer by unit ID with quantity exactly one. A serialized unit in transit is unavailable in both Shops.
 
