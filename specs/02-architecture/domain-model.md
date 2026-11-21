@@ -156,7 +156,7 @@
 14. Financial refunds do not imply physical stock return. Each physical return is separately selected, authorized, recorded and ledgered.
 15. Stock transfer dispatch decreases source stock; receipt increases destination stock. In-transit stock is unavailable; source and destination belong to the same Company.
 16. Inventory balance/unit-state update and corresponding InventoryMovement insert are atomic and idempotent.
-17. A PaymentTransaction references exactly one of Sale or ServiceOrder (XOR), from the same Shop.
+17. A `PaymentTransaction` references exactly one of Sale, ServiceOrder or ServiceDeposit (XOR), from the same Shop; enforce the valid kind-to-target combinations defined by the Finance model.
 18. `DailyClosing` is unique on `(ShopId, BusinessDate)` and reconciles only that Shop.
 19. A service order may enter `AWAITING_PARTS` from `CREATED` or `IN_PROGRESS` only while at least one blocking `ServicePartRequirement` is not fully reserved.
 20. A stock entry increases Shop on-hand and available quantity only; it never creates reservations automatically. An employee explicitly selects the ServiceOrder requirement(s) and quantities in a separate authorized reservation action, which is applied atomically and reflected in the Parts to Buy view.
