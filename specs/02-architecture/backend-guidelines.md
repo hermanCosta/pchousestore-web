@@ -32,8 +32,7 @@
 
 - The persistent authentication principal represents the Shop and contains no active Employee identity or employee role.
 - Before each protected operation, validate the submitted employee code/password directly against the Company-wide employee credential. Verify active status, Company membership and the feature-specific permission in the active Shop context. Active profiles are EMPLOYEE, MANAGER and ADMIN; no ShopEmployee assignment is required.
-- Create a short-lived, one-time EmployeeActionAuthorization scoped to ShopSession, Shop and action code (and, where practical, a canonical operation/request fingerprint). Active Company-wide profiles are `EMPLOYEE`, `MANAGER` and `ADMIN`; the same employee credential works in all Shops owned by the Company.
-- Consume the authorization exactly once in the same database transaction as the business write. Reject expired, consumed, wrong-Shop, wrong-action and replayed authorizations.
+- Do not create, issue, persist, consume or accept an EmployeeActionAuthorization token, entity or endpoint. A fresh employee credential challenge is part of each protected request and is revalidated on retries and idempotent replays.
 - Resolve and persist the employee actor from the server-side credential validation, never from a client-supplied employee ID.
 - Log successful/failed challenges without logging credentials, hashes or PINs.
 
