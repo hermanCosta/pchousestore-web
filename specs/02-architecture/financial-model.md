@@ -78,7 +78,7 @@ Alternative terminal outcomes include `REFUNDED` and `FORFEITED`; a partially re
 - If the Company cannot supply the agreed service/item, or misses the agreed date and no replacement date is agreed, the unconsumed balance is refundable, subject to applicable consumer rights.
 - If the customer changes their mind, apply the terms disclosed and accepted before payment. Any retention/non-refundable portion must be clearly disclosed, fair and legally valid. For a special-order part, only a documented and genuinely non-recoverable supplier cost may be considered where the customer accepted that term in advance. Never automatically forfeit the whole deposit.
 - A `SECURITY` deposit is returned when its stated purpose ends, less only documented deductions accepted in the terms and permitted by law.
-- `FORFEITED` requires a fresh `MANAGER` or `ADMIN` code/password challenge, reason, terms snapshot and documented evidence/cost. `ADMIN` inherits Manager permissions; no second approver is required.
+- `FORFEITED` requires a fresh `MANAGER` code/password challenge, reason, terms snapshot and documented evidence/cost. This is an explicit feature-specific restriction; `ADMIN` cannot forfeit deposits. No second approver is required.
 - Deposit amount reconciliation: `available_held = settled_receipts - applied - settled_refunds - approved_forfeitures`.
 
 A parts pre-order deposit is a financial arrangement only. The application does not capture supplier/source, purchase orders, purchase links, ETA, tracking or supplier receipt. Parts are purchased outside the application and physical stock replenishment is recorded independently through the Stock module.
@@ -185,7 +185,7 @@ The formula is the v1 operational till-control baseline. Detailed accounting cha
 12. Cash total €10.22 may be rounded to €10.20 only when the Shop has opted in and the bill is fully cash-paid; line/tax values remain €10.22-derived and the adjustment is stored separately.
 13. Card/bank-transfer totals are never rounded. Exact cash payment can bypass rounding.
 14. A mixed cash/card transaction is not rounded under the initial implementation rule.
-15. Refunds and deposit forfeitures require one fresh `MANAGER` or `ADMIN` code/password challenge at every amount; no second approver or configurable threshold applies. Stock replenishment is a separate stock operation and is not linked to supplier procurement records.
+15. Payment refunds and deposit refunds require one fresh `MANAGER` or `ADMIN` code/password challenge at every amount; deposit forfeiture requires a fresh `MANAGER` challenge only. No second approver or configurable threshold applies. Stock replenishment is a separate stock operation and is not linked to supplier procurement records.
 
 ## 10. Open and deferred items
 
