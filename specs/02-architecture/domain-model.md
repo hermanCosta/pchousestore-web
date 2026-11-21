@@ -211,3 +211,12 @@ The Documents module owns document metadata/history and reprint audit, while bus
 
 The target catalogue and trigger rules are defined in [Reports, Receipts and Document Printing](reports-and-document-printing.md). Operational reports query persisted business ledgers; customer-facing documents use the source transaction's immutable snapshot.
 
+
+
+## ServiceOrder Pickup invariant (2026-11-20)
+
+Pickup is permitted from both `FIXED` and `NOT_FIXED`. It changes lifecycle status to `PICKED` and records `picked_at`, without overwriting the independent technical outcome. An outstanding financial balance or held deposit does not block Pickup and Pickup never modifies financial state.
+
+For `FIXED`, Pickup has no inventory or reservation side effects: active reservations remain as-is, and the existing full-settlement rule consumes them when the balance reaches zero. For `NOT_FIXED`, Pickup records integer used quantities for each active reservation, bounded from zero to the active reserved quantity; it consumes only used quantities and releases the unused remainder atomically. No unreserved quantity can be introduced or consumed. Zero usage releases all active reservations; no active reservations means no disposition step.
+
+The command requires fresh employee code/password authentication and explicit final confirmation. In one transaction it writes `PICKED`, `picked_at`, `SERVICE_ORDER_PICKED_UP`, the append-only employee-attributed Note and any applicable `NOT_FIXED` stock effects. A required `IdempotencyKey` prevents duplicate effects; concurrent distinct Pickup commands for one order allow only one commit, with the loser receiving a conflict. There is no direct undo/cancel; corrections are separate auditable operations and do not automatically recreate reservations.
