@@ -33,7 +33,7 @@ The token/session must never include:
 
 - `employee_id`;
 - employee code, name, or password;
-- `MANAGER` or `TECHNICIAN` as the logged-in Shop principal's role;
+- any employee role or permission as the logged-in Shop principal's role;
 - an employee identity inherited from a previous operation.
 
 ### Employee actor
