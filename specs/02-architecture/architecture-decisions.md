@@ -547,7 +547,7 @@ See [Image Upload Policy](image-upload-policy.md). Limits are configurable and c
 ### Identity boundary
 
 - The token principal is the Shop access credential/Shop context, not an employee. `sub` identifies the stable Shop access principal; the access token carries `company_id`, `shop_id` and `shop_session_id`.
-- The access token contains no EmployeeId, employee code, employee name or MANAGER/TECHNICIAN role.
+- The access token contains no EmployeeId, employee code, employee name or employee role.
 - The API resolves the operational Shop from verified token claims and confirms the referenced ShopSession is active. Client-supplied ShopId is never an authorization source.
 - For feature-protected commands, the backend freshly validates the acting employee's code/password, active status, Company membership and feature-specific permission. No employee authorization token/entity/endpoint is issued or consumed; OAuth does not replace actor attribution.
 
@@ -658,7 +658,7 @@ DATA-05 must review provider-specific migrations, generated columns, byte-array 
 - Refresh tokens are disabled for the v1 public SPA client. Re-enabling them requires a later ADR with rotation and reuse detection.
 - Set and validate ShopSession idle/absolute timeouts and signing-certificate deployment/rotation before production; these do not change the Shop-only token identity boundary.
 - Select hosting/deployment technology during deployment planning and the report-generation library when report requirements are specified. Neither blocks the Phase 2 foundation.
-- GDPR image retention, VAT/legal configuration, role-matrix refinement and other product decisions remain governed by their existing specifications and ADRs; this ADR does not resolve them.
+- GDPR image retention, VAT/legal configuration and other product decisions remain governed by their existing specifications and ADRs; this ADR does not resolve them.
 
 ### Consequences
 
