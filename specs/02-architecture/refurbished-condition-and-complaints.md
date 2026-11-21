@@ -35,7 +35,7 @@ The 12-month commercial guarantee is additional to statutory consumer rights. Ex
 
 ### Proposed v1 commercial coverage
 
-The additional commercial guarantee is proposed to cover internal hardware/component failures that arise during normal intended use and are not attributable to an excluded external cause. The first remedy is normally inspection and repair at no charge; if repair is not possible or does not resolve the covered failure, the Manager records an appropriate replacement or other remedy under the published terms and statutory rights.
+The additional commercial guarantee is proposed to cover internal hardware/component failures that arise during normal intended use and are not attributable to an excluded external cause. The first remedy is normally inspection and repair at no charge; if repair is not possible or does not resolve the covered failure, `MANAGER` or `ADMIN` records an appropriate replacement or other remedy under the published terms and statutory rights.
 
 Proposed exclusions from the additional commercial guarantee (not from statutory rights):
 
@@ -119,7 +119,7 @@ These are system guardrails and workflow prompts, not a legal decision engine. B
 | `CustomerComplaintCase` | Complaint header, customer, source SaleItem or ServiceOrder, dates, claim basis, status and assignment. |
 | `CustomerComplaintCaseEvent` | Append-only state transitions, notes and customer communications. |
 | `CustomerComplaintCaseAttachment` | Private image evidence and metadata. |
-| `CustomerComplaintResolution` | Final remedy, reason, manager actor and linked refund/replacement/repair records. |
+| `CustomerComplaintResolution` | Final remedy, reason, server-resolved `MANAGER`/`ADMIN` actor and linked refund/replacement/repair records. |
 
 A complaint must reference at least one supported source (`sale_item_id` or `service_order_id`). A refurbished sale claim uses the SaleItem whose `refurbished_unit_id` identifies the physical unit. A claim about workmanship links to the ServiceOrder.
 
@@ -129,7 +129,7 @@ A complaint must reference at least one supported source (`sale_item_id` or `ser
 2. A unit with failed tests remains quarantined and cannot be sold as an ordinary refurbished unit.
 3. A customer reports a fault 8 months after handover; the case can be reviewed under statutory rights even if the commercial guarantee terms are disputed.
 4. A customer reports a fault 14 months after handover; the case is not auto-rejected and can still be assessed under statutory rights.
-5. A complaint within 30 days is flagged for manager review of the short-term right to terminate; the system does not force repair where the customer is entitled to choose another remedy.
+5. A complaint within 30 days is flagged for `MANAGER`/`ADMIN` review of the short-term right to terminate; the system does not force repair where the customer is entitled to choose another remedy.
 6. An `EMPLOYEE` can add inspection evidence but cannot approve a refund or close the claim.
 7. A full/partial refund is linked to the original payment; returned physical goods are handled by a separate StockReturn.
 8. Every communication, inspection, decision and remedy has an employee actor and timestamp.
