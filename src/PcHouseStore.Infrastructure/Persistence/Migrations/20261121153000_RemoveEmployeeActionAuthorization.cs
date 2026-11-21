@@ -18,8 +18,21 @@ public partial class RemoveEmployeeActionAuthorization : Migration
             name: "ck_employee_role_code",
             table: "employee_role_assignment");
 
-        // The former TECHNICIAN profile maps to the new EMPLOYEE profile.
+        // Preserve the approved single-profile model: MANAGER takes precedence over the retired TECHNICIAN profile.
         migrationBuilder.Sql("""
+            UPDATE employee_role_assignment AS technician
+            SET is_active = FALSE
+            WHERE technician.role_code = 'TECHNICIAN'
+              AND technician.is_active = TRUE
+              AND EXISTS (
+                  SELECT 1
+                  FROM employee_role_assignment AS manager
+                  WHERE manager.employee_id = technician.employee_id
+                    AND manager.company_id = technician.company_id
+                    AND manager.role_code = 'MANAGER'
+                    AND manager.is_active = TRUE
+              );
+
             UPDATE employee_role_assignment
             SET role_code = 'EMPLOYEE'
             WHERE role_code = 'TECHNICIAN';
@@ -32,11 +45,22 @@ public partial class RemoveEmployeeActionAuthorization : Migration
 
         // One-use authorization tokens are ephemeral credentials, not business history.
         // Existing unconsumed records are intentionally invalidated by dropping this table.
+        migrationBuilder.CreateIndex(
+            name: "uq_employee_one_active_profile",
+            table: "employee_role_assignment",
+            column: "employee_id",
+            unique: true,
+            filter: "is_active = TRUE");
+
         migrationBuilder.DropTable(name: "employee_action_authorization");
     }
 
     protected override void Down(MigrationBuilder migrationBuilder)
     {
+        migrationBuilder.DropIndex(
+            name: "uq_employee_one_active_profile",
+            table: "employee_role_assignment");
+
         migrationBuilder.DropCheckConstraint(
             name: "ck_employee_role_code",
             table: "employee_role_assignment");
