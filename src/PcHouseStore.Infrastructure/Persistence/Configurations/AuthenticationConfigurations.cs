@@ -124,6 +124,7 @@ public sealed class EmployeeRoleAssignmentRecordConfiguration : IEntityTypeConfi
         builder.Property(x => x.AssignedAt).HasColumnName("assigned_at").HasColumnType("timestamp with time zone").IsRequired();
         builder.Property(x => x.AssignedByEmployeeId).HasColumnName("assigned_by_employee_id");
         builder.HasIndex(x => new { x.EmployeeId, x.RoleCode }).IsUnique().HasDatabaseName("uq_employee_role");
+        builder.HasIndex(x => x.EmployeeId).IsUnique().HasFilter("is_active = TRUE").HasDatabaseName("uq_employee_one_active_profile");
         builder.HasOne<EmployeeRecord>().WithMany().HasForeignKey(x => new { x.EmployeeId, x.CompanyId })
             .HasPrincipalKey(x => new { x.Id, x.CompanyId }).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<EmployeeRecord>().WithMany().HasForeignKey(x => new { x.AssignedByEmployeeId, x.CompanyId })
