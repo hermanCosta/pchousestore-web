@@ -185,16 +185,27 @@ public static partial class CatalogueEndpoints
         var now = DateTime.UtcNow;
         var item = new CatalogItemRecord
         {
-            CompanyId = companyId, Kind = kind!, Name = request.Name.Trim(), Sku = sku,
-            ListPrice = request.ListPrice, ProductCategoryId = categoryId,
+            CompanyId = companyId,
+            Kind = kind!,
+            Name = request.Name.Trim(),
+            Sku = sku,
+            ListPrice = request.ListPrice,
+            ProductCategoryId = categoryId,
             InventoryTrackingMode = kind == "PRODUCT" ? NormalizeTrackingMode(request.InventoryTrackingMode) : null,
             ServiceDescription = kind == "SERVICE" ? request.Description!.Trim() : null,
-            IsActive = true, CreatedAt = now, UpdatedAt = now
+            IsActive = true,
+            CreatedAt = now,
+            UpdatedAt = now
         };
         db.CatalogItems.Add(item);
-        try { await db.SaveChangesAsync(ct); }
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
         catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23505", ConstraintName: "uq_catalog_item_company_sku" })
-        { return Problem(context, 409, "catalog_sku_conflict", "This SKU is already used in the Company."); }
+        {
+            return Problem(context, 409, "catalog_sku_conflict", "This SKU is already used in the Company.");
+        }
         AddAudit(db, auth.Authorization!, "CatalogItem", item, "CATALOG_ITEM_CREATED", now);
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
@@ -417,11 +428,19 @@ public static partial class CatalogueEndpoints
         AddAudit(db, actor, type, record.Id, action, at);
     private static void AddAudit(PcHouseStoreDbContext db, ShopWriteAuditContext actor, string type, FaultRecord record, string action, DateTime at) =>
         AddAudit(db, actor, type, record.Id, action, at);
-    private static void AddAudit(PcHouseStoreDbContext db, ShopWriteAuditContext actor, string type, long id, string action, DateTime at) => db.CatalogueAuditEvents.Add(new CatalogueAuditEventRecord
-    {
-        CompanyId = actor.CompanyId, ShopId = actor.ShopId, ShopSessionId = actor.SessionId, ActorType = "SHOP_SESSION",
-        ActorEmployeeId = null, ResourceType = type, ResourceId = id, ActionCode = action, OccurredAt = at
-    });
+    private static void AddAudit(PcHouseStoreDbContext db, ShopWriteAuditContext actor, string type, long id, string action, DateTime at) =>
+        db.CatalogueAuditEvents.Add(new CatalogueAuditEventRecord
+        {
+            CompanyId = actor.CompanyId,
+            ShopId = actor.ShopId,
+            ShopSessionId = actor.SessionId,
+            ActorType = "SHOP_SESSION",
+            ActorEmployeeId = null,
+            ResourceType = type,
+            ResourceId = id,
+            ActionCode = action,
+            OccurredAt = at
+        });
 
     private sealed record ShopWriteAuditContext(long CompanyId, long ShopId, long SessionId);
     private sealed record ShopWriteResult(ShopWriteAuditContext? Authorization, IResult? Error);
