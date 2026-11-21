@@ -1,3 +1,5 @@
+> **SUPERSEDED — 2026-11-21:** This file is retained as legacy discovery/history only. The authoritative employee profile, credential, permission and direct-authentication rules are in [Employee Management](employee-management.md). Do not implement the old `MANAGER`/`TECHNICIAN` union, one-use `EmployeeActionAuthorization` flow, authorization headers, old API DTOs, employee-administration audit log or 12-character password policy from this document. The current implementation uses `EMPLOYEE`, `MANAGER`, `ADMIN` and fresh employee code/password validation in each protected request body.
+
 # Feature: Employee administration
 
 **Status:** APPROVED — product rules and technical patterns approved 2026-11-12  
