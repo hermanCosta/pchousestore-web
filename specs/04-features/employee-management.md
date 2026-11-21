@@ -241,10 +241,10 @@ Example:
 ## 11. Required technical reconciliation before implementation
 
 - Reconcile the current `Employee` / `EmployeeCredential` persistence mapping and add a mandatory-password-change state without creating a parallel credential store.
-- **COMPLETED — 2026-11-21:** Retired `EmployeeActionAuthorization` from the API, EF entity/configuration/DbSet and model snapshot. Added migration `20261121153000_RemoveEmployeeActionAuthorization` to drop the ephemeral token table and map `TECHNICIAN` to `EMPLOYEE`; apply only through the normal EF Core migration workflow.
+- **IMPLEMENTED — 2026-11-21:** Retired `EmployeeActionAuthorization` and `EmployeeAdministrationEventRecord` from API writes, EF entities/configurations/DbSets and the model snapshot. Migration `20261121153000_RemoveEmployeeActionAuthorization` drops both legacy tables and reconciles `TECHNICIAN` to `EMPLOYEE`; it has not yet been applied to a database.
 - **IMPLEMENTED IN MIGRATION — 2026-11-21:** Replace `TECHNICIAN` with `EMPLOYEE`, preserve `MANAGER` precedence where legacy dual assignments exist, and enforce one active profile per employee with a filtered unique index.
 - Apply the approved six-character minimum consistently to employee password validation in the API, UI and tests.
-- **IMPLEMENTED — 2026-11-21:** Employee administration and Shop credential operations now submit a fresh `employeeChallenge` in each protected request body. Added policy/migration tests; full build and database integration execution remain to be run.
+- **IMPLEMENTED — 2026-11-21:** Employee administration and Shop credential operations submit a fresh `employeeChallenge` in each protected request body. Added policy and migration-operation tests. CI build/test and database execution remain pending.
 - **IMPLEMENTED — 2026-11-21:** The deployment bootstrap now provisions the initial `ADMIN` profile (`BootstrapAdmin`); the legacy `BootstrapManager` operation name remains as a compatibility alias but also creates an `ADMIN`.
 - Keep Shop OIDC/session/token identity unchanged.
 - Inspect the legacy Java Swing employee screens, controller, DAO, model, password-reset and role checks. Record source references and distinguish confirmed legacy behavior from this approved redesign, per `AGENTS.md`.
