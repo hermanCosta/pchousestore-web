@@ -1,4 +1,4 @@
-> **SUPERSEDING PRODUCT DECISION (2026-11-20):** The employee authorization design in this document is superseded by [Employee Management](../04-features/employee-management.md). Do not use `TECHNICIAN` as an active role and do not create/use `EmployeeActionAuthorization` tokens, entities or endpoints. For every feature-defined protected operation, validate the acting employee's own credential directly in the backend, freshly for that operation, and enforce active status, Company membership and feature-specific role permission. Keep employee identity and roles out of the Shop OIDC token and ShopSession. All Shop OIDC/OAuth protocol, JWT validation and Shop-session rules in this document remain in force unless explicitly contradicted by the employee-management SPEC. The legacy employee authorization endpoint, token header, EF entity and table mapping have been removed from the current code; migration `20261121153000_RemoveEmployeeActionAuthorization` is pending application. Older endpoint/DTO descriptions below are historical only.
+> **SUPERSEDING PRODUCT DECISION (2026-11-20):** The employee authorization design in this document is superseded by [Employee Management](../04-features/employee-management.md). Do not use `TECHNICIAN` as an active role and do not create/use `EmployeeActionAuthorization` tokens, entities or endpoints. For every feature-defined protected operation, validate the acting employee's own credential directly in the backend, freshly for that operation, and enforce active status, Company membership and feature-specific role permission. Keep employee identity and roles out of the Shop OIDC token and ShopSession. All Shop OIDC/OAuth protocol, JWT validation and Shop-session rules in this document remain in force unless explicitly contradicted by the employee-management SPEC. The legacy employee authorization endpoint, token header, EF entity and table mapping have been removed from the current code; migration `20261121153000_RemoveEmployeeActionAuthorization` is pending application. Any remaining references to `EmployeeActionAuthorization` or its endpoint/DTO are historical only.
 
 # API Authentication and Token Security — OAuth 2.0 / OpenID Connect
 
@@ -38,15 +38,14 @@ The token/session must never include:
 
 ### Employee actor
 
-Employee authentication remains a separate, action-level business authorization mechanism:
+Employee identity is resolved only for operations whose feature specification requires employee authorization:
 
 1. The bearer token authenticates the current Shop context.
-2. For each protected write, React prompts for `employee_code` and password.
-3. The API validates the employee hash, active status, Company ownership and role permission for the requested action.
-4. It creates a short-lived `EmployeeActionAuthorization` bound to `ShopSession`, `Shop`, action code and operation-context hash.
-5. It consumes that authorization exactly once in the same database transaction as the business command.
+2. For each protected operation, the client collects the acting employee's code and password.
+3. The API validates the employee password hash, active status, Company membership and feature-specific permission on the server.
+4. The backend resolves the employee actor and executes the authorized business operation. The credential validation and business operation must be protected against replay and must not rely on a reusable or one-use authorization token.
 
-No employee access token is issued and the employee password challenge does not become an OAuth grant. A fresh employee challenge is required for the next protected action.
+No employee access token is issued, and the employee password challenge is not an OAuth grant. A fresh credential validation is required for each protected operation. Raw employee credentials must never be stored in logs, request hashes, idempotency snapshots or audit payloads. The active role baseline is `EMPLOYEE`, `MANAGER` and `ADMIN`; `ADMIN` inherits `MANAGER` permissions unless a feature-specific exception is explicitly defined.
 
 ## 3. Authorization Code + PKCE flow
 
@@ -77,7 +76,7 @@ Required standard claims/validation inputs:
 - `scope` — includes `shop.api`;
 - `company_id`, `shop_id`, `shop_session_id` — server-issued Shop context claims.
 
-No employee claim or employee role is allowed in this token. `MANAGER`/`TECHNICIAN` permissions are evaluated only by the employee action challenge and authorization policy.
+No employee claim or employee role is allowed in this token. Feature-specific employee permissions are evaluated by the backend after fresh credential validation; the active roles are `EMPLOYEE`, `MANAGER` and `ADMIN`, with `ADMIN` inheriting `MANAGER` permissions unless a feature-specific exception is explicitly defined.
 
 Initial token policy proposal:
 
@@ -95,7 +94,7 @@ The final expiry/idle values require a security/operations acceptance test; the 
 - Apply a default authorization policy to all `/api/v1/**` endpoints. Public exceptions are limited to health/readiness and OIDC protocol endpoints as required.
 - Require the `shop.api` scope for application API calls, then apply action-specific authorization policies.
 - Derive `CompanyId` and `ShopId` from the verified token and active ShopSession record. Reject or ignore client-supplied Shop identifiers as authorization context.
-- Apply request-rate limits to authorization, token and employee challenge endpoints by source/network and endpoint. Failed attempts never lock or disable credentials or create credential-specific rejection windows; do not invalidate the shared ShopSession.
+- Apply request-rate limits to authorization, token and employee credential-validation endpoints by source/network and endpoint. Failed employee credential attempts must not lock or disable employee credentials, create credential-specific rejection windows or invalidate the shared ShopSession.
 - Use HTTPS only, exact registered redirect URIs, strict allowed CORS origins, secure token signing-key storage, short token lifetimes, security headers/CSP and redacted logs.
 - React keeps access tokens in memory only; never write access/refresh/ID tokens to `localStorage`, `sessionStorage`, IndexedDB, analytics or browser logs. Never send ID tokens to the API.
 - Since API calls use an explicit Authorization header, do not add cookie-based authentication as an implicit fallback for `/api/v1/**`. The authorization server's own HttpOnly cookie is only for its Shop sign-in session.
@@ -116,7 +115,7 @@ The final expiry/idle values require a security/operations acceptance test; the 
 - Authorization server: OpenIddict Server + ASP.NET Core integration; EF Core token/application/authorization persistence.
 - Credentials: `ShopAccessCredential` with a vetted password hasher; keep it logically separate from `Employee.password_hash`.
 - API resource server: `Microsoft.AspNetCore.Authentication.JwtBearer` plus ASP.NET Core policy-based authorization.
-- Employee operation authorization: existing `EmployeeActionAuthorization` application/domain service; it is not replaced by OAuth.
+- Employee operation authorization: backend validation of fresh employee credentials for each feature-protected operation, including active status, Company membership and feature-specific permission. Do not create or use `EmployeeActionAuthorization`.
 - React: OIDC authorization-code client integration configured as a public SPA client with PKCE `S256` and memory-only token handling.
 
 OpenIddict's ASP.NET Core integration documents support for ASP.NET Core/.NET 10. Package versions must be pinned and tested together during implementation; do not copy an old package version from a sample without compatibility review.
