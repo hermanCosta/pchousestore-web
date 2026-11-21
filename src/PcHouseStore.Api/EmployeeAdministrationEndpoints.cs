@@ -272,32 +272,34 @@ public static class EmployeeAdministrationEndpoints
             return Problem(context, 409, "last_management_user", "The Company must retain at least one active MANAGER or ADMIN.");
 
         var now = DateTime.UtcNow;
-        var assignments = await db.EmployeeRoleAssignments.Where(x => x.CompanyId == actor.CompanyId && x.EmployeeId == employeeId)
+        var assignments = await db.EmployeeRoleAssignments.AsNoTracking()
+            .Where(x => x.CompanyId == actor.CompanyId && x.EmployeeId == employeeId)
             .ToListAsync(cancellationToken);
-        var desired = request.Roles.Select(NormalizeRole).ToHashSet(StringComparer.Ordinal);
-        foreach (var assignment in assignments)
-        {
-            var shouldBeActive = desired.Contains(assignment.RoleCode);
-            if (assignment.IsActive != shouldBeActive)
-            {
-                assignment.IsActive = shouldBeActive;
-                if (shouldBeActive)
-                {
-                    assignment.AssignedAt = now;
-                    assignment.AssignedByEmployeeId = actor.Id;
-                }
-            }
-        }
-        foreach (var missingRole in desired.Except(assignments.Select(x => x.RoleCode), StringComparer.Ordinal))
+        var desiredRole = request.Roles[0];
+        var existingDesiredRole = assignments.SingleOrDefault(x => x.RoleCode == desiredRole);
+
+        // Deactivate first, then activate the selected profile to satisfy the filtered unique index.
+        await db.EmployeeRoleAssignments
+            .Where(x => x.CompanyId == actor.CompanyId && x.EmployeeId == employeeId && x.IsActive)
+            .ExecuteUpdateAsync(update => update.SetProperty(x => x.IsActive, false), cancellationToken);
+
+        if (existingDesiredRole is null)
             db.EmployeeRoleAssignments.Add(new EmployeeRoleAssignmentRecord
             {
                 CompanyId = actor.CompanyId,
                 EmployeeId = employeeId,
-                RoleCode = missingRole,
+                RoleCode = desiredRole,
                 IsActive = true,
                 AssignedAt = now,
                 AssignedByEmployeeId = actor.Id
             });
+        else
+            await db.EmployeeRoleAssignments
+                .Where(x => x.Id == existingDesiredRole.Id && x.CompanyId == actor.CompanyId)
+                .ExecuteUpdateAsync(update => update
+                    .SetProperty(x => x.IsActive, true)
+                    .SetProperty(x => x.AssignedAt, now)
+                    .SetProperty(x => x.AssignedByEmployeeId, actor.Id), cancellationToken);
         employee.UpdatedAt = now;
         db.EmployeeAdministrationEvents.Add(NewEvent(actor.CompanyId, actor.Id, employeeId, "EMPLOYEE_ROLES_CHANGED"));
         await db.SaveChangesAsync(cancellationToken);
