@@ -14,6 +14,7 @@ jobs:
           dotnet-version: 10.0.x
       - run: dotnet restore PcHouseStore.sln
       - run: dotnet build PcHouseStore.sln --no-restore --configuration Release
+      - run: dotnet test PcHouseStore.sln --no-build --configuration Release
       - run: dotnet format PcHouseStore.sln --verify-no-changes --no-restore
 
   frontend:
