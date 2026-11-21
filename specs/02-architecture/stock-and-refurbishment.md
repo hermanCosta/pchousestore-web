@@ -176,3 +176,13 @@ Every refurbished unit sold by the Company carries a 12-month commercial guarant
 ## 11. Legacy evidence reconciliation
 
 See [Legacy Stock and ServiceOrder Reconciliation](legacy-stock-service-order-reconciliation.md) for the source-level comparison with `hermanCosta/pchousestoremvn`. The legacy application stores a manually editable product quantity and provides a low-stock listing, but the reviewed source does not establish a stock ledger, reservation lifecycle or automatic ServiceOrder/Sale stock deduction. The target has no minimum-stock field or reorder threshold: `qty` represents physical on-hand stock (`quantity_on_hand`), while reservations are tracked separately. The target stock ledger, explicit reservations, settlement consumption and independent pickup/refund/cancellation flows are approved redesign behavior, not legacy parity. Import legacy physical quantities only after a separate data-validation decision.
+
+
+## ServiceOrder Pickup stock rules (2026-11-20)
+
+- Pickup is allowed from both `FIXED` and `NOT_FIXED`; lifecycle becomes `PICKED` while technical outcome remains independently stored.
+- `FIXED`: Pickup performs no inventory movement and does not consume, release or mutate reservations. Reserved parts are consumed only by the existing full-financial-settlement rule.
+- `NOT_FIXED`: present all active reservations with reserved, used and calculated released quantities. Used quantity is an integer from zero through the active reserved quantity. Consume only used reserved quantity and release the unused remainder atomically with Pickup. Zero use releases all active reservations. If no active reservations exist, skip stock disposition. Unreserved products/quantities cannot be added to this command.
+- Financial balance is irrelevant to Pickup eligibility and stock disposition. Pickup does not settle, waive or refund any amount.
+- The stock disposition, movements, reservation updates, ServiceOrder state, immutable event and Note share one transaction. A rollback leaves no partial effects.
+- Require fresh employee code/password authorization, explicit confirmation, an idempotency key and concurrency protection. A repeated committed key returns its original result; a concurrent distinct command loses with a conflict. No direct undo/cancel is offered; corrections require a separate auditable stock operation.
