@@ -11,7 +11,14 @@ type Props = {
   onSubmit: (credentials: ManagerCredentials) => Promise<boolean>;
 };
 
-export default function ManagerCredentialsDialog({ open, busy, error, onCancel, onSubmit, credentialRole = "Manager or Admin" }: Props) {
+export default function ManagerCredentialsDialog({
+  open,
+  busy,
+  error,
+  onCancel,
+  onSubmit,
+  credentialRole = "Manager or Admin",
+}: Props) {
   const [employeeCode, setEmployeeCode] = useState("");
   const [password, setPassword] = useState("");
 
@@ -36,26 +43,66 @@ export default function ManagerCredentialsDialog({ open, busy, error, onCancel, 
 
   return (
     <div className="dialog-backdrop">
-      <section className="credential-dialog" role="dialog" aria-modal="true" aria-labelledby="manager-dialog-title">
+      <section
+        className="credential-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="manager-dialog-title"
+      >
         <div className="credential-dialog-heading">
-          <span className="dialog-lock-icon" aria-hidden="true">✓</span>
+          <span className="dialog-lock-icon" aria-hidden="true">
+            ✓
+          </span>
           <div>
-          <h2 id="manager-dialog-title">{credentialRole} verification</h2>
-        <p>Confirm this protected change with your employee credentials.</p>
+            <h2 id="manager-dialog-title">{credentialRole} verification</h2>
+            <p>Confirm this protected change with your employee credentials.</p>
           </div>
         </div>
-        {error && <p className="auth-error dialog-error" role="alert">{error}</p>}
-        <form className="auth-form" onSubmit={event => void submit(event)}>
-          <label className="auth-field">{credentialRole} employee code
-            <input required maxLength={40} autoComplete="username" autoFocus value={employeeCode} onChange={event => setEmployeeCode(event.target.value)} disabled={busy} />
+        {error && (
+          <p className="auth-error dialog-error" role="alert">
+            {error}
+          </p>
+        )}
+        <form className="auth-form" onSubmit={(event) => void submit(event)}>
+          <label className="auth-field">
+            {credentialRole} employee code
+            <input
+              required
+              maxLength={40}
+              autoComplete="username"
+              autoFocus
+              value={employeeCode}
+              onChange={(event) => setEmployeeCode(event.target.value)}
+              disabled={busy}
+            />
           </label>
-          <label className="auth-field">{credentialRole} password
-            <input required type="password" maxLength={128} autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} disabled={busy} />
+          <label className="auth-field">
+            {credentialRole} password
+            <input
+              required
+              type="password"
+              maxLength={128}
+              autoComplete="current-password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              disabled={busy}
+            />
           </label>
-          <p className="form-help">These credentials are used once and cleared after submission.</p>
+          <p className="form-help">
+            These credentials are used once and cleared after submission.
+          </p>
           <div className="dialog-actions">
-            <button type="button" className="secondary" onClick={onCancel} disabled={busy}>Cancel</button>
-            <button type="submit" disabled={busy}>{busy ? "Verifying…" : "Confirm change"}</button>
+            <button
+              type="button"
+              className="secondary"
+              onClick={onCancel}
+              disabled={busy}
+            >
+              Cancel
+            </button>
+            <button type="submit" disabled={busy}>
+              {busy ? "Verifying…" : "Confirm change"}
+            </button>
           </div>
         </form>
       </section>

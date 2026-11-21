@@ -1,8 +1,14 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import EmployeeAdministration, { type EmployeeAdminPage } from "./EmployeeAdministration";
-import CatalogueAdministration, { type CatalogueAdminPage } from "./CatalogueAdministration";
-import ManagerCredentialsDialog, { type ManagerCredentials } from "./ManagerCredentialsDialog";
+import EmployeeAdministration, {
+  type EmployeeAdminPage,
+} from "./EmployeeAdministration";
+import CatalogueAdministration, {
+  type CatalogueAdminPage,
+} from "./CatalogueAdministration";
+import ManagerCredentialsDialog, {
+  type ManagerCredentials,
+} from "./ManagerCredentialsDialog";
 import { apiBaseUrl, getShopAccessToken, userManager } from "../auth/oidc";
 
 let callbackProcessing: Promise<void> | undefined;
@@ -17,7 +23,11 @@ type ShopSession = {
   shopPhone: string | null;
   companyEmail: string | null;
 };
-type AdminPage = "shop-profile" | "shop-access-credential" | EmployeeAdminPage | CatalogueAdminPage;
+type AdminPage =
+  | "shop-profile"
+  | "shop-access-credential"
+  | EmployeeAdminPage
+  | CatalogueAdminPage;
 
 const adminPageTitles: Record<AdminPage, string> = {
   "shop-profile": "Shop profile",
@@ -34,8 +44,10 @@ const adminPageTitles: Record<AdminPage, string> = {
 const adminPageDescriptions: Record<AdminPage, string> = {
   "shop-profile": "Your active Shop details.",
   "shop-access-credential": "Manage this Shop's sign-in credential.",
-  "employee-password-change": "Change your employee credential. This is separate from the Shop sign-in password.",
-  "employee-directory-search": "Search and load employee records for this Company.",
+  "employee-password-change":
+    "Change your employee credential. This is separate from the Shop sign-in password.",
+  "employee-directory-search":
+    "Search and load employee records for this Company.",
   "create-employee": "Register an employee and assign their Company-wide role.",
   "employee-directory": "Review and administer employee registration records.",
   "customer-directory": "Search and manage Company customers.",
@@ -64,19 +76,25 @@ export default function App() {
     async function initialize() {
       try {
         if (window.location.pathname === "/auth/callback") {
-          callbackProcessing ??= userManager.signinRedirectCallback().then(() => {
-            window.history.replaceState({}, document.title, "/");
-          });
+          callbackProcessing ??= userManager
+            .signinRedirectCallback()
+            .then(() => {
+              window.history.replaceState({}, document.title, "/");
+            });
           await callbackProcessing;
         } else if (window.location.pathname === "/auth/logout-callback") {
-          callbackProcessing ??= userManager.signoutRedirectCallback().then(() => {
-            window.history.replaceState({}, document.title, "/");
-          });
+          callbackProcessing ??= userManager
+            .signoutRedirectCallback()
+            .then(() => {
+              window.history.replaceState({}, document.title, "/");
+            });
           await callbackProcessing;
         } else if (window.location.pathname === "/auth/silent-callback") {
-          silentCallbackProcessing ??= userManager.signinSilentCallback().finally(() => {
-            silentCallbackProcessing = undefined;
-          });
+          silentCallbackProcessing ??= userManager
+            .signinSilentCallback()
+            .finally(() => {
+              silentCallbackProcessing = undefined;
+            });
           await silentCallbackProcessing;
           return;
         }
@@ -91,30 +109,50 @@ export default function App() {
         const response = await fetch(`${apiBaseUrl}/api/v1/session`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        if (response.status === 401) throw new Error("The API rejected the access token (HTTP 401). Please sign in again.");
-        if (response.status === 403) throw new Error("The access token is missing the required Shop API scope (HTTP 403).");
-        if (!response.ok) throw new Error(`Session verification failed (HTTP ${response.status}).`);
-        const session = await response.json() as ShopSession;
+        if (response.status === 401)
+          throw new Error(
+            "The API rejected the access token (HTTP 401). Please sign in again.",
+          );
+        if (response.status === 403)
+          throw new Error(
+            "The access token is missing the required Shop API scope (HTTP 403).",
+          );
+        if (!response.ok)
+          throw new Error(
+            `Session verification failed (HTTP ${response.status}).`,
+          );
+        const session = (await response.json()) as ShopSession;
         if (active) {
           setShop(session);
-          setCredentialVersion(window.sessionStorage.getItem(`pc-house-credential-version.${session.shopId}`) ?? "1");
+          setCredentialVersion(
+            window.sessionStorage.getItem(
+              `pc-house-credential-version.${session.shopId}`,
+            ) ?? "1",
+          );
           setStatus("Shop signed in");
         }
       } catch (cause) {
-        if (active) setError(cause instanceof Error ? cause.message : "Sign-in failed.");
+        if (active)
+          setError(cause instanceof Error ? cause.message : "Sign-in failed.");
       }
     }
     void initialize();
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, []);
 
-  useEffect(() => userManager.events.addSilentRenewError(() => {
-    void userManager.removeUser().finally(() => {
-      setShop(null);
-      setStatus("Your Shop session has expired. Sign in again.");
-      setError(null);
-    });
-  }), []);
+  useEffect(
+    () =>
+      userManager.events.addSilentRenewError(() => {
+        void userManager.removeUser().finally(() => {
+          setShop(null);
+          setStatus("Your Shop session has expired. Sign in again.");
+          setError(null);
+        });
+      }),
+    [],
+  );
 
   async function handleCredentialSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -124,57 +162,89 @@ export default function App() {
     setManagerDialogOpen(true);
   }
 
-  async function confirmShopChange(credentials: ManagerCredentials): Promise<boolean> {
+  async function confirmShopChange(
+    credentials: ManagerCredentials,
+  ): Promise<boolean> {
     if (!shop || saving) return false;
     setSaving(true);
     setError(null);
     setNotice(null);
     try {
       const token = await getShopAccessToken();
-      if (!token) throw new Error("Your Shop session has expired. Sign in again.");
+      if (!token)
+        throw new Error("Your Shop session has expired. Sign in again.");
       const version = Number(credentialVersion);
-      if (!Number.isSafeInteger(version) || version < 1) throw new Error("Enter a valid credential version.");
+      if (!Number.isSafeInteger(version) || version < 1)
+        throw new Error("Enter a valid credential version.");
 
-      const actionCode = action === "rotate" ? "SHOP_ACCESS_CREDENTIAL_ROTATE" : "SHOP_ACCESS_CREDENTIAL_CHANGE_STATUS";
-      const challenge = await fetch(`${apiBaseUrl}/api/v1/employee-action-authorizations`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          employeeCode: credentials.employeeCode,
-          password: credentials.password,
-          actionCode,
-          resourceType: "Shop",
-          resourceId: shop.shopId,
-          targetShopId: Number(shop.shopId),
-          operationContext: { credentialVersion: version },
-        }),
-      });
-      if (!challenge.ok) throw await apiError(challenge);
-      const authorization = await challenge.json() as { authorizationToken: string };
-      const response = await fetch(`${apiBaseUrl}/api/v1/shops/${encodeURIComponent(shop.shopId)}/access-credential`, {
-        method: action === "rotate" ? "PUT" : "PATCH",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-          "X-Employee-Action-Authorization": authorization.authorizationToken,
+      const actionCode =
+        action === "rotate"
+          ? "SHOP_ACCESS_CREDENTIAL_ROTATE"
+          : "SHOP_ACCESS_CREDENTIAL_CHANGE_STATUS";
+      const challenge = await fetch(
+        `${apiBaseUrl}/api/v1/employee-action-authorizations`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            employeeCode: credentials.employeeCode,
+            password: credentials.password,
+            actionCode,
+            resourceType: "Shop",
+            resourceId: shop.shopId,
+            targetShopId: Number(shop.shopId),
+            operationContext: { credentialVersion: version },
+          }),
         },
-        body: JSON.stringify(action === "rotate"
-          ? { newPassword: newShopPassword, expectedCredentialVersion: version }
-          : { isActive, expectedCredentialVersion: version }),
-      });
+      );
+      if (!challenge.ok) throw await apiError(challenge);
+      const authorization = (await challenge.json()) as {
+        authorizationToken: string;
+      };
+      const response = await fetch(
+        `${apiBaseUrl}/api/v1/shops/${encodeURIComponent(shop.shopId)}/access-credential`,
+        {
+          method: action === "rotate" ? "PUT" : "PATCH",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+            "X-Employee-Action-Authorization": authorization.authorizationToken,
+          },
+          body: JSON.stringify(
+            action === "rotate"
+              ? {
+                  newPassword: newShopPassword,
+                  expectedCredentialVersion: version,
+                }
+              : { isActive, expectedCredentialVersion: version },
+          ),
+        },
+      );
       if (!response.ok) throw await apiError(response);
 
-      window.sessionStorage.setItem(`pc-house-credential-version.${shop.shopId}`, String(version + 1));
+      window.sessionStorage.setItem(
+        `pc-house-credential-version.${shop.shopId}`,
+        String(version + 1),
+      );
       setCredentialVersion(String(version + 1));
       setNewShopPassword("");
-      setNotice("Credential updated. All sessions for this Shop were signed out; sign in again to continue.");
+      setNotice(
+        "Credential updated. All sessions for this Shop were signed out; sign in again to continue.",
+      );
       await userManager.removeUser();
       setShop(null);
       setStatus("Shop credential updated");
       setManagerDialogOpen(false);
       return true;
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "The credential could not be updated.");
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "The credential could not be updated.",
+      );
       return false;
     } finally {
       setNewShopPassword("");
@@ -196,23 +266,48 @@ export default function App() {
       await userManager.signoutRedirect();
     } catch (cause) {
       setSigningOut(false);
-      setError(cause instanceof Error ? cause.message : "Sign out could not be started.");
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Sign out could not be started.",
+      );
     }
   }
 
-  if (window.location.pathname === "/auth/callback" || window.location.pathname === "/auth/logout-callback" || window.location.pathname === "/auth/silent-callback") {
-    const isSilentCallback = window.location.pathname === "/auth/silent-callback";
+  if (
+    window.location.pathname === "/auth/callback" ||
+    window.location.pathname === "/auth/logout-callback" ||
+    window.location.pathname === "/auth/silent-callback"
+  ) {
+    const isSilentCallback =
+      window.location.pathname === "/auth/silent-callback";
     return (
       <main className="auth-shell">
         <section className="auth-card" aria-live="polite">
           <Brand />
           <div className="auth-content">
-            <h1>{isSilentCallback ? "Renewing Shop session" : window.location.pathname === "/auth/callback" ? "Completing sign-in" : "Completing sign out"}</h1>
-            <p className="auth-description">{isSilentCallback ? "Please wait while your access is renewed." : window.location.pathname === "/auth/callback" ? "Please wait while your Shop session is verified." : "Please wait while your Shop session is cleared."}</p>
+            <h1>
+              {isSilentCallback
+                ? "Renewing Shop session"
+                : window.location.pathname === "/auth/callback"
+                  ? "Completing sign-in"
+                  : "Completing sign out"}
+            </h1>
+            <p className="auth-description">
+              {isSilentCallback
+                ? "Please wait while your access is renewed."
+                : window.location.pathname === "/auth/callback"
+                  ? "Please wait while your Shop session is verified."
+                  : "Please wait while your Shop session is cleared."}
+            </p>
             {error && (
               <div className="auth-error" role="alert">
                 <p>{error}</p>
-                <button onClick={() => window.location.assign("/")}>{window.location.pathname === "/auth/callback" ? "Restart sign-in" : "Return to Shop access"}</button>
+                <button onClick={() => window.location.assign("/")}>
+                  {window.location.pathname === "/auth/callback"
+                    ? "Restart sign-in"
+                    : "Return to Shop access"}
+                </button>
               </div>
             )}
           </div>
@@ -224,15 +319,137 @@ export default function App() {
   return (
     <main className={shop ? "auth-shell auth-shell-full" : "auth-shell"}>
       <section className={shop ? "auth-card auth-card-wide" : "auth-card"}>
-        <div className="app-header"><Brand />{shop && <div className="admin-menu">
-          <button className="admin-menu-trigger" aria-label="Open administration menu" aria-expanded={menuOpen} onClick={() => setMenuOpen(value => !value)}><span/><span/><span/></button>
-          {menuOpen && <nav className="admin-menu-panel" aria-label="Administration">
-            <p>SHOP</p><button className="admin-menu-item" aria-current={activePage === "shop-profile" ? "page" : undefined} onClick={() => navigateAdmin("shop-profile")}>Shop profile</button><button className="admin-menu-item" aria-current={activePage === "shop-access-credential" ? "page" : undefined} onClick={() => navigateAdmin("shop-access-credential")}>Shop access credential</button>
-            <p>EMPLOYEES</p><button className="admin-menu-item" aria-current={activePage === "employee-password-change" ? "page" : undefined} onClick={() => navigateAdmin("employee-password-change")}>Change my password</button><button className="admin-menu-item" aria-current={activePage === "employee-directory-search" ? "page" : undefined} onClick={() => navigateAdmin("employee-directory-search")}>Load employees</button><button className="admin-menu-item" aria-current={activePage === "create-employee" ? "page" : undefined} onClick={() => navigateAdmin("create-employee")}>Create employee</button><button className="admin-menu-item" aria-current={activePage === "employee-directory" ? "page" : undefined} onClick={() => navigateAdmin("employee-directory")}>Employee directory</button>
-            <p>CATALOGUE</p><button className="admin-menu-item" aria-current={activePage === "customer-directory" ? "page" : undefined} onClick={() => navigateAdmin("customer-directory")}>Customers</button><button className="admin-menu-item" aria-current={activePage === "catalog-items" ? "page" : undefined} onClick={() => navigateAdmin("catalog-items")}>Products and Services</button><button className="admin-menu-item" aria-current={activePage === "product-categories" ? "page" : undefined} onClick={() => navigateAdmin("product-categories")}>Product categories</button><button className="admin-menu-item" aria-current={activePage === "fault-catalogue" ? "page" : undefined} onClick={() => navigateAdmin("fault-catalogue")}>Fault catalogue</button>
-            <p>SESSION</p><button className="admin-menu-item" disabled={signingOut} onClick={() => { setMenuOpen(false); void handleSignOut(); }}>{signingOut ? "Signing out…" : "Sign out"}</button>
-          </nav>}
-        </div>}</div>
+        <div className="app-header">
+          <Brand />
+          {shop && (
+            <div className="admin-menu">
+              <button
+                className="admin-menu-trigger"
+                aria-label="Open administration menu"
+                aria-expanded={menuOpen}
+                onClick={() => setMenuOpen((value) => !value)}
+              >
+                <span />
+                <span />
+                <span />
+              </button>
+              {menuOpen && (
+                <nav className="admin-menu-panel" aria-label="Administration">
+                  <p>SHOP</p>
+                  <button
+                    className="admin-menu-item"
+                    aria-current={
+                      activePage === "shop-profile" ? "page" : undefined
+                    }
+                    onClick={() => navigateAdmin("shop-profile")}
+                  >
+                    Shop profile
+                  </button>
+                  <button
+                    className="admin-menu-item"
+                    aria-current={
+                      activePage === "shop-access-credential"
+                        ? "page"
+                        : undefined
+                    }
+                    onClick={() => navigateAdmin("shop-access-credential")}
+                  >
+                    Shop access credential
+                  </button>
+                  <p>EMPLOYEES</p>
+                  <button
+                    className="admin-menu-item"
+                    aria-current={
+                      activePage === "employee-password-change"
+                        ? "page"
+                        : undefined
+                    }
+                    onClick={() => navigateAdmin("employee-password-change")}
+                  >
+                    Change my password
+                  </button>
+                  <button
+                    className="admin-menu-item"
+                    aria-current={
+                      activePage === "employee-directory-search"
+                        ? "page"
+                        : undefined
+                    }
+                    onClick={() => navigateAdmin("employee-directory-search")}
+                  >
+                    Load employees
+                  </button>
+                  <button
+                    className="admin-menu-item"
+                    aria-current={
+                      activePage === "create-employee" ? "page" : undefined
+                    }
+                    onClick={() => navigateAdmin("create-employee")}
+                  >
+                    Create employee
+                  </button>
+                  <button
+                    className="admin-menu-item"
+                    aria-current={
+                      activePage === "employee-directory" ? "page" : undefined
+                    }
+                    onClick={() => navigateAdmin("employee-directory")}
+                  >
+                    Employee directory
+                  </button>
+                  <p>CATALOGUE</p>
+                  <button
+                    className="admin-menu-item"
+                    aria-current={
+                      activePage === "customer-directory" ? "page" : undefined
+                    }
+                    onClick={() => navigateAdmin("customer-directory")}
+                  >
+                    Customers
+                  </button>
+                  <button
+                    className="admin-menu-item"
+                    aria-current={
+                      activePage === "catalog-items" ? "page" : undefined
+                    }
+                    onClick={() => navigateAdmin("catalog-items")}
+                  >
+                    Products and Services
+                  </button>
+                  <button
+                    className="admin-menu-item"
+                    aria-current={
+                      activePage === "product-categories" ? "page" : undefined
+                    }
+                    onClick={() => navigateAdmin("product-categories")}
+                  >
+                    Product categories
+                  </button>
+                  <button
+                    className="admin-menu-item"
+                    aria-current={
+                      activePage === "fault-catalogue" ? "page" : undefined
+                    }
+                    onClick={() => navigateAdmin("fault-catalogue")}
+                  >
+                    Fault catalogue
+                  </button>
+                  <p>SESSION</p>
+                  <button
+                    className="admin-menu-item"
+                    disabled={signingOut}
+                    onClick={() => {
+                      setMenuOpen(false);
+                      void handleSignOut();
+                    }}
+                  >
+                    {signingOut ? "Signing out…" : "Sign out"}
+                  </button>
+                </nav>
+              )}
+            </div>
+          )}
+        </div>
         <div className="auth-content">
           <h1>{shop ? adminPageTitles[activePage] : "Shop access"}</h1>
           <p className="auth-description">
@@ -244,27 +461,74 @@ export default function App() {
             {shop ? `Signed in to ${shop.shopName} (${shop.shopCode})` : status}
           </p>
           {shop && activePage === "shop-profile" && (
-            <dl id="shop-profile" className="shop-profile" aria-label="Active Shop profile">
-              <div><dt>Shop</dt><dd>{shop.shopName}</dd></div>
-              <div><dt>Address</dt><dd>{shop.shopAddress || "Not set"}</dd></div>
-              <div><dt>Phone</dt><dd>{shop.shopPhone || "Not set"}</dd></div>
-              <div><dt>Email</dt><dd>{shop.companyEmail || "Not set"}</dd></div>
+            <dl
+              id="shop-profile"
+              className="shop-profile"
+              aria-label="Active Shop profile"
+            >
+              <div>
+                <dt>Shop</dt>
+                <dd>{shop.shopName}</dd>
+              </div>
+              <div>
+                <dt>Address</dt>
+                <dd>{shop.shopAddress || "Not set"}</dd>
+              </div>
+              <div>
+                <dt>Phone</dt>
+                <dd>{shop.shopPhone || "Not set"}</dd>
+              </div>
+              <div>
+                <dt>Email</dt>
+                <dd>{shop.companyEmail || "Not set"}</dd>
+              </div>
             </dl>
           )}
-          {error && <p className="auth-error" role="alert">{error}</p>}
-          {notice && <p className="auth-notice" role="status">{notice}</p>}
+          {error && (
+            <p className="auth-error" role="alert">
+              {error}
+            </p>
+          )}
+          {notice && (
+            <p className="auth-notice" role="status">
+              {notice}
+            </p>
+          )}
           {shop && activePage === "shop-access-credential" && (
-            <form id="shop-access-credential" className="auth-form credential-form" onSubmit={handleCredentialSubmit}>
+            <form
+              id="shop-access-credential"
+              className="auth-form credential-form"
+              onSubmit={handleCredentialSubmit}
+            >
               <h2>Shop access credential</h2>
-              <p className="form-help">Changes apply to {shop.shopName}. You will need to sign in again after saving.</p>
+              <p className="form-help">
+                Changes apply to {shop.shopName}. You will need to sign in again
+                after saving.
+              </p>
               <label className="auth-field">
                 Credential version
-                <input type="number" min="1" step="1" required value={credentialVersion} onChange={event => setCredentialVersion(event.target.value)} />
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  required
+                  value={credentialVersion}
+                  onChange={(event) => setCredentialVersion(event.target.value)}
+                />
               </label>
-              <p className="form-help">This version is remembered in this browser after a successful update. If another Manager changed the credential, enter its current version and request fresh verification.</p>
+              <p className="form-help">
+                This version is remembered in this browser after a successful
+                update. If another Manager changed the credential, enter its
+                current version and request fresh verification.
+              </p>
               <label className="auth-field">
                 Operation
-                <select value={action} onChange={event => setAction(event.target.value as "rotate" | "status")}>
+                <select
+                  value={action}
+                  onChange={(event) =>
+                    setAction(event.target.value as "rotate" | "status")
+                  }
+                >
                   <option value="rotate">Change Shop password</option>
                   <option value="status">Change credential status</option>
                 </select>
@@ -272,30 +536,74 @@ export default function App() {
               {action === "rotate" ? (
                 <label className="auth-field">
                   New Shop password
-                  <input type="password" minLength={12} maxLength={128} autoComplete="new-password" required value={newShopPassword} onChange={event => setNewShopPassword(event.target.value)} />
+                  <input
+                    type="password"
+                    minLength={12}
+                    maxLength={128}
+                    autoComplete="new-password"
+                    required
+                    value={newShopPassword}
+                    onChange={(event) => setNewShopPassword(event.target.value)}
+                  />
                 </label>
               ) : (
                 <>
                   <label className="auth-field">
                     Status
-                    <select value={isActive ? "active" : "disabled"} onChange={event => setIsActive(event.target.value === "active")}>
+                    <select
+                      value={isActive ? "active" : "disabled"}
+                      onChange={(event) =>
+                        setIsActive(event.target.value === "active")
+                      }
+                    >
                       <option value="active">Enabled</option>
                       <option value="disabled">Disabled</option>
                     </select>
                   </label>
                 </>
               )}
-              <button className="auth-submit" disabled={saving}>{saving ? "Saving…" : "Save credential"}</button>
+              <button className="auth-submit" disabled={saving}>
+                {saving ? "Saving…" : "Save credential"}
+              </button>
             </form>
           )}
-          {shop && (activePage === "employee-password-change" || activePage === "employee-directory-search" || activePage === "create-employee" || activePage === "employee-directory") &&
-            <EmployeeAdministration page={activePage} getShopAccessToken={getShopAccessToken} />}
-          {shop && (activePage === "customer-directory" || activePage === "catalog-items" || activePage === "product-categories" || activePage === "fault-catalogue") &&
-            <CatalogueAdministration page={activePage} getShopAccessToken={getShopAccessToken} />}
+          {shop &&
+            (activePage === "employee-password-change" ||
+              activePage === "employee-directory-search" ||
+              activePage === "create-employee" ||
+              activePage === "employee-directory") && (
+              <EmployeeAdministration
+                page={activePage}
+                getShopAccessToken={getShopAccessToken}
+              />
+            )}
+          {shop &&
+            (activePage === "customer-directory" ||
+              activePage === "catalog-items" ||
+              activePage === "product-categories" ||
+              activePage === "fault-catalogue") && (
+              <CatalogueAdministration
+                page={activePage}
+                getShopAccessToken={getShopAccessToken}
+              />
+            )}
           <div className="auth-actions">
-            {!shop && <button onClick={() => void userManager.signinRedirect()}>Sign in</button>}
+            {!shop && (
+              <button onClick={() => void userManager.signinRedirect()}>
+                Sign in
+              </button>
+            )}
           </div>
-          <ManagerCredentialsDialog open={managerDialogOpen} busy={saving} error={error} onCancel={() => { setManagerDialogOpen(false); setError(null); }} onSubmit={confirmShopChange} />
+          <ManagerCredentialsDialog
+            open={managerDialogOpen}
+            busy={saving}
+            error={error}
+            onCancel={() => {
+              setManagerDialogOpen(false);
+              setError(null);
+            }}
+            onSubmit={confirmShopChange}
+          />
         </div>
       </section>
     </main>
@@ -304,8 +612,15 @@ export default function App() {
 
 async function apiError(response: Response): Promise<Error> {
   try {
-    const problem = await response.json() as { detail?: string; code?: string };
-    return new Error(problem.detail ?? problem.code ?? `Request failed (HTTP ${response.status}).`);
+    const problem = (await response.json()) as {
+      detail?: string;
+      code?: string;
+    };
+    return new Error(
+      problem.detail ??
+        problem.code ??
+        `Request failed (HTTP ${response.status}).`,
+    );
   } catch {
     return new Error(`Request failed (HTTP ${response.status}).`);
   }
