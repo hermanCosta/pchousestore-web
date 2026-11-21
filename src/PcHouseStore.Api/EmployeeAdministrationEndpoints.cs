@@ -430,7 +430,7 @@ public static class EmployeeAdministrationEndpoints
 
     private static string? NormalizeEmail(string? email) => string.IsNullOrWhiteSpace(email) ? null : email.Trim().ToLowerInvariant();
     private static bool ValidPassword(string? password) => !string.IsNullOrEmpty(password) && password.Length is >= 6 and <= 128;
-    private static bool ValidRoles(IReadOnlyCollection<string>? roles) => roles is { Count: > 0 and <= 3 } &&
+    private static bool ValidRoles(IReadOnlyCollection<string>? roles) => roles is { Count: 1 } &&
         roles.All(x => x is "EMPLOYEE" or "MANAGER" or "ADMIN") && roles.Distinct(StringComparer.Ordinal).Count() == roles.Count;
     private static string NormalizeRole(string role) => role.Trim().ToUpperInvariant();
 
