@@ -1,6 +1,6 @@
 # Financial Model — Ireland deployment
 
-**Status:** Approved operational v1 financial rules; customer-facing deposit wording, legal terms, tax and accounting mappings remain subject to external review. Revision v16 (8 November 2026). This is an operational data model, not legal, tax or accounting advice.
+**Status:** Approved operational v1 financial rules, reconciled with employee authorization and refund decisions as of 2026-11-21. Customer-facing deposit wording, legal terms, tax and accounting mappings remain subject to external review. This is an operational data model, not legal, tax or accounting advice.
 
 ## 1. Scope and decisions
 
@@ -11,7 +11,7 @@ The model supports one Company with multiple Shops, a persistent Shop session an
 | Tender methods | `CASH` and `CARD` only in v1; enabled per Shop | DECIDED |
 | Service deposits | Receive at service booking; track purpose and disposition | DECIDED |
 | Weekly refurbished instalments | Plan plus dated schedule and receipts | DECIDED; fulfillment/legal mode pending |
-| Refunds | Partial and total; `MANAGER` and `ADMIN`; original tender by default | DECIDED v1 baseline |
+| Refunds | Partial and total; `MANAGER` and `ADMIN`; original tender only | DECIDED v1 baseline |
 | Currency | EUR | DECIDED baseline |
 | Cash rounding | Optional per Shop, Ireland €0.05 cash-only rounding | DECIDED baseline |
 | Approval policy | Every refund requires a fresh `MANAGER` or `ADMIN` code/password challenge; deposit forfeiture requires `MANAGER`; no second approver | DECIDED v1 baseline |
@@ -71,7 +71,7 @@ Alternative terminal outcomes include `REFUNDED` and `FORFEITED`; a partially re
 
 - A deposit received at booking is a cash/bank/card movement and appears in the correct Shop cash/financial report.
 - It is not automatically applied to `ServiceOrder.balance_due`.
-- `DepositApplication` is an explicit, non-cash operation that credits the service order, optionally against a specific `ServiceOrderItem`. It must be employee-authorized and cannot exceed the deposit's available held balance.
+- `DepositApplication` is an explicit, non-cash operation that credits the service order, optionally against a specific `ServiceOrderItem`. It requires fresh direct employee credential validation and feature-specific permission, and cannot exceed the deposit's available held balance.
 - `DEPOSIT_REFUND` is a real outgoing payment linked to the original deposit receipt. Refund tender allocations identify how money was returned. It is distinct from `REFUND`, which applies only to an original settled `PAYMENT`; deposit refunds follow deposit lifecycle and available-held-balance rules.
 - No expiry/forfeiture runs automatically. If no customer response has been recorded for 90 days, set an operational `REVIEW_REQUIRED` flag and prompt the Shop to contact the customer; this is not a legal expiry date.
 - Before receipt, snapshot the service/part purpose, expected fulfilment date, refund/cancellation terms and customer acknowledgement.
@@ -119,7 +119,7 @@ Every refund is a separate positive-magnitude `PaymentTransaction` with kind `RE
 
 Validation must lock or use optimistic concurrency on the original transaction so concurrent refund requests cannot over-refund it. A full refund is simply a refund whose amount equals the remaining refundable amount. Partial refunds may be item-linked through `PaymentRefundLine`; order-level refunds are allowed with a documented reason.
 
-- Every refund requires a fresh `MANAGER` or `ADMIN` code/password challenge, regardless of amount. The backend directly validates the employee credential, active status, Company membership and permission; no action-authorization token/entity/endpoint is created or consumed. No second approver is required.
+- Every refund requires a fresh `MANAGER` or `ADMIN` code/password challenge, regardless of amount. The backend directly validates the employee credential, active status, Company membership and permission; no action-authorization token/entity/endpoint is created, persisted or consumed. No second approver is required.
 - Refund is allocated back to the original tender by default. For a split CASH/CARD receipt, each refund allocation is linked to the original `PaymentAllocation` and cannot exceed that allocation's remaining refundable amount. Alternative tender is disabled in v1.
 - For CARD, the authorized `MANAGER` or `ADMIN` performs the refund on the external terminal against the original card transaction, then records the result/reference in the application. Do not store card numbers or security data.
 - A refund transaction does not automatically restock inventory. Physical items returned to the Shop are selected separately through `StockReturn`/`StockReturnLine`, with quantity capped at previously consumed less already returned. A monetary refund and physical return are separate records.
@@ -127,9 +127,9 @@ Validation must lock or use optimistic concurrency on the original transaction s
 
 ## 7. Approval and employee accountability
 
-The persistent ShopSession remains the store context only. Every receipt, deposit application, deposit refund/forfeiture, instalment plan acceptance, instalment receipt, refund, adjustment and cash movement requires a fresh employee credential challenge.
+The persistent ShopSession remains the store context only. Every receipt, deposit application, deposit refund/forfeiture, instalment plan acceptance, instalment receipt, refund, adjustment and cash movement requires fresh direct employee credential validation in the backend, including active status, Company membership and feature-specific permission.
 
-The v1 approval policy is role-based, not amount-threshold based: `MANAGER` and `ADMIN` can execute payment refunds and deposit refunds, each using one fresh employee authorization. Deposit forfeiture remains `MANAGER`-only and requires one fresh Manager authorization. No second approver is required. `BusinessActionApproval` remains available for future actions that explicitly need dual control, but it is not inserted into these standard flows. `ADMIN` inherits the Manager permission set except where a feature-specific rule explicitly restricts an action. The actor is Company-wide and may operate in any Shop under the same Company.
+The v1 approval policy is role-based, not amount-threshold based: `MANAGER` and `ADMIN` can execute payment refunds and deposit refunds, each after fresh direct backend validation of the employee's code/password, active status, Company membership and feature-specific permission. Deposit forfeiture remains `MANAGER`-only and requires the same fresh direct validation. Do not issue, persist, consume or reuse an `EmployeeActionAuthorization`. No second approver is required. `BusinessActionApproval` remains available for future actions that explicitly need dual control, but it is not inserted into these standard flows. `ADMIN` inherits the Manager permission set except where a feature-specific rule explicitly restricts an action. The actor is Company-wide and may operate in any Shop under the same Company.
 
 ## 8. ServiceOrder financial and stock orchestration
 
@@ -139,7 +139,7 @@ FIN-01 owns the financial command and ledger rules. For a financial action assoc
 - If any step fails, the entire operation rolls back: no payment/application, balance update, stock movement, reservation mutation, event, Note or committed idempotency result may remain.
 - A partial payment or an unapplied deposit does not consume stock. A `NOT_FIXED` ServiceOrder payment settlement or deposit application never consumes or releases reservations; its stock disposition remains exclusively part of the Pickup command.
 - A financial action that does not trigger stock consumption still persists its financial record/event and required ServiceOrder `BusinessNote` atomically in one transaction.
-- Every successfully committed financial action associated with a ServiceOrder—including payment, deposit receipt, deposit application, payment refund and deposit refund—must append an employee-attributed `BusinessNote` containing the action/result and relevant transaction reference. Store the resolved employee identity and name snapshot plus timestamp as structured metadata. The financial ledger/event remains authoritative; the Note is an append-only operational history entry. A failed or rolled-back action creates no Note.
+- Every successfully committed financial action associated with a ServiceOrder—including payment, deposit receipt, deposit application, payment refund and deposit refund—must append an employee-attributed `BusinessNote` containing the action/result and relevant transaction reference. Resolve the employee from the fresh direct credential validation; never accept the actor identity from the client. Store the resolved employee identity and name snapshot plus timestamp as structured metadata. The financial ledger/event remains authoritative; the Note is an append-only operational history entry. A failed or rolled-back action creates no Note.
 - `REFUND` eligibility for a ServiceOrder payment requires an existing settled incoming `PAYMENT`, a positive refundable remainder, technical outcome `NOT_FIXED`, and lifecycle status `NOT_FIXED` or `PICKED`. This condition must be enforced by the backend, not only by UI visibility. A `DEPOSIT_REFUND` is a separate operation governed by the deposit's refundable held balance and lifecycle; it must not be represented as `REFUND` or counted against a payment's refundable remainder.
 - Payment settlement and deposit application commands that can be retried must use the shared idempotency persistence rules. A committed replay returns the original result without repeating financial, stock, event or Note effects; a rolled-back attempt leaves no committed record and may be retried.
 
