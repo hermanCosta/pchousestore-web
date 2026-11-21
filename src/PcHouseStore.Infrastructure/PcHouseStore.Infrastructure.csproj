@@ -1,7 +1,25 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <Compile Include="**/*.cs" />
+    <Compile Include="DependencyInjection.cs" />
+    <Compile Include="Persistence/Configurations/AuthenticationConfigurations.cs" />
+    <Compile Include="Persistence/Configurations/CatalogueConfigurations.cs" />
+    <Compile Include="Persistence/Entities/AuthenticationEntities.cs" />
+    <Compile Include="Persistence/Migrations/20261112005610_AuthenticationFoundationInitial.Designer.cs" />
+    <Compile Include="Persistence/Migrations/20261112005610_AuthenticationFoundationInitial.cs" />
+    <Compile Include="Persistence/Migrations/20261113004053_EmployeeAdministration.Designer.cs" />
+    <Compile Include="Persistence/Migrations/20261113004053_EmployeeAdministration.cs" />
+    <Compile Include="Persistence/Migrations/20261113010857_DeploymentOperatorEmployeeBootstrap.Designer.cs" />
+    <Compile Include="Persistence/Migrations/20261113010857_DeploymentOperatorEmployeeBootstrap.cs" />
+    <Compile Include="Persistence/Migrations/20261114013424_CustomerAndCatalogueFoundation.Designer.cs" />
+    <Compile Include="Persistence/Migrations/20261114013424_CustomerAndCatalogueFoundation.cs" />
+    <Compile Include="Persistence/Migrations/20261114024313_CatalogueShopSessionAudit.Designer.cs" />
+    <Compile Include="Persistence/Migrations/20261114024313_CatalogueShopSessionAudit.cs" />
+    <Compile Include="Persistence/Migrations/20261121153000_RemoveEmployeeActionAuthorization.Designer.cs" />
+    <Compile Include="Persistence/Migrations/20261121153000_RemoveEmployeeActionAuthorization.cs" />
+    <Compile Include="Persistence/Migrations/PcHouseStoreDbContextModelSnapshot.cs" />
+    <Compile Include="Persistence/PcHouseStoreDbContext.cs" />
+    <Compile Include="Persistence/PcHouseStoreDesignTimeDbContextFactory.cs" />
   </ItemGroup>
 
   <ItemGroup>
