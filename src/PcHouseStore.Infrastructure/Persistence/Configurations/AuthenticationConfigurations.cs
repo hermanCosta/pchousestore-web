@@ -84,30 +84,6 @@ public sealed class EmployeeRecordConfiguration : IEntityTypeConfiguration<Emplo
     }
 }
 
-public sealed class EmployeeAdministrationEventRecordConfiguration : IEntityTypeConfiguration<EmployeeAdministrationEventRecord>
-{
-    public void Configure(EntityTypeBuilder<EmployeeAdministrationEventRecord> builder)
-    {
-        builder.ToTable("employee_administration_event");
-        builder.HasKey(x => x.Id);
-        builder.Property(x => x.Id).HasColumnName("id").ValueGeneratedOnAdd();
-        builder.Property(x => x.CompanyId).HasColumnName("company_id").IsRequired();
-        builder.Property(x => x.ActorEmployeeId).HasColumnName("actor_employee_id");
-        builder.Property(x => x.ActorType).HasColumnName("actor_type").HasMaxLength(40).IsRequired();
-        builder.Property(x => x.ActorIdentifier).HasColumnName("actor_identifier").HasMaxLength(240);
-        builder.Property(x => x.TargetEmployeeId).HasColumnName("target_employee_id");
-        builder.Property(x => x.ActionCode).HasColumnName("action_code").HasMaxLength(80).IsRequired();
-        builder.Property(x => x.OccurredAt).HasColumnName("occurred_at").HasColumnType("timestamp with time zone").IsRequired();
-        builder.HasIndex(x => new { x.CompanyId, x.OccurredAt }).HasDatabaseName("ix_employee_administration_event_company_time");
-        builder.HasIndex(x => new { x.TargetEmployeeId, x.OccurredAt }).HasDatabaseName("ix_employee_administration_event_target_time");
-        builder.HasOne<CompanyRecord>().WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Restrict);
-        builder.HasOne<EmployeeRecord>().WithMany().HasForeignKey(x => new { x.ActorEmployeeId, x.CompanyId })
-            .HasPrincipalKey(x => new { x.Id, x.CompanyId }).OnDelete(DeleteBehavior.Restrict);
-        builder.HasOne<EmployeeRecord>().WithMany().HasForeignKey(x => new { x.TargetEmployeeId, x.CompanyId })
-            .HasPrincipalKey(x => new { x.Id, x.CompanyId }).OnDelete(DeleteBehavior.Restrict);
-    }
-}
-
 public sealed class EmployeeRoleAssignmentRecordConfiguration : IEntityTypeConfiguration<EmployeeRoleAssignmentRecord>
 {
     public void Configure(EntityTypeBuilder<EmployeeRoleAssignmentRecord> builder)
