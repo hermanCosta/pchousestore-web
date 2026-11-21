@@ -194,7 +194,7 @@
 - v1 tender methods are CASH/CARD only; card processor integration is deferred. Payment/deposit refunds require MANAGER or ADMIN; deposit forfeiture is MANAGER-only. Refunds use original tender by default. Deposit terms and 90-day review/no-auto-forfeit policy are documented in `financial-model.md`.
 - Company's legal VAT registration/status and correct tax treatment in Ireland. The software starts with VAT disabled/no VAT amount added, but this is not a legal exemption; review is a production go-live gate.
 - Refurbished 12-month commercial guarantee duration is decided; proposed coverage/exclusions are documented and remain subject to owner/legal review. A/B/C condition, inspection and complaint workflow are specified in [Refurbished Condition Grades and Customer Complaint Workflow](refurbished-condition-and-complaints.md).
-- Required serial-number/serial-uniqueness rules by category and acquisition/source details for refurbished units.
+- Refurbished unit identity is decided: the Company-unique internal `asset_code` is mandatory; manufacturer serial is optional only when the manufacturer provides none and is Company-unique when populated. Acquisition/source details remain open for DDL review.
 
 - Whether any future Shop requires more than one physical till. Initial baseline is one cash register per Shop/day.
 - Credit-sale handover before full instalment settlement remains disabled pending Irish legal/regulatory review; initial mode is LAYAWAY.
