@@ -1,3 +1,5 @@
+> **ROLE-MODEL SUPERSESSION — 2026-11-20:** The role list and any role-specific wording in this 2026-11-19 decision are historical. [Employee Management](../04-features/employee-management.md) is authoritative for the current `EMPLOYEE`, `MANAGER`, `ADMIN` single-profile model. The direct per-operation password validation and removal of one-use employee authorization tokens remain consistent with this decision.
+
 # Product-owner decision update — employee operation authentication
 
 **Status:** DECIDED  
