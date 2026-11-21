@@ -224,10 +224,10 @@ export default function EmployeeAdministration({ companyId, page, getShopAccessT
       {page === "create-employee" && <form id="create-employee" className="auth-form employee-create-form" onSubmit={createEmployee}>
         <div className="employee-form-grid">
           <label className="auth-field">Employee code
-            <input required maxLength={40} value={newEmployee.employeeCode} onChange={event => setNewEmployee(current => ({ ...current, employeeCode: event.target.value, initialPassword: initialPasswordCustomized ? current.initialPassword : defaultTemporaryPassword(event.target.value) }))} />
+            <input required maxLength={40} value={newEmployee.employeeCode} onChange={event => setNewEmployee(current => ({ ...current, employeeCode: event.target.value }))} />
           </label>
           <label className="auth-field">First name
-            <input required value={newEmployee.firstName} onChange={event => setNewEmployee(current => ({ ...current, firstName: event.target.value }))} />
+            <input required value={newEmployee.firstName} onChange={event => setNewEmployee(current => ({ ...current, firstName: event.target.value, initialPassword: initialPasswordCustomized ? current.initialPassword : defaultTemporaryPassword(event.target.value) }))} />
           </label>
           <label className="auth-field">Last name
             <input required value={newEmployee.lastName} onChange={event => setNewEmployee(current => ({ ...current, lastName: event.target.value }))} />
@@ -346,7 +346,8 @@ async function responseError(response: Response): Promise<Error> {
   }
 }
 
-function defaultTemporaryPassword(employeeCode: string) {
-  const normalizedCode = employeeCode.trim().toUpperCase();
-  return normalizedCode ? `${normalizedCode}@pchouse` : "";
+function defaultTemporaryPassword(firstName: string) {
+  const firstWord = firstName.trim().split(/\\s+/)[0] ?? "";
+  const normalizedName = firstWord.normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").replace(/[^a-zA-Z0-9]/g, "");
+  return normalizedName ? `${normalizedName}@pchouse` : "";
 }
