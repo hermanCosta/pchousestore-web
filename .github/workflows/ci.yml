@@ -14,6 +14,7 @@ jobs:
           dotnet-version: 10.0.x
       - run: dotnet restore PcHouseStore.sln
       - run: dotnet msbuild src/PcHouseStore.Infrastructure/PcHouseStore.Infrastructure.csproj -getItem:Compile -getItem:EmbeddedResource
+      - run: dotnet msbuild src/PcHouseStore.Infrastructure/PcHouseStore.Infrastructure.csproj -getProperty:EnableDefaultItems -getProperty:EnableDefaultCompileItems -getProperty:DefaultLanguageSourceExtension -getProperty:DefaultItemExcludes -getProperty:MSBuildDisableFeaturesFromVersion
       - run: dotnet build PcHouseStore.sln --no-restore --configuration Release
       - run: dotnet format PcHouseStore.sln --verify-no-changes --no-restore
 
