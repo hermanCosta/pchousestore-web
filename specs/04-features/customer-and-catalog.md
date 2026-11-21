@@ -6,7 +6,7 @@
 
 ## 1. Goal
 
-Define the customer and shared catalogue foundation used by every Shop in one Company, with Company scoping enforced on reads and writes. Preserve historical references when customer or catalogue records are deactivated. This draft does not authorize implementation until all business-critical OPEN items are resolved and the SPEC is approved.
+Define the approved customer and shared catalogue foundation used by every Shop in one Company, with Company scoping enforced on reads and writes. Preserve historical references when customer or catalogue records are deactivated. CAT-01 is approved; implementation status is tracked separately from this specification.
 
 ## 2. Legacy source references
 
@@ -41,12 +41,12 @@ See the detailed method inventory in [`customer-catalog-feature-audit.md`](../01
 - SKU is optional for Products and Services. When present, it must match `SKU-[A-Z0-9]{8}`, is normalized to uppercase and unique per Company, including inactive records.
 - Shop inventory is separate, per Shop, and quantity tracking uses whole units.
 - Minimum stock is set per Shop; low-stock reporting compares that Shop's on-hand Product quantity with its configured minimum.
-- Technician can read the full Company customer directory. Customer/catalogue records marked inactive remain visible in existing records and history but cannot be selected for new operations. Legacy `OTHER` entries are excluded and not migrated.
+- Customer directory access is governed by the authenticated Shop session, not by an employee role. Customer/catalogue records marked inactive remain visible in existing records and history but cannot be selected for new operations. Legacy `OTHER` entries are excluded and not migrated.
 - An authenticated Shop session may create/edit/deactivate/reactivate customer records, Products, Services, categories, sale prices and Fault catalogue entries without an employee challenge. Refunds remain Manager-only and employee-protected.
 - V1 uses soft deletion. Historical sale/service-order lines must retain stable snapshots/references as defined in their feature specifications.
 - All queries and mutation targets must be scoped to the authenticated Company. Shop-specific inventory is scoped to the active Shop.
 
-## 5. Proposed redesign (pending CAT-01 approval)
+## 5. Approved target design
 
 - Customer directory with Company-wide search, details, create/edit and deactivate actions.
 - Product and Service catalogue screens share search and lifecycle controls while showing type-specific fields. Product forms manage category and stock-tracking configuration; per-Shop quantities/minimums are managed in inventory workflows.
@@ -62,20 +62,20 @@ Inactive records remain visible on existing records and history, but cannot be s
 
 - Company owns shared customers and catalogue entries; a Shop is not the owner of a customer/catalogue row.
 - Product stock is per Shop and not stored as a shared catalogue quantity.
-- Managers and Technicians may manage catalogue prices/categories under the approved role matrix.
+- Customer and catalogue management is available to an authenticated active Shop session without an individual employee credential challenge; there is no role-based employee distinction within CAT-01.
 - Soft deletion is the v1 baseline.
 
 ### Resolved business rules
 
 1. Customer phone defaults to Irish input. The “International number” checkbox switches the field to international input. Store and compare as E.164. A matching Company phone blocks Customer creation, including when the existing record is inactive; no automatic merge.
-2. Technician can read the Company customer directory and create/edit customer records.
+2. An authenticated active Shop session can read the Company customer directory and create/edit customer records; no individual employee identity or role is required for CAT-01.
 3. Customer email is optional and may repeat; no email unique constraint.
 4. Remove `OTHER` from the target and do not migrate legacy `OTHER` entries.
 5. SKU is optional. When present, it matches `SKU-[A-Z0-9]{8}`; normalize uppercase, unique per Company and reserved after deactivation.
 6. Product minimum stock is configured per Shop and drives that Shop's low-stock report.
 7. Fault descriptions are the primary display/search/selection values. Generate immutable Company-unique `FLT-` sequence codes, padded to at least six digits, with no reuse.
-8. Technician may manage Products, Services, categories and prices and create/edit Fault catalogue entries. Refunds remain Manager-only.
-9. Inactive records remain visible on existing records/history and cannot be selected for new operations. Existing drafts may display already-linked inactive records but cannot add another reference to them. MANAGER and TECHNICIAN may reactivate records.
+8. An authenticated active Shop session may manage Products, Services, categories and prices and create/edit Fault catalogue entries without an employee challenge. Refunds remain Manager- and ADMIN-authorized under the financial/refund specifications, with fresh employee credentials.
+9. Inactive records remain visible on existing records/history and cannot be selected for new operations. Existing drafts may display already-linked inactive records but cannot add another reference to them. An authenticated active Shop session may reactivate records without an employee challenge.
 
 ### Deferred details
 
@@ -152,7 +152,7 @@ Acceptance criteria:
 - `OTHER` is neither offered nor imported into the target catalogue.
 - Low-stock comparison uses the active Shop's `ShopInventory.minimum_quantity`.
 - Inactive customer/catalogue records cannot be used in new operations but remain readable from existing history.
-- An authenticated Shop session can reactivate an inactive record; an existing draft can display its linked inactive item but cannot add another reference to it.
+- An authenticated active Shop session can reactivate an inactive record; an existing draft can display its linked inactive item but cannot add another reference to it.
 - Customer and catalogue CRUD works without an employee challenge but is restricted to the authenticated Shop's Company and is audited against the ShopSession; refunds remain Manager-only and employee-protected.
 - A Shop cannot assign inventory to a Service or to a Product belonging to another Company.
 - Money uses decimal/Numeric, never binary floating point.
