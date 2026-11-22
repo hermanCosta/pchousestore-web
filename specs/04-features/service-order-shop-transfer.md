@@ -49,6 +49,18 @@ Legacy source references are recorded in `specs/01-discovery/deep-dive-findings.
 | BR-16 | All active employees of the Company, regardless of role (`EMPLOYEE`, `MANAGER` or `ADMIN`) and Shop, may view the complete ServiceOrder transfer record, including operational history, rejection/return reasons, device condition/observations, financial transfer header and component amounts, deposit-level details and source-ledger references. Viewing does not grant permission to initiate/accept transfers beyond BR-08, alter records, or edit/delete immutable events. | Product Owner approval, 2026-11-21 | DECIDED — company-wide read access; retention policy remains OPEN |
 | BR-17 | Transfer operational, financial and audit events are append-only and must not be edited, deleted or purged by application users or ordinary application jobs. Keep them in the database indefinitely by default; do not implement automatic expiry/purge. Any legally required retention limitation, restriction or personal-data anonymization must follow a separately approved legal/data-governance process, preserve financial and operational traceability to the greatest extent lawfully permitted, and never silently rewrite event history. Exact legal retention periods and anonymization procedures are not established by this product decision. | Product Owner approval, 2026-11-21 | DECIDED — no application deletion/automatic purge; legal retention/anonymization governance remains OPEN |
 
+### 5.1 Approved relational-integrity strategy (technical review 1)
+
+The Product Owner approved the following PostgreSQL relational-integrity strategy on 2026-11-21. These are schema-design requirements; they do not authorize production DDL or application implementation:
+
+- Store `company_id` on the transfer aggregate and enforce both source and destination Shop references through composite FKs to `shop(id,company_id)`, supported by a unique candidate key on that pair. Enforce distinct source/destination Shops with a CHECK constraint.
+- At transfer creation, lock the ServiceOrder row in the same transaction and verify that its current Shop is the declared source Shop and that its Company matches the transfer. This is a creation-time invariant; do not bind the transfer permanently to the mutable current `service_order.shop_id`.
+- Enforce financial-event header identity against the transfer through a composite FK covering transfer, ServiceOrder, source Shop and destination Shop.
+- Carry `service_order_id` on financial-event component lines and use composite FKs to ensure the line belongs to its event and any referenced deposit belongs to that same ServiceOrder.
+- Enforce line shape and non-negative amount with CHECK constraints; use partial unique indexes to prevent duplicate order-balance and per-deposit liability lines. A deferred transaction-end constraint must ensure exactly one `ORDER_BALANCE` line exists, including when its amount is zero. Deposit-liability lines represent only deposits with positive remaining held/unapplied liability.
+
+The complete physical schema, trigger implementation, transaction locking/isolation and remaining DATA-05 review remain open. See [Proposed Relational Database Model](../02-architecture/database-model.md), section 4, for the candidate constraints.
+
 ## 5. Proposed redesign (REDESIGN)
 
 Use the following approved candidate lifecycle for the transfer aggregate:
