@@ -126,9 +126,7 @@ The deposit record contains the agreed target amount, currency, purpose, terms s
 
 ### Deposit lifecycle
 
-`OPEN -> PARTIALLY_FUNDED -> HELD -> PARTIALLY_APPLIED -> APPLIED`
-
-Alternative terminal outcomes include `REFUNDED` and `FORFEITED`; a partially refunded deposit may remain open for its residual held amount. `valid_until` is null by default; no automatic expiry applies.
+The deposit status is a derived projection, not a manually advanced state machine. Its values are `OPEN`, `PARTIALLY_FUNDED`, `HELD`, `PARTIALLY_DISPOSED` and `CLOSED`. Applications, refunds and forfeitures are immutable ledger facts and may coexist; they are not mutually exclusive status values. The canonical per-deposit liability formula remains authoritative. `valid_until` is null by default; no automatic expiry applies.
 
 - A deposit received at booking is a cash/bank/card movement and appears in the correct Shop cash/financial report.
 - It is not automatically applied to `ServiceOrder.balance_due`.
@@ -141,6 +139,24 @@ Alternative terminal outcomes include `REFUNDED` and `FORFEITED`; a partially re
 - A `SECURITY` deposit is returned when its stated purpose ends, less only documented deductions accepted in the terms and permitted by law.
 - `FORFEITED` requires a fresh `MANAGER` code/password challenge, reason, terms snapshot and documented evidence/cost. This is an explicit feature-specific restriction; `ADMIN` cannot forfeit deposits. No second approver is required.
 - Deposit amount reconciliation: `available_held = settled_receipts - applied - settled_refunds - approved_forfeitures`.
+
+
+
+### Derived deposit status and operational review flag (lifecycle review approved 2026-11-22)
+
+Derive the status from committed, valid financial sources for that specific deposit, in this precedence order:
+
+1. `OPEN`: no settled `DEPOSIT_RECEIPT` exists.
+2. `CLOSED`: at least one settled receipt exists and canonical `available_held = 0`; all received value has been applied, refunded or validly forfeited.
+3. `PARTIALLY_DISPOSED`: `available_held > 0` and at least one positive committed application, settled deposit refund or valid forfeiture exists.
+4. `PARTIALLY_FUNDED`: no disposition exists and settled receipts are greater than zero but below `target_amount`.
+5. `HELD`: no disposition exists and settled receipts meet or exceed `target_amount`.
+
+`available_held` is always calculated as settled receipts minus committed applications, settled deposit refunds and valid authorized forfeitures. The status is only a projection/cache and cannot authorize or execute a financial command. It may be recomputed when a valid source record is committed; a later receipt can therefore change the derived classification without rewriting any earlier event. Do not create exclusive `APPLIED`, `REFUNDED` or `FORFEITED` statuses.
+
+Pending deposit-refund reservations reduce command-time spendable capacity but do not alter the posted liability formula or derived status. `RELEASED` is an administrative event with zero financial effect and does not change the status.
+
+The operational `REVIEW_REQUIRED` flag is independent of the derived status. It can coexist with any status, including `CLOSED`, and has no effect on liability, application/refund capacity or Shop transfer. Clearing it is an operational acknowledgement only. The existing 90-day no-customer-response rule may raise the flag; it must never trigger automatic expiry, refund or forfeiture.
 
 ### Canonical ServiceDeposit liability reconciliation (technical review 3 — decision 3 approved)
 
