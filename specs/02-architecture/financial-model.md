@@ -102,7 +102,7 @@ cash_refundable_remaining =
 
 This rule governs the maximum refundable cash/card received. Consumer-law or contractual entitlement may require a different business resolution; the application must not pay more through the original tender than was actually received.
 
-`refundable_remaining(original, allocation) = original_allocation_received_amount - sum(settled_refunds_referencing_original_allocation)`; the original transaction's overall cap is the sum of its per-allocation remaining caps.
+`refundable_remaining(original, allocation) = original_allocation_received_amount - sum(PENDING and SETTLED refund allocations referencing that original allocation)`; the original transaction's overall cap is the sum of its per-allocation remaining caps.
 ## 3. Configurable tender methods
 
 `PaymentMethod` is a catalogue seeded with exactly two active methods in v1: `CASH` and `CARD`. `ShopPaymentMethod` enables/disables these methods per branch. Other tenders (bank transfer, store credit, cheque, online payment) are out of initial scope.
@@ -240,13 +240,19 @@ Every refund is a separate positive-magnitude `PaymentTransaction` with kind `RE
 
 `refundable_remaining(original, allocation) = original_allocation_received_amount - sum(settled_refunds_referencing_original_allocation)`; the original transaction's overall cap is the sum of its per-allocation remaining caps.
 
-Validation must lock or use optimistic concurrency on the original transaction so concurrent refund requests cannot over-refund it. A full refund is simply a refund whose amount equals the remaining refundable amount. Partial refunds may be item-linked through `PaymentRefundLine`; order-level refunds are allowed with a documented reason.
+Validation must lock the original transaction and affected original `PaymentAllocation` rows in deterministic ID order, then recalculate capacity after locks. For ServiceOrder-linked refunds, lock the `ServiceOrder` first, following the shared lock order; for other targets, lock the original transaction before allocation rows. A PENDING refund reserves capacity in the same transaction as its header and allocations, so concurrent requests cannot reserve the same amount. A full refund is an amount equal to the remaining refundable capacity. Partial refunds may be item-linked through `PaymentRefundLine`; order-level refunds are allowed with a documented reason.
 
 - Every refund requires a fresh `MANAGER` or `ADMIN` code/password challenge, regardless of amount. The backend directly validates the employee credential, active status, Company membership and permission; no action-authorization token/entity/endpoint is created, persisted or consumed. No second approver is required.
 - Refund is allocated back to the original tender only. For a split CASH/CARD receipt, each refund allocation is linked to the original `PaymentAllocation` and cannot exceed that allocation's remaining refundable amount. Alternative tender is disabled in v1.
 - For CARD, the authorized `MANAGER` or `ADMIN` performs the refund on the external terminal against the original card transaction, then records the result/reference in the application. Do not store card numbers or security data.
 - A refund transaction does not automatically restock inventory. Physical items returned to the Shop are selected separately through `StockReturn`/`StockReturnLine`, with quantity capped at previously consumed less already returned. A monetary refund and physical return are separate records.
 - Partial refunds can be linked to one or more SaleItems/ServiceOrderItems and a reason. A total refund is the residual refundable amount after prior settled refunds.
+
+- Refund header integrity: `REFUND` must reference an original settled incoming `PAYMENT`; `DEPOSIT_REFUND` must reference an original settled incoming `DEPOSIT_RECEIPT`. Original and refund must target the same aggregate and use the same currency.
+- Allocation integrity: every refund allocation references the exact original `PaymentAllocation` from the transaction named by the refund header, with the same tender and currency. Each refund allocation is positive, and allocation totals must equal the transaction amount. Non-refund allocations must not carry an original-allocation reference.
+- Refund capacity is calculated independently for each original allocation. CASH capacity is based on actual physical cash received (`amount_tendered - change_amount)); CARD capacity is based on the approved/settled original allocation amount. Prior linked PENDING and SETTLED refunds reserve/consume capacity; FAILED and VOIDED refunds release it. A REVERSED refund blocks further refunds until explicit reconciliation/correction and does not automatically release capacity.
+- Lock the original transaction before calculating refund capacity, then lock affected original allocation rows in deterministic ID order and recalculate after locks. For ServiceOrder refunds, lock the ServiceOrder first according to the shared lock order. No cross-tender substitution, cross-allocation offset or reallocation is allowed.
+- Persist the refund transaction and allocations, idempotency record, and required ServiceOrder `BusinessNote` atomically. A pending refund has no cash-drawer effect; only a settled cash refund reduces physical cash.
 
 ## 7. Approval and employee accountability
 
