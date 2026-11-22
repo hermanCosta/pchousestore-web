@@ -1,6 +1,6 @@
 # Feature: Cross-Shop ServiceOrder Transfer
 
-**Status:** DRAFT — discovery recorded; initiation and acceptance permissions approved 2026-11-21; other business-critical transfer rules remain OPEN
+**Status:** DRAFT — BR-01 through BR-10 business rules and transfer lifecycle approved 2026-11-21; technical/data approval and audit governance remain OPEN
 **Owner:** Product Owner
 
 ## 1. Objective and scope
@@ -44,7 +44,21 @@ Legacy source references are recorded in `specs/01-discovery/deep-dive-findings.
 
 ## 5. Proposed redesign (REDESIGN)
 
-Treat transfer as an explicit audited workflow with `DRAFT -> IN_TRANSIT -> RECEIVED` (candidate states only; approval pending). Preserve one ServiceOrder identity and append source/destination events. Do not silently rewrite historical Shop ownership on settled transactions. Do not implement until BR-05 through BR-10 are resolved and this SPEC is approved.
+Use the following approved candidate lifecycle for the transfer aggregate:
+
+| Current state | Command / condition | Next state |
+|---|---|---|
+| `DRAFT` | Source dispatches the device | `IN_TRANSIT` |
+| `DRAFT` | Source cancels before dispatch | `CANCELLED` |
+| `IN_TRANSIT` | Destination physically receives, inspects and accepts | `RECEIVED` |
+| `IN_TRANSIT` | Destination physically receives/inspects but rejects, with mandatory reason | `REJECTED` |
+| `REJECTED` | Both Shops document an agreed resolution and destination still has custody; destination completes acceptance | `RECEIVED` |
+| `REJECTED` | Device is dispatched back to source | `RETURN_IN_TRANSIT` |
+| `RETURN_IN_TRANSIT` | Source physically receives and records the returned device | `RETURNED_TO_SOURCE` |
+
+No other state transitions are allowed. In particular, the source cannot cancel after dispatch; a rejection alone does not return the device or change responsibility; and a rejected transfer can be accepted later only while the destination retains physical custody and both Shops record the agreed resolution. Once return dispatch begins, the destination cannot accept that same transfer. No timeout automatically changes or closes a transfer.
+
+Only transition to `RECEIVED` transfers operational responsibility, changes the ServiceOrder's current Shop and moves the outstanding balance/held deposit liability. Those changes must commit atomically. `CANCELLED` and `RETURNED_TO_SOURCE` leave the ServiceOrder and its financial liability with the source. Preserve one ServiceOrder identity and all settled transaction attribution. This lifecycle is business-approved; exact persistence/concurrency implementation remains subject to technical and data approval.
 
 ## 6. Data requirements
 
@@ -52,11 +66,11 @@ Candidate records: `ServiceOrderTransfer` (order, source Shop, destination Shop,
 
 ## 7. API contracts
 
-Candidate commands: create transfer request, dispatch, accept/receive, reject/cancel where permitted. Every command must validate current order state and Shop ownership on the server and be idempotent under duplicate submission. DTO fields, routes, error codes and authorization policies are OPEN until the workflow and role decisions are approved.
+Candidate commands: create transfer request, dispatch, accept/receive, reject, agree-and-accept after rejection, dispatch return, confirm return receipt, and cancel before dispatch. Every command must validate current transfer state, physical-custody preconditions and Shop ownership on the server and be idempotent under duplicate submission. The transition table in Section 5 is exhaustive; invalid transitions must be rejected. DTO fields, routes and error codes remain OPEN pending technical approval.
 
 ## 8. UI flows and states
 
-Candidate source-Shop flow: select eligible order and destination Shop, review outstanding balance/deposit and custody/parts summary, authorize, dispatch, then track status. Candidate destination-Shop flow: review transfer and accept physical custody, then assume operational work. Loading, stale-state, rejection and reconciliation screens depend on OPEN decisions.
+Source-Shop flow: create, review and dispatch; cancel only while `DRAFT`; track all in-transit, rejected and return states. Destination-Shop flow: inspect physical device, record condition/observations, then accept or reject with a reason. After rejection, both Shops may document an agreement and destination may accept only if it still has custody, or destination may dispatch the device back. Source confirms physical return. Only `RECEIVED` moves Shop and financial responsibility.
 
 ## 9. Acceptance criteria
 
@@ -66,11 +80,14 @@ Candidate source-Shop flow: select eligible order and destination Shop, review o
 - [x] AC-04: Physical custody, device condition/observations and explicit destination acceptance are recorded before destination operational ownership begins.
 - [ ] AC-05: Parts, procurement and authorization behavior match approved policies.
 - [ ] AC-06: Duplicate or concurrent commands cannot create multiple transfers or move liability twice.
+- [x] AC-08: Transfer lifecycle follows only the approved transitions in Section 5; cancellation is pre-dispatch only, rejection requires a reason, and no timeout auto-closes a transfer.
+- [x] AC-09: A rejected transfer can be accepted only after documented agreement while destination retains custody, or returned through `RETURN_IN_TRANSIT` and source-confirmed `RETURNED_TO_SOURCE`.
+- [x] AC-10: Only `RECEIVED` changes current Shop and transfers outstanding balance/held deposit liability atomically; cancellation and return to source leave responsibility at source.
 - [ ] AC-07: Every transition is attributable to an employee authorization and timestamp.
 
 ## 10. Test scenarios
 
-After approval: same-Company and cross-Company validation; status eligibility; settled history preservation; liability transfer without cash movement; deposit cap/reconciliation; parts and procurement outcomes; custody acceptance; unauthorized role; duplicate and concurrent dispatch/receipt; audit event completeness; UI rejection/stale-state paths.
+Test the exhaustive transition matrix, including invalid transitions; cancel-before-dispatch; prohibited cancel-after-dispatch; reject with mandatory reason; agreed acceptance after rejection while destination retains custody; prohibit acceptance after return dispatch; return dispatch and source receipt; no timeout closure; atomic Shop/liability handoff only on `RECEIVED`; settled history preservation; deposit reconciliation; duplicate/concurrent commands; audit event completeness and stale-state handling.
 
 ## 11. Open questions
 
@@ -80,10 +97,11 @@ After approval: same-Company and cross-Company validation; status eligibility; s
 - [x] Who can initiate/accept, and does each side require a fresh employee challenge? All three profiles may initiate at source and accept at destination; each command requires a fresh direct employee credential challenge.
 - [x] Can a dispatched transfer be rejected, cancelled or timed out, and how are liabilities reversed? Source may cancel only before dispatch; destination may reject receipt with a mandatory reason; after dispatch there is no unilateral source cancellation and no automatic timeout closure. The transfer remains pending until physical return is recorded or both Shops document an agreed resolution. Financial liability does not move before destination acceptance.
 - [x] What is the approved event/audit payload? Every immutable event records transfer/order IDs, both Shop IDs, action and previous/resulting state, employee ID/name snapshot, timestamp, relevant financial-event references, and action-specific reasons, device condition/observations or return/resolution references. Events cannot be edited or deleted.
+- [x] What transfer states and transitions govern dispatch, acceptance, rejection and physical return? See the exhaustive lifecycle table in Section 5.
 - [ ] How are audit visibility, retention and financial reconciliation exposed? These remain technical/data-governance decisions.
 
 ## 12. Approval
 
-- Product approval: PARTIAL — BR-01 through BR-10 business event payload decided; audit visibility/retention and technical/data details remain open
+- Product approval: BUSINESS RULES APPROVED — BR-01 through BR-10 and transfer state lifecycle approved 2026-11-21; audit visibility/retention governance remains open
 - Technical approval: PENDING
 - Data-model approval: PENDING
