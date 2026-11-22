@@ -81,6 +81,18 @@ Alternative terminal outcomes include `REFUNDED` and `FORFEITED`; a partially re
 - `FORFEITED` requires a fresh `MANAGER` code/password challenge, reason, terms snapshot and documented evidence/cost. This is an explicit feature-specific restriction; `ADMIN` cannot forfeit deposits. No second approver is required.
 - Deposit amount reconciliation: `available_held = settled_receipts - applied - settled_refunds - approved_forfeitures`.
 
+### ServiceOrder balance and refund separation (technical review 3 — decision 1 approved)
+
+The Product Owner approved on 2026-11-22 that a `REFUND` or `DEPOSIT_REFUND` is an outgoing-funds event and must not directly mutate or recalculate `ServiceOrder.balance_due`.
+
+- A settled `PAYMENT` credits the ServiceOrder balance once. A `DepositApplication` credits the ServiceOrder balance once and reduces the originating deposit's held liability by the same amount.
+- A `REFUND` records the outgoing amount against its original settled `PAYMENT`, subject to the original-tender and refundable-remainder rules. It does not reverse the original payment credit in `balance_due`, create a new customer debt, or change the order total.
+- A `DEPOSIT_REFUND` reduces only the originating deposit's remaining held liability and records the outgoing funds against its original settled `DEPOSIT_RECEIPT`. It does not change `balance_due`; the refunded amount must be from the deposit's un-applied refundable balance.
+- A refund is not an order-price correction, discount, write-off or balance adjustment. If a future business case requires changing the amount owed, it must use a separate explicit, authorized, reasoned and auditable balance-adjustment operation. Such an operation, its permissions, accounting treatment and persistence schema are not approved or defined by this decision; do not infer or implement one.
+- Refund records remain separate from payment credits and from inventory returns. A refund does not automatically restock stock or alter ServiceOrder technical/lifecycle status.
+
+The balance cache must be updated atomically with each qualifying credit/application and protected by the ServiceOrder aggregate lock. The exact reconciliation formula and treatment of any future balance-adjustment events remain part of technical review 3; do not derive `balance_due` by subtracting refund transactions.
+
 A parts pre-order deposit is a financial arrangement only. The application does not capture supplier/source, purchase orders, purchase links, ETA, tracking or supplier receipt. Parts are purchased outside the application and physical stock replenishment is recorded independently through the Stock module.
 
 ## 5. Weekly instalment plans for refurbished sales
