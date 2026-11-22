@@ -168,8 +168,9 @@ Every refurbished unit sold by the Company carries a 12-month commercial guarant
 
 ## 9. Required validation and idempotency
 
-- Lock the relevant ShopInventory row while reserving, releasing, consuming, transferring or returning quantity-tracked stock, or use an optimistic concurrency token with retry-safe commands.
+- For stock commands linked to a ServiceOrder, first lock the parent `service_order` row (`SELECT ... FOR UPDATE`) before locking reservation rows and then `shop_inventory` rows. This shared parent lock serializes reservation changes with payment settlement, deposit application, Pickup and cross-Shop ServiceOrder transfer. Lock multiple reservation and ShopInventory rows in ascending ID order. For standalone stock commands without a ServiceOrder, lock the relevant ShopInventory row while reserving, releasing, consuming, transferring or returning quantity-tracked stock, or use an optimistic concurrency token with retry-safe commands.
 - Verify availability after acquiring the lock; pre-read UI values are not authoritative.
+- ServiceOrder-linked stock commands use PostgreSQL `READ COMMITTED` with the canonical lock order documented in [Relational Database Model](database-model.md), section 4: ServiceOrder first, then transfer/deposit/payment rows when relevant, reservation rows, and ShopInventory. Re-read reservation and availability state after acquiring locks; do not rely on pre-lock UI values. A command must participate in the caller's transaction when invoked by payment settlement, Pickup or transfer acceptance.
 - Use a unique command/idempotency key for payment settlement, transfer dispatch/receipt and stock returns.
 - Every movement records Shop, Product, the server-resolved employee actor, time, reason and source document/line. Protected stock commands validate the employee's fresh code/password directly; do not persist or reference an EmployeeActionAuthorization or authorization ID.
 - Never mutate `quantity_on_hand` without inserting the matching InventoryMovement in the same database transaction.
