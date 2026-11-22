@@ -93,6 +93,29 @@ The Product Owner approved on 2026-11-22 that a `REFUND` or `DEPOSIT_REFUND` is 
 
 The balance cache must be updated atomically with each qualifying credit/application and protected by the ServiceOrder aggregate lock. The exact reconciliation formula and treatment of any future balance-adjustment events remain part of technical review 3; do not derive `balance_due` by subtracting refund transactions.
 
+### Canonical ServiceOrder balance formula (technical review 3 — decision 2 approved)
+
+The Product Owner approved on 2026-11-22 the following canonical formula:
+
+```text
+balance_due = total
+            - sum(settled PAYMENT amounts targeting this ServiceOrder)
+            - sum(DepositApplication amounts credited to this ServiceOrder)
+```
+
+Rules and enforcement:
+
+- `total` is the current approved ServiceOrder total after discounts and applicable tax calculation, using the order's currency and persisted monetary snapshots.
+- Count only `PaymentTransaction` rows with kind `PAYMENT`, target `service_order_id`, status `SETTLED`, and the same currency. Use the transaction's applied amount once; do not sum its tender allocations again because those allocations reconcile to that amount.
+- Count each committed `DepositApplication` exactly once. Its amount is a non-cash credit to the order and a corresponding reduction of that same deposit's held liability.
+- Do not count `DEPOSIT_RECEIPT` as an order payment before an explicit application. Do not subtract `REFUND` or `DEPOSIT_REFUND` transactions from this formula. Do not count transfer-financial-event lines as payments or credits.
+- A new settled payment or deposit application must not make the resulting balance negative. Reject an amount greater than the current outstanding balance; any future overpayment/credit-balance workflow requires separate Product Owner approval.
+- A refund does not reopen the ServiceOrder balance. A future change to the amount owed must use a separately approved balance-adjustment operation; no such operation is defined by this decision.
+- Recalculate and validate the formula under the ServiceOrder aggregate lock. Persist the resulting `balance_due` in the same transaction as the qualifying payment/application and its ledger/event/Note/idempotency effects. If the computed result differs from the materialized value before a new financial command, block the command and require reconciliation; never silently overwrite the discrepancy.
+- The materialized `balance_due` is a transactionally maintained cache/projection, not an independent financial source of truth. Provide a read-only reconciliation process that compares it with the formula and reports mismatches. It must not auto-correct balances.
+
+This formula supersedes any ambiguous interpretation of `balance_due` elsewhere in the specs. All features, reports and transfer acceptance must use the same definition.
+
 A parts pre-order deposit is a financial arrangement only. The application does not capture supplier/source, purchase orders, purchase links, ETA, tracking or supplier receipt. Parts are purchased outside the application and physical stock replenishment is recorded independently through the Stock module.
 
 ## 5. Weekly instalment plans for refurbished sales
