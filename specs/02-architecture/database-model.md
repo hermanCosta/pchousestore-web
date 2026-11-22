@@ -223,6 +223,12 @@ All financial command idempotency is persisted in the shared `idempotency_record
 
 **Deposit balance:** `available_deposit = settled_deposit_receipts - deposit_applications - settled_deposit_refunds - approved_forfeitures`. A held/security deposit does not reduce the ServiceOrder balance until a distinct `DepositApplication` is recorded.
 
+**Canonical per-deposit liability formula (Product Owner decision, 2026-11-22):**
+```text
+available_held = settled_receipts - applied - settled_refunds - approved_forfeitures
+```
+Calculate independently for each ServiceDeposit. Receipts count only when the linked `DEPOSIT_RECEIPT` transaction is `SETTLED`; applications count only when the committed DepositApplication references that deposit; refunds count only when the linked `DEPOSIT_REFUND` transaction is `SETTLED`; forfeitures count only from valid `FORFEITED` events with mandatory reason and required Manager authorization. `RELEASED` has zero effect. Pending/failed/voided transactions are excluded. The event ledger is the reconciliation trail: its referenced transaction/application validates the event but must not be summed a second time. Currency must match and the result must be non-negative. Missing, duplicate, inconsistent, unsupported or mismatched records block financial commands and transfer acceptance until explicit reconciliation. The materialized held balance is a cache only; reconciliation is read-only and never auto-corrects. No pooling or offsetting between deposits.
+
 **ServiceOrder refund/balance invariant (Product Owner decision, 2026-11-22):** a settled `REFUND` against a ServiceOrder payment does not reverse the original payment credit in `balance_due` and does not create a new customer debt. A `DEPOSIT_REFUND` reduces only the originating deposit's un-applied held liability; it does not change `balance_due`. Refunds are outgoing-funds records, not order-price or balance adjustments. Do not subtract refunds when reconciling `balance_due`. Any future change to the amount owed requires a separately approved, authorized and auditable balance-adjustment operation; no such table or behavior is approved by this decision. The balance cache is updated atomically with qualifying ServiceOrder payment credits and deposit applications under the ServiceOrder aggregate lock.
 
 **Canonical ServiceOrder balance formula (Product Owner decision, 2026-11-22):**
