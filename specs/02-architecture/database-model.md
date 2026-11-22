@@ -497,3 +497,65 @@ The Pickup command must persist the following within one PostgreSQL transaction:
 - Persist/claim an `idempotency_record` as defined in the Pickup idempotency and concurrency constraints. Scope it to Shop + `SERVICE_ORDER_PICKUP` + ServiceOrder + key; compare the normalized request hash; return the original committed status/body for an identical replay; reject changed-payload reuse; commit/rollback it with all business effects.
 - Lock or concurrency-check the ServiceOrder and its active reservations so concurrent distinct Pickup commands cannot both commit. The losing command returns a conflict and the client refreshes.
 - Do not model a direct undo/cancel transition. A future correction must be a separate auditable operation and must not automatically reactivate reservations.
+
+
+### Deposit event constraint-trigger matrix (DATA-05 review)
+
+This matrix defines the physical validation scope for the immutable ServiceDeposit event ledger and its source records. It is a design specification only; it is not executable SQL and does not authorize migration generation.
+
+| Trigger family | Table/event coverage | Deferred end-of-transaction validations |
+|---|---|---|
+| `service_deposit_event_integrity` | Row-level constraint trigger on `service_deposit_event` INSERT/UPDATE/DELETE | Validate the final event shape and source linkage. `RECEIVED` must reference exactly one `DEPOSIT_RECEIPT` transaction in `SETTLED`; `APPLIED` exactly one committed `DepositApplication`; `REFUNDED` exactly one `DEPOSIT_REFUND` transaction in `SETTLED`; `FORFEITED` and `RELEASED` reference neither source. Enforce the required source-reference nullability, positive amounts for the first four event kinds, exactly zero for `RELEASED`, and mandatory reason for `FORFEITED`. Validate the event's deposit, ServiceOrder, currency and amount against its exact source. |
+| `service_deposit_source_integrity` | Row-level constraint triggers on `payment_transaction` INSERT/UPDATE and `deposit_application` INSERT/UPDATE/DELETE (including status/commit-state changes) | Validate both directions: every settled deposit receipt/refund has exactly one matching event of the correct kind, and every `RECEIVED`/`REFUNDED` event points to the matching settled transaction; every committed application has exactly one `APPLIED` event, and every `APPLIED` event points to that committed application. Reject a source whose deposit, ServiceOrder, currency, amount, transaction kind, target or final status no longer matches its event. Non-settled receipt/refund transactions and uncommitted applications must not have effective events. |
+| `service_deposit_liability_integrity` | Row-level constraint triggers on `service_deposit_event`, `payment_transaction` and `deposit_application` INSERT/UPDATE; DELETE coverage on event/application tables is defensive | Recompute each affected deposit independently from final persisted source rows. Posted liability is `settled_receipts - committed_applications - settled_refunds - approved_forfeitures`. `RELEASED` has zero effect. Reject a negative result, duplicate/missing source event, unsupported event shape, currency mismatch or inconsistent source amount. For a new `FORFEITED` event, validate that the forfeiture amount does not exceed the remaining held amount after prior committed applications, settled refunds, prior valid forfeitures and any outstanding pending-refund reservations. |
+| `service_deposit_refund_reservation_integrity` | Reuse/coordinate with `payment_refund_capacity_integrity` on `payment_transaction` and `payment_allocation` INSERT/UPDATE and allocation DELETE | A `PENDING` `DEPOSIT_REFUND` reserves both (a) capacity on its exact original tender allocation under the payment refund matrix and (b) capacity against the deposit's currently available held liability. `SETTLED` consumes both capacities. `FAILED`/`VOIDED` release the pending reservation. `REVERSED` blocks further refunds and financial commands for the affected deposit until explicit reconciliation/correction; it must not automatically release capacity. The same refund must pass both independent caps. |
+
+**Declarative constraints and source identity**
+
+- Use row-local `CHECK` constraints for event-kind reference shape, positive/zero amount rules and mandatory local fields. Use composite candidate keys/FKs to prove that the referenced transaction/application belongs to the exact same `service_deposit` and `service_order`; do not rely only on application-side ID comparisons.
+- Add unique source-reference constraints so one `payment_transaction_id` can back at most one deposit event and one `deposit_application_id` can back at most one deposit event. A transaction cannot be both a receipt and refund event, nor can an application be applied twice.
+- Event amount must equal the exact source amount: `RECEIVED` and `REFUNDED` equal the linked PaymentTransaction amount; `APPLIED` equals the committed DepositApplication amount. All amounts and currencies must match the owning deposit and ServiceOrder. Amounts are positive magnitudes; event kind determines the financial direction.
+- `FORFEITED` has no transaction/application source reference, requires a positive amount, mandatory non-empty reason and server-resolved employee actor. The required fresh `MANAGER` credential challenge is an application authorization precondition. A database trigger may validate actor identity/profile/status and persisted authorization evidence if such evidence is part of the approved schema, but it cannot claim to prove that a fresh password challenge occurred merely from an employee ID. Do not introduce an authorization token/table without a separate approved design.
+- `RELEASED` has no source reference, amount exactly zero, and no liability or cash effect. It is an administrative release/unhold event only; it does not represent payment, refund, forfeiture, or a reduction of the deposit liability.
+- Deposit events are append-only and immutable. Normal application/database roles must not update or delete them. Defensive triggers reject UPDATE/DELETE; privileged maintenance is outside ordinary application operation and must preserve the audit trail. Source records that contribute to a posted ledger cannot be physically deleted or silently rewritten.
+- Deferred trigger functions must inspect both OLD and NEW affected aggregate IDs as applicable, validate the final transaction state, be deterministic and safe when invoked more than once, and not depend on trigger firing order. Register checks on both parent and child/source tables so changing either side cannot bypass the invariant.
+
+**Liability and pending-refund capacity**
+
+- The canonical posted liability remains:
+  ```text
+  available_held = settled_receipts - committed_applications - settled_refunds - approved_forfeitures
+  ```
+  Only `SETTLED` `DEPOSIT_RECEIPT` and `DEPOSIT_REFUND` transactions count; only committed `DepositApplication` rows count; only valid `FORFEITED` events count. `RELEASED` contributes zero. Pending/failed/voided transactions are excluded from this posted-liability formula.
+- Separately, command-time spendable capacity is `available_held - pending_deposit_refund_reservations`. This reservation does not rewrite the posted liability formula: it prevents multiple pending refunds from reserving the same held funds. Each pending refund is counted once by its transaction/allocation source, not again through its event (a `REFUNDED` event is created only when the refund is settled).
+- A `DEPOSIT_REFUND` must pass both the exact-original-tender refundable cap from the PaymentAllocation refund matrix and the deposit-level spendable held-capacity check. Passing one cap does not waive the other. No tender substitution, cross-deposit pooling, offsetting or reallocation is allowed.
+- `FORFEITED` is validated against the held amount remaining at its posting boundary, net of committed applications, settled refunds, prior valid forfeitures and pending deposit-refund reservations. A forfeiture cannot consume funds already applied, refunded or reserved by a pending refund. The event, reason, actor attribution, idempotency record and any required ServiceOrder Note are persisted atomically.
+- A materialized held balance is only a cache. Recompute authoritative values after locks; any missing, duplicate, unsupported, mismatched or negative ledger state blocks the affected deposit's financial commands and related transfer acceptance until explicit reconciliation. Reconciliation remains read-only and never auto-corrects.
+
+**Locking, transaction boundaries and authorization**
+
+- Every deposit mutation first locks the owning `service_order` row using `SELECT ... FOR UPDATE`, then the affected `service_deposit` row. For commands affecting multiple deposits, lock deposits in ascending stable ID order.
+- For a `DEPOSIT_REFUND`, continue the canonical lock order after the deposit lock: lock the original `payment_transaction`, then its affected original `payment_allocation` rows in ascending ID order. Re-read source status, original tender capacity, deposit liability and pending reservations after all locks are held. Do not reverse the approved global order: ServiceOrder -> ServiceDeposit -> PaymentTransaction -> PaymentAllocation.
+- Receipt settlement, application, refund, forfeiture and their event/source records, required ServiceOrder Note, idempotency record and materialized cache update must commit or roll back atomically. No deposit event is a cash movement by itself; only the linked settled receipt/refund transaction has the corresponding tender/drawer effect.
+- Application authorization remains feature-specific: deposit receipt/application/refund commands require their already-defined employee credential/role checks; forfeiture requires a fresh `MANAGER` credential challenge. The trigger validates persisted relational and amount invariants, not the authenticity of a credential challenge unless an explicitly approved evidence mechanism is added.
+- Use conditional version updates and shared idempotency semantics. An identical replay returns the original committed result; changed-payload reuse is rejected. A concurrent command that loses the aggregate lock/version race must fail as a conflict or retry the whole transaction within the existing bounded transient-retry policy.
+
+**Required PostgreSQL integration scenarios**
+
+1. Each of the five event kinds accepts only its exact source-reference shape; malformed, missing or extra references fail at commit.
+2. `RECEIVED` requires a settled `DEPOSIT_RECEIPT`; pending/failed/voided/reversed or wrong-kind transactions cannot back it.
+3. `APPLIED` requires one committed application belonging to the same deposit and ServiceOrder; uncommitted, duplicate, wrong-deposit or wrong-amount application fails.
+4. `REFUNDED` requires a settled `DEPOSIT_REFUND` linked to a settled receipt for the same deposit; pending/failed/voided/reversed or wrong-target/currency sources fail.
+5. Every valid settled receipt/refund and committed application has exactly one matching event; changing source status/amount/target or deleting a source cannot silently orphan or invalidate the event.
+6. Duplicate transaction/application source references, event amount mismatch, currency mismatch and composite-FK scope mismatch fail.
+7. `FORFEITED` requires positive amount, non-empty reason, actor and MANAGER authorization at command boundary; amount above held capacity or reserved pending-refund capacity fails.
+8. `RELEASED` accepts only zero amount and no financial references; it never changes liability or cash/drawer totals.
+9. Multiple deposits on one ServiceOrder are reconciled independently; no cross-deposit pooling or offset is possible.
+10. A `DEPOSIT_REFUND` that is within the original tender cap but exceeds deposit held capacity fails; one within held capacity but above original tender capacity also fails.
+11. PENDING deposit refunds reserve held capacity; FAILED/VOIDED release it; SETTLED consumes it; REVERSED blocks further commands pending explicit reconciliation.
+12. Concurrent application/refund/forfeiture attempts against one deposit cannot over-consume held liability; concurrent refunds also cannot exceed any original tender allocation.
+13. Rollback leaves no partial event, transaction, application, Note, idempotency record or cache update.
+14. Repeated trigger invocation is deterministic and does not double-count source records or events.
+15. Run tests using separate connections against the supported real PostgreSQL version and EF Core/Npgsql mappings; SQLite is not an acceptable substitute for deferred-trigger/concurrency verification.
+16. Specifically prove that deferred trigger queries under PostgreSQL `READ COMMITTED` observe competing committed reservations after lock waits. If they do not, revise the physical validation strategy before creating migrations; do not assume the trigger matrix alone proves this behavior.
+
