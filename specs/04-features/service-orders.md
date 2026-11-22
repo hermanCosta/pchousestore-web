@@ -140,7 +140,27 @@ A newly created order starts in `CREATED`. `REFUNDED` is a financial event/outco
 - PICKED
 - CANCELLED
 
-`FINISHED` is a legacy status and is not used in the target lifecycle. `NOT_FIXED` can return to `IN_PROGRESS` for another repair attempt until handover occurs. `FIXED` can return to `IN_PROGRESS` only while `balance_due > 0`, retaining reservations; after full settlement and stock consumption, direct reversal is prohibited and later rework requires a separate corrective workflow. Cancellation is permitted only from `CREATED`, `IN_PROGRESS` or `AWAITING_PARTS`, even if payments or stock reservations exist; required financial and inventory adjustments remain owned by FIN-01 and the stock module. Cancellation is prohibited from `FIXED`, `NOT_FIXED` and `PICKED`. `PICKED` represents physical collection, not payment completion. The full transition matrix remains subject to technical verification.
+`FINISHED` is a legacy status and is not used in the target lifecycle. `REFUNDED` is a financial event/outcome, not a lifecycle status. The approved lifecycle transition matrix is:
+
+| Current status | Allowed next status | Condition |
+|---|---|---|
+| `CREATED` | `IN_PROGRESS` | Explicit start-work command. |
+| `CREATED` | `AWAITING_PARTS` | At least one blocking Product-part requirement is not fully reserved. |
+| `CREATED` | `CANCELLED` | Explicit cancellation by an authorized `MANAGER` or `ADMIN`; financial and stock consequences remain separate FIN-01/stock operations. |
+| `IN_PROGRESS` | `AWAITING_PARTS` | At least one blocking Product-part requirement is not fully reserved. |
+| `IN_PROGRESS` | `FIXED` | Technical work is complete and every blocking part requirement is fully reserved. |
+| `IN_PROGRESS` | `NOT_FIXED` | The technical outcome is explicitly recorded as not fixed. |
+| `IN_PROGRESS` | `CANCELLED` | Explicit cancellation by an authorized `MANAGER` or `ADMIN`; financial and stock consequences remain separate FIN-01/stock operations. |
+| `AWAITING_PARTS` | `IN_PROGRESS` | Every blocking part requirement is fully reserved and an explicit resume command is authorized. Receipt/reservation alone does not resume work. |
+| `AWAITING_PARTS` | `CANCELLED` | Explicit cancellation by an authorized `MANAGER` or `ADMIN`; financial and stock consequences remain separate FIN-01/stock operations. |
+| `FIXED` | `IN_PROGRESS` | Only while `balance_due > 0`; active reservations remain in place. After full settlement consumes reserved parts, direct reversal is prohibited and later rework requires a separate corrective workflow. |
+| `FIXED` | `PICKED` | Explicit physical customer handover. |
+| `NOT_FIXED` | `IN_PROGRESS` | Explicitly resume another repair attempt before physical handover. |
+| `NOT_FIXED` | `PICKED` | Explicit physical customer handover; an outstanding balance or held deposit does not block it. |
+| `PICKED` | — | Terminal lifecycle status; no direct undo or cancellation. |
+| `CANCELLED` | — | Terminal lifecycle status. |
+
+All transitions not listed above are rejected. Payment settlement does not automatically change lifecycle status to `PICKED`; Pickup is a separate physical handover command. Refunds and deposit refunds are financial operations and never change lifecycle status. Each successfully committed transition must atomically persist its structured event and append-only employee-attributed `Notes` entry. Authorization, stock effects, financial consequences, idempotency and concurrency rules remain governed by the relevant command contracts and FIN-01/stock specifications.
 
 ### 5.3 Proposed UI
 
