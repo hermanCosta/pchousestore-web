@@ -36,7 +36,7 @@ Legacy source references are recorded in `specs/01-discovery/deep-dive-findings.
 | BR-03 | Settled transactions remain attributed to the source Shop. | Product-owner decision recorded in discovery | DECIDED |
 | BR-04 | Outstanding balance and held/unapplied deposit liability move through an audited internal event and do not create a cash receipt. | Product-owner decision recorded in discovery | DECIDED |
 | BR-05 | The source Shop records dispatch and the transfer enters `IN_TRANSIT`. The destination Shop must physically receive the device, record its condition and any observations, and confirm acceptance. Only then does the transfer enter `RECEIVED` and operational responsibility move to the destination. If the device does not arrive or a discrepancy is found, the transfer remains pending and responsibility does not change automatically. | Product Owner approval, 2026-11-21 | DECIDED |
-| BR-06 | Define what happens to service-part reservations, received parts and procurement requests owned by the source Shop. | No evidence located | OPEN |
+| BR-06 | On transfer acceptance, release active service-part reservations at the source Shop; the destination may create new reservations only against its own available stock. Parts already physically received by the source remain there unless moved through a separately recorded physical Product stock transfer. Outstanding procurement requests remain attributed to the source Shop until formally amended with the supplier; they do not move automatically with the ServiceOrder. The destination Shop becomes responsible for arranging any parts still required to complete the service. | Product Owner approval, 2026-11-21 | DECIDED |
 | BR-07 | Define eligible statuses and whether transfer is allowed with payments, refunds, deposits, open complaints or procurement activity. | No complete transition matrix | OPEN |
 | BR-08 | EMPLOYEE, MANAGER and ADMIN may initiate a transfer from the source Shop. EMPLOYEE, MANAGER and ADMIN may accept it at the destination Shop. Each protected command requires a fresh direct credential challenge from the acting employee; the backend validates active status, Company membership, the employee's role and source/destination Shop context. | Product Owner approval, 2026-11-21; employee-management authorization model | DECIDED |
 | BR-09 | Define transfer cancellation/rejection, timeout and recovery after dispatch. | No evidence located | OPEN |
@@ -75,7 +75,7 @@ After approval: same-Company and cross-Company validation; status eligibility; s
 ## 11. Open questions
 
 - [x] What exact event establishes physical custody and destination acceptance? Destination records physical receipt, device condition and observations, then explicitly confirms acceptance; this transitions the transfer to `RECEIVED`.
-- [ ] Which source-Shop reservations, parts and procurement requests move, release or remain behind?
+- [x] Which source-Shop reservations, parts and procurement requests move, release or remain behind? Release source reservations; destination can reserve its own available stock; received parts stay at source unless physically transferred through the stock-transfer workflow; open procurement requests remain at source until supplier amendment; destination arranges remaining parts.
 - [ ] Which ServiceOrder statuses and financial states are eligible?
 - [x] Who can initiate/accept, and does each side require a fresh employee challenge? All three profiles may initiate at source and accept at destination; each command requires a fresh direct employee credential challenge.
 - [ ] Can a dispatched transfer be rejected, cancelled or timed out, and how are liabilities reversed?
@@ -83,6 +83,6 @@ After approval: same-Company and cross-Company validation; status eligibility; s
 
 ## 12. Approval
 
-- Product approval: PARTIAL — BR-01 through BR-05 and BR-08 decided; remaining business rules are open
+- Product approval: PARTIAL — BR-01 through BR-06 and BR-08 decided; remaining business rules are open
 - Technical approval: PENDING
 - Data-model approval: PENDING
