@@ -75,6 +75,8 @@ The Product Owner approved the following PostgreSQL concurrency baseline on 2026
 
 The same ServiceOrder-first lock convention must be used by related payment, deposit, refund, reservation and Pickup commands; otherwise the transfer lock cannot prevent races with commands that bypass the aggregate synchronization point. Exact provider implementation and retry limits remain in DATA-05 review.
 
+The approved ServiceOrder refund/balance rule also applies before and after a Shop transfer: settled `REFUND` and `DEPOSIT_REFUND` records do not directly change the canonical `balance_due`. A transfer snapshots the current canonical balance and each deposit's separate remaining liability after applying all qualifying credits/applications and deposit events; it must not subtract refund transactions from the order balance or count refunded deposit amounts as held liability. Any future balance-adjustment workflow requires separate Product Owner and technical approval.
+
 ## 5. Proposed redesign (REDESIGN)
 
 Use the following approved candidate lifecycle for the transfer aggregate:
