@@ -53,7 +53,7 @@ See the detailed method inventory in [`customer-catalog-feature-audit.md`](../01
 - Normalize phone input for matching while preserving a formatted display value. Do not merge customer identities automatically.
 - Store immutable customer-detail snapshots (name and contact details) on committed Sale/ServiceOrder records, alongside the stable Customer reference, so later Customer edits do not rewrite historical records. Store immutable descriptive and price snapshots on committed Sale/ServiceOrder lines so later catalogue edits, including sale-price changes, do not rewrite history.
 
-Inactive records remain visible on existing records and history, but cannot be selected in new operations. Committed order-line snapshots and references remain unchanged.
+Inactive records remain visible on existing records and history, but cannot be selected in new operations. Committed order-line snapshots and references remain unchanged. Product categories may be deactivated even when Products reference them; deactivation preserves the category record and all existing Product references. A category referenced by any Product must never be permanently deleted. Category lifecycle is soft deactivation/reactivation only.
 
 ## 6. Business rules and invariants
 
@@ -62,7 +62,7 @@ Inactive records remain visible on existing records and history, but cannot be s
 - Company owns shared customers and catalogue entries; a Shop is not the owner of a customer/catalogue row.
 - Product stock is per Shop and not stored as a shared catalogue quantity.
 - Customer and catalogue management is available to an authenticated active Shop session without an individual employee credential challenge; there is no role-based employee distinction within CAT-01.
-- Soft deletion is the v1 baseline.
+- Soft deletion is the v1 baseline. Product categories may be deactivated even when Products reference them; this preserves the category and all existing Product references. A category referenced by one or more Products must never be permanently deleted; only soft deactivation/reactivation is supported.
 
 ### Resolved business rules
 
@@ -72,7 +72,7 @@ Inactive records remain visible on existing records and history, but cannot be s
 4. Remove `OTHER` from the target and do not migrate legacy `OTHER` entries.
 6. No minimum-stock field or low-stock threshold exists. `quantity_on_hand` represents physical stock; `quantity_reserved` represents active reservations; available quantity is `quantity_on_hand - quantity_reserved`.
 7. Fault descriptions are the primary display/search/selection values. Generate immutable Company-unique `FLT-` sequence codes, padded to at least six digits, with no reuse.
-8. Any authenticated active Shop session may manage Products, Services, product categories and prices and create/edit Fault catalogue entries without an employee challenge; no Manager role is required. Product categories are shared across all Shops in the Company. Each Product has exactly one required category; Services have no product category. Payment refunds and deposit refunds are authorized to `MANAGER` and `ADMIN` under FIN-01, with fresh direct employee credential validation; deposit forfeiture remains `MANAGER`-only.
+8. Any authenticated active Shop session may manage Products, Services, product categories and prices and create/edit Fault catalogue entries without an employee challenge; no Manager role is required. Product categories are shared across all Shops in the Company. Each Product has exactly one required category; Services have no product category. Categories may be deactivated even when Products reference them, preserving all existing references. A referenced category must never be permanently deleted; only soft deactivation/reactivation is supported. Payment refunds and deposit refunds are authorized to `MANAGER` and `ADMIN` under FIN-01, with fresh direct employee credential validation; deposit forfeiture remains `MANAGER`-only.
 9. Inactive records remain visible on existing records/history and cannot be selected for new operations. Existing drafts may display already-linked inactive records but cannot add another reference to them. An authenticated active Shop session may reactivate records without an employee challenge. Customer reactivation restores the same Customer record, preserving its ID, phone, email, history and existing references; it never creates a new Customer. Block reactivation if a Company-scoped uniqueness invariant would be violated.
 10. Editing a Customer updates only the current Company customer-directory record. It must not rewrite customer-detail snapshots or other historical data already committed to Sales or ServiceOrders. New committed operations capture the latest Customer details in their own immutable snapshot while retaining the stable Customer reference.
 11. Customer deactivation must not be blocked by existing Sales, ServiceOrders or historical references. It only prevents the Customer from being selected for new operations; existing records, their Customer references and immutable snapshots remain intact and readable. Deactivation does not cancel, modify or detach any existing business record. A deactivation reason/observation is optional and, when provided, is retained as an audit detail.
@@ -148,7 +148,7 @@ Acceptance criteria:
 - Customer phone defaults to Ireland; international checkbox accepts international input; both normalize to E.164.
 - A matching E.164 customer phone in the Company, including an inactive record, returns a hard conflict on create or phone update and creates no duplicate. Updating a customer while retaining its own existing phone succeeds; the edited record is excluded from its duplicate check.
 - Repeated customer email is accepted.
-- Product and Service sale prices are required, non-negative and stored as `NUMERIC(19,2)`; zero is valid and negative values are rejected. Every Product requires exactly one category belonging to the Company; Services have no product category. Any authenticated active Shop session can manage categories without a Manager role or employee challenge. The target catalogue has no SKU field.
+- Product and Service sale prices are required, non-negative and stored as `NUMERIC(19,2)`; zero is valid and negative values are rejected. Every Product requires exactly one category belonging to the Company; Services have no product category. Any authenticated active Shop session can manage categories without a Manager role or employee challenge. Categories can be deactivated even when referenced by Products, preserving all references; referenced categories cannot be permanently deleted. The target catalogue has no SKU field.
 - New Faults receive immutable, unique `FLT-` sequence codes; description remains primary in search/selection.
 - `OTHER` is neither offered nor imported into the target catalogue.
 - `ShopInventory` stores physical on-hand quantity and reserved quantity only; no minimum-stock threshold or low-stock comparison is implemented.
@@ -157,6 +157,7 @@ Acceptance criteria:
 - An authenticated active Shop session can reactivate an inactive record without an employee challenge. Customer reactivation restores the same record and preserves its ID, contact details, history and existing references; it does not create a replacement. Block reactivation when a Company-scoped uniqueness invariant would be violated. An existing draft can display its linked inactive item but cannot add another reference to it.
 - Customer and catalogue CRUD works without an employee challenge but is restricted to the authenticated Shop's Company and is audited against the ShopSession; payment refunds and deposit refunds require `MANAGER` or `ADMIN` credentials under FIN-01; deposit forfeiture remains `MANAGER`-only.
 - A Shop cannot assign inventory to a Service or to a Product belonging to another Company.
+- Deactivating a product category does not delete it or alter existing Product references. Permanent deletion of a category referenced by one or more Products is prohibited; category lifecycle uses soft deactivation/reactivation.
 - Money uses C# `decimal` and PostgreSQL `NUMERIC(19,2)`, never binary floating point. Product and Service sale prices are required and cannot be negative; zero is allowed.
 - Inactive records do not disappear from historical committed records.
 - Mutations are audited with the ShopSession actor; no employee identity or one-use employee authorization is required for CAT-01 writes.
