@@ -223,6 +223,8 @@ All financial command idempotency is persisted in the shared `idempotency_record
 
 **Deposit balance:** `available_deposit = settled_deposit_receipts - deposit_applications - settled_deposit_refunds - approved_forfeitures`. A held/security deposit does not reduce the ServiceOrder balance until a distinct `DepositApplication` is recorded.
 
+**ServiceOrder refund/balance invariant (Product Owner decision, 2026-11-22):** a settled `REFUND` against a ServiceOrder payment does not reverse the original payment credit in `balance_due` and does not create a new customer debt. A `DEPOSIT_REFUND` reduces only the originating deposit's un-applied held liability; it does not change `balance_due`. Refunds are outgoing-funds records, not order-price or balance adjustments. Do not subtract refunds when reconciling `balance_due`. Any future change to the amount owed requires a separately approved, authorized and auditable balance-adjustment operation; no such table or behavior is approved by this decision. The balance cache is updated atomically with qualifying ServiceOrder payment credits and deposit applications under the ServiceOrder aggregate lock.
+
 **Instalment balance:** `installment_outstanding = scheduled_amount - sum(settled InstallmentSettlement.amount_applied)`. No amount can be settled twice. The plan, schedule and receipts remain immutable/auditable; corrections are reversal/adjustment events, not edits to historical receipts.
 
 ## 3. Relationship cardinalities
