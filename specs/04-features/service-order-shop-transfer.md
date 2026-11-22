@@ -1,6 +1,6 @@
 # Feature: Cross-Shop ServiceOrder Transfer
 
-**Status:** DRAFT — BR-01 through BR-12 business rules and transfer lifecycle approved 2026-11-21; technical/data approval and audit governance remain OPEN
+**Status:** DRAFT — BR-01 through BR-13 business rules and transfer lifecycle approved 2026-11-21; technical/data approval and audit governance remain OPEN
 **Owner:** Product Owner
 
 ## 1. Objective and scope
@@ -43,6 +43,7 @@ Legacy source references are recorded in `specs/01-discovery/deep-dive-findings.
 | BR-10 | Maintain an immutable, append-only audit history for the transfer. Each event records the transfer ID, ServiceOrder ID, source and destination Shop IDs, previous and resulting state/action, acting employee ID and employee-name snapshot, timestamp, and references to related financial-liability events. Rejection and cancellation events include the mandatory reason; destination receipt/acceptance events include the recorded device condition and observations; return or agreed-resolution events include their supporting references and outcome. Events cannot be edited or deleted. Audit visibility and retention policy remain subject to technical/data governance review. | Product Owner approval, 2026-11-21; technical visibility/retention pending | DECIDED — event payload; OPEN — visibility/retention |
 | BR-11 | Destination acceptance (`RECEIVED`) must atomically update the ServiceOrder's current Shop, transfer eligible outstanding balance and held/unapplied deposit liability through a non-cash internal financial event, release source-Shop service-part reservations, update transfer state and append the required audit/ServiceOrder history. If any operation fails, the complete transaction rolls back. Settled payments remain attributed to the source Shop and are not recreated or moved. | Product Owner approval, 2026-11-21 | DECIDED |
 | BR-12 | For each ServiceDeposit, transfer only its actual outstanding held/unapplied liability at acceptance, derived from immutable deposit events and applications—not the original amount received or target amount. Previously applied, refunded or forfeited amounts are excluded. `RELEASED` means administrative unhold/release only and does not extinguish the financial obligation or reduce transferable liability. Actual extinguishment is recorded as `FORFEITED`, with a mandatory reason and the authorization required by the deposit lifecycle; it reduces the liability. Preserve immutable origin Shop and all receipt/payment history; update only current responsible Shop and transfer net outstanding liability. | Product Owner approval, 2026-11-21 | DECIDED — net-liability and RELEASED/FORFEITED distinction |
+| BR-13 | Each deposit is transferred independently. Calculate and move only that deposit's own outstanding held/unapplied balance; do not pool, redistribute, offset or reallocate balances between deposits. Preserve every prior application against its original deposit and its original ServiceOrder allocation. Partial applications remain historical and are not recalculated or moved to another deposit as part of Shop transfer. | Product Owner approval, 2026-11-21 | DECIDED |
 
 ## 5. Proposed redesign (REDESIGN)
 
@@ -75,7 +76,7 @@ For each deposit linked to the ServiceOrder, calculate the outstanding liability
 - `FORFEITED` records actual extinguishment of the customer's deposit entitlement/obligation. It requires a mandatory reason and the authorization required by the deposit lifecycle; its amount reduces outstanding liability.
 - Never use `RELEASED` as a synonym for forfeiture. Preserve both events in the immutable ledger.
 - Transfer each deposit's net outstanding liability and update its current responsible `shop_id` to the destination; preserve immutable `origin_shop_id`, original receipt transaction, applications, refunds, forfeitures and all historical events.
-- The sum of per-deposit outstanding liabilities must reconcile to the amount recorded in the transfer's internal non-cash liability event. Do not double-count deposit applications as both deposit liability and outstanding ServiceOrder balance.
+- The sum of per-deposit outstanding liabilities must reconcile to the deposit-liability component recorded in the transfer's internal non-cash liability event. Do not double-count deposit applications as both deposit liability and outstanding ServiceOrder balance. Each deposit is calculated independently: never pool, offset, redistribute or reallocate one deposit's balance to another. Existing partial/full applications remain attached to the original deposit and retain their original allocation; transfer does not rewrite or replay them.
 
 If the ledger is inconsistent, contains unresolved events, or cannot determine the outstanding liability unambiguously, acceptance must fail and roll back; it must not guess or silently write off the difference.
 
@@ -119,11 +120,12 @@ Source-Shop flow: create, review and dispatch; cancel only while `DRAFT`; track 
 - [x] AC-12: Retries/concurrent acceptance cannot duplicate financial liability events or stock reservation release; settled payment history remains attributed to source.
 - [x] AC-13: Each deposit transfers only its ledger-derived outstanding held/unapplied liability; applied, refunded and forfeited amounts are excluded, origin and historical records remain unchanged, and unresolved ledger inconsistencies block acceptance.
 - [x] AC-14: `RELEASED` is administrative only and does not reduce liability; only a valid `FORFEITED` event with mandatory reason and required authorization extinguishes liability.
+- [x] AC-15: Each deposit's liability is calculated and transferred independently; no pooling, offsetting, redistribution or reallocation between deposits occurs, and historical applications remain attached to their original deposit.
 - [ ] AC-07: Every transition is attributable to an employee authorization and timestamp.
 
 ## 10. Test scenarios
 
-Test the exhaustive transition matrix, including invalid transitions; cancel-before-dispatch; prohibited cancel-after-dispatch; reject with mandatory reason; agreed acceptance after rejection while destination retains custody; prohibit acceptance after return dispatch; return dispatch and source receipt; no timeout closure; atomic Shop/liability handoff only on `RECEIVED`; forced rollback on failure at each transaction stage; retry/concurrent acceptance idempotency; no duplicate liability event or reservation release; settled history preservation; per-deposit net liability reconciliation (including partially applied/refunded/forfeited deposits, administrative `RELEASED` events that preserve liability, and authorized `FORFEITED` events that extinguish it); audit event completeness and stale-state handling.
+Test the exhaustive transition matrix, including invalid transitions; cancel-before-dispatch; prohibited cancel-after-dispatch; reject with mandatory reason; agreed acceptance after rejection while destination retains custody; prohibit acceptance after return dispatch; return dispatch and source receipt; no timeout closure; atomic Shop/liability handoff only on `RECEIVED`; forced rollback on failure at each transaction stage; retry/concurrent acceptance idempotency; no duplicate liability event or reservation release; settled history preservation; per-deposit net liability reconciliation (including partial applications, refunds, forfeitures, administrative `RELEASED` events and authorized `FORFEITED` events); verify no pooling, offset, redistribution or reallocation and preservation of historical application-to-deposit links; audit event completeness and stale-state handling.
 
 ## 11. Open questions
 
@@ -136,10 +138,11 @@ Test the exhaustive transition matrix, including invalid transitions; cancel-bef
 - [x] What transfer states and transitions govern dispatch, acceptance, rejection and physical return? See the exhaustive lifecycle table in Section 5.
 - [x] How is Shop and financial responsibility handed over? In one atomic destination-acceptance transaction as specified in BR-11 and Section 6; settled payments remain attributed to source.
 - [x] Which deposit amount moves? Only each deposit's actual outstanding held/unapplied liability, net of applied/refunded/forfeited amounts. `RELEASED` is administrative and preserves liability; `FORFEITED` extinguishes it with reason and required authorization.
+- [x] Are deposits pooled or reallocated during transfer? No. Each deposit is transferred independently; prior applications remain attached to the original deposit and are not redistributed.
 - [ ] How are audit visibility, retention and financial reconciliation exposed? These remain technical/data-governance decisions.
 
 ## 12. Approval
 
-- Product approval: BUSINESS RULES APPROVED — BR-01 through BR-12, transfer state lifecycle, atomic acceptance and net deposit-liability principle and RELEASED/FORFEITED distinction approved 2026-11-21; audit visibility/retention governance remains open
+- Product approval: BUSINESS RULES APPROVED — BR-01 through BR-12, transfer state lifecycle, atomic acceptance and net deposit-liability principle, RELEASED/FORFEITED distinction and independent per-deposit treatment approved 2026-11-21; audit visibility/retention governance remains open
 - Technical approval: PENDING
 - Data-model approval: PENDING
