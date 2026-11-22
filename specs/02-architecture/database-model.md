@@ -82,6 +82,48 @@ The `employee_role_assignment` table retains profile history, but only one profi
 - Refund header, allocations, idempotency record and required ServiceOrder Note are persisted atomically. Pending refunds do not affect the cash drawer; only a settled cash refund does.
 - These are logical requirements, not production DDL. DATA-05 must verify PostgreSQL syntax, partial indexes, constraint-trigger semantics and EF Core mapping before migrations.
 
+### Payment transaction and refund constraint-trigger matrix (DATA-05 review)
+
+This matrix defines the first physical validation scope. It is a design specification only; it is not executable SQL and does not authorize migration generation.
+
+| Trigger family | Table/event coverage | Deferred end-of-transaction validations |
+|---|---|---|
+| `payment_transaction_integrity` | Row-level constraint trigger on `payment_transaction` INSERT/UPDATE | Validate the final header state: positive transaction amount; exactly one valid target according to kind; refund kind/source-kind compatibility; original transaction exists, is a settled incoming transaction of the required kind, and matches the refund target aggregate and currency; no self-reference; a reversed original or an original with an unresolved REVERSED refund is blocked from further refunds. Validate that the transaction has at least one allocation and that allocation totals equal the transaction amount. |
+| `payment_allocation_integrity` | Row-level constraint trigger on `payment_allocation` INSERT/UPDATE/DELETE | Validate the final allocation set for the affected transaction: every allocation amount is positive; tender-specific values are coherent; the transaction allocation sum equals its header amount; refund allocations reference the exact original allocation from the header's original transaction and preserve tender and currency; refund allocations require a non-null original-allocation reference and non-refund allocations require NULL. |
+| `payment_refund_capacity_integrity` | Row-level constraint triggers on `payment_transaction` and `payment_allocation` INSERT/UPDATE; allocation DELETE is also covered so a source or refund allocation cannot be removed to bypass the check | For every affected original incoming allocation, recompute the received amount and linked refund reservations from persisted final rows. CASH received amount is `amount_tendered - change_amount`; CARD received amount is the approved/settled original allocation amount. Sum linked refund allocations only when their refund transaction is `PENDING` or `SETTLED`. Reject capacity below zero. FAILED/VOIDED refund transactions release capacity. Any linked `REVERSED` refund blocks further refunds until explicit reconciliation/correction; it does not release capacity automatically. |
+
+**Trigger responsibilities and non-trigger constraints**
+
+- Use ordinary `CHECK` constraints for row-local rules (positive amounts, valid cash/change ranges, required nullable-reference shape and target XOR where expressible), composite foreign keys for identity/scope/tender/currency relationships, and filtered unique indexes for unique source references. Triggers are reserved for cross-row and cross-table invariants; they do not replace simpler declarative constraints.
+- A refund header must reference exactly one original transaction of the matching incoming kind: `REFUND -> PAYMENT`; `DEPOSIT_REFUND -> DEPOSIT_RECEIPT`. The original transaction must be `SETTLED`, and both transactions must target the same aggregate and currency. A refund may never target another refund.
+- Every refund allocation references the exact original allocation named by the refund header, not merely any allocation with the same tender. Refund and original allocation tender/currency must match. The original incoming transaction's allocation sum and the refund transaction's allocation sum must each equal their respective transaction header amount.
+- The capacity check is per original allocation, not just per original transaction. It must include all `PENDING` and `SETTLED` refund allocations, including a PENDING refund that has no drawer effect yet. It must not count FAILED/VOIDED refunds. A REVERSED refund is a hard reconciliation block, not spare capacity.
+- A trigger caused by a refund transaction status change must validate the affected original transaction and all original allocations referenced by that refund. A trigger caused by an original transaction status change must validate its existing refunds; an original cannot become non-SETTLED or REVERSED while leaving new refund creation enabled.
+- Validation must be symmetric: inserting/updating a refund header, inserting/updating/deleting a refund allocation, or changing a source transaction/allocation status or amount cannot bypass the same final-state invariants. Financial records must not be physically deleted through normal application paths; deletion events are covered defensively for allocation integrity, and production privileges/FKs must prevent deletion of settled financial history.
+- Deferred trigger functions must identify the affected transaction/allocation from both NEW and OLD values as applicable, validate final persisted state, and tolerate multiple trigger invocations for the same aggregate in one transaction. They must not depend on trigger firing order or intermediate header/allocation statement order.
+
+**Concurrency contract**
+
+- The application acquires locks before writes using the previously approved canonical order: ServiceOrder first for ServiceOrder-linked operations; then original PaymentTransaction; then affected original PaymentAllocation rows ordered by ascending primary key. For non-ServiceOrder targets, lock the original PaymentTransaction before its affected allocations.
+- After locks are held, reread source transaction status, original allocation received amounts, existing PENDING/SETTLED refunds and any REVERSED block. Validate and persist the refund header, allocations, idempotency record and required ServiceOrder Note in one transaction.
+- The deferred trigger is a final database integrity backstop. It must not introduce a lock acquisition order that conflicts with the command contract. The implementation review must prove that concurrent refund attempts serialize on the original transaction/allocation locks and that the losing transaction cannot commit an over-refund.
+- Under PostgreSQL `READ COMMITTED`, the implementation must verify trigger-query visibility after waiting on a lock and prove that the deferred validation sees committed competing reservations. If this cannot be demonstrated reliably with the chosen trigger function/locking pattern, DATA-05 must revise the physical strategy before migrations; do not rely on an unverified assumption about MVCC snapshots.
+
+**Required PostgreSQL integration scenarios**
+
+1. Valid single-allocation CASH and CARD refunds at the exact refundable cap.
+2. Mixed CASH/CARD original payment with independent per-allocation caps; no cross-tender substitution or offset.
+3. PENDING refund reserves capacity; a second concurrent refund cannot reserve the same amount.
+4. FAILED and VOIDED refunds release capacity; SETTLED refunds consume it.
+5. REVERSED refund blocks subsequent refunds until a separate reconciliation/correction path is completed.
+6. Two concurrent refunds against one original allocation: one succeeds within the cap and the other receives a conflict or integrity failure; no over-refund commits.
+7. Refund header inserted before allocations and allocations inserted before header validation; final valid transaction commits regardless of statement order.
+8. Missing allocation, duplicate/wrong original allocation, wrong tender/currency, wrong original transaction, mismatched allocation sum, and mismatched target all fail at commit.
+9. Changes to original transaction status/amount or original allocation amount cannot invalidate existing refunds silently.
+10. Rollback removes the refund header, allocations, idempotency claim and ServiceOrder Note together; no partial financial effect remains.
+11. Repeated deferred trigger invocation within one transaction remains deterministic and does not double-count an allocation.
+12. Verify EF Core/Npgsql mapping and generated migration SQL against the supported PostgreSQL version; run concurrency tests using separate real database connections and transactions.
+
 ### PostgreSQL and EF Core physical-integrity implementation baseline (DATA-05 — approved technical review)
 
 The Product Owner approved the following implementation strategy on 2026-11-22. This is a provider-specific design decision; it does not authorize production migrations or schema changes by itself.
