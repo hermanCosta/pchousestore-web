@@ -205,6 +205,10 @@ Money uses C# decimal and PostgreSQL NUMERIC(19,2) in EUR. Store event timestamp
 
 All routes other than Pickup remain candidate routes. FIN-01 owns payment/deposit/refund APIs; the Stock module owns inventory reservation, consumption and physical returns; SO-XFER-SPEC owns cross-Shop transfer.
 
+### 7.2 Create ServiceOrder — customer reference
+
+The create command must receive the identifier of an existing Customer (`customerId`) selected from the Company-shared customer directory. It must not create, update, merge or otherwise mutate Customer master data as part of ServiceOrder creation. If the customer does not yet exist, the operator must create the Customer through CAT-01 and then select that record when creating the ServiceOrder. The backend must verify that the referenced Customer belongs to the active Shop's Company and is active/selectable for new operations; reject missing, inactive or foreign-Company Customer references.
+
 ### 7.1 Pickup HTTP contract — approved
 
 **Request**
