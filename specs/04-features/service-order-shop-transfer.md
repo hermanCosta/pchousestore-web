@@ -112,6 +112,7 @@ For each deposit linked to the ServiceOrder, calculate the outstanding liability
 - The sum of per-deposit outstanding liabilities must reconcile to the deposit-liability component recorded in the transfer's internal non-cash liability event. The ServiceOrder outstanding balance is transferred once from the canonical `balance_due`/financial-ledger result, which already reflects any deposit applications credited to the order. The remaining held/unapplied liability is calculated separately per deposit. Do not add applied amounts to `balance_due` again or include any amount in both components. Each deposit is calculated independently: never pool, offset, redistribute or reallocate one deposit's balance to another. Existing partial/full applications remain attached to the original deposit and retain their original allocation; transfer does not rewrite or replay them.
 
 If the ledger is inconsistent, contains unresolved events, or cannot determine the outstanding liability unambiguously, acceptance must fail and roll back; it must not guess or silently write off the difference.
+The transfer acceptance command must also fail closed if the ServiceOrder balance or any linked deposit has an unresolved reconciliation finding, or if its required reconciliation scope is `INCOMPLETE`. A previous `PASSED` run is evidence only for its recorded scope/check-set version; the acceptance transaction must still recalculate and validate authoritative ledgers under the approved locks.
 
 ### Internal financial transfer event (BR-15)
 
