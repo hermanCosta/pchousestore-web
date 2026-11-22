@@ -51,7 +51,7 @@ Do not count `PENDING`, `FAILED`, `VOIDED` or `REVERSED` payment transactions. D
 
 ### Cash rounding
 
-Use the recorded cash tender less change to calculate what physically entered the drawer. Persist the separate `cash_rounding_adjustment` for audit and reconciliation to the customer balance, but do not add it to the drawer formula a second time. Cash rounding must not change the original line prices or tax calculation base.
+Use the recorded cash tender less change to calculate what physically entered the drawer. For an eligible all-CASH rounded payment, `amount_tendered - change_amount` must equal `amount_applied + cash_rounding_adjustment`; for example, €10.02 applied with a -€0.02 adjustment yields €10.00 physically received. Persist the separate signed adjustment for audit, but do not add it to or subtract it from the drawer formula a second time. The maximum cumulative cash refund is the physically received amount (€10.00 in this example), less prior settled cash refunds linked to the original allocation—not the larger amount applied to the customer balance. Cash rounding must not change original line prices or tax calculation base.
 
 ## 4. Counting and variance
 
