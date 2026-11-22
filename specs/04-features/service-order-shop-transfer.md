@@ -61,6 +61,20 @@ The Product Owner approved the following PostgreSQL relational-integrity strateg
 
 The complete physical schema, trigger implementation, transaction locking/isolation and remaining DATA-05 review remain open. See [Proposed Relational Database Model](../02-architecture/database-model.md), section 4, for the candidate constraints.
 
+### 5.2 Approved concurrency and atomicity strategy (technical review 2)
+
+The Product Owner approved the following PostgreSQL concurrency baseline on 2026-11-21:
+
+- Use `READ COMMITTED` with explicit row-level locks; do not use global `SERIALIZABLE` isolation for this workflow.
+- Every transfer lifecycle command that depends on or changes a ServiceOrder must lock the ServiceOrder row first, then the `service_order_transfer` row. A preliminary unlocked read may discover the ServiceOrder ID, but all state must be reread/revalidated after locks are acquired.
+- Continue the canonical lock order for affected rows: ServiceOrder, transfer, deposits by ascending ID, existing payment transactions by ascending ID when needed, reservation rows by ascending ID, then ShopInventory rows by ascending ID. Acquire only relevant rows and never reverse this order.
+- After locks are held, recalculate canonical `balance_due`, each deposit's remaining held/unapplied liability and active source reservations from authoritative persisted state. Do not use pre-lock reads or client-submitted financial/stock values.
+- Every transfer state mutation must compare the expected aggregate `version` and increment it conditionally. Stale versions return a conflict; they are not silently reapplied.
+- The idempotency claim/result, transfer state, financial event and lines, Shop/deposit ownership changes, reservation release and audit/history records commit in one transaction. An identical committed replay returns the original result; changed-payload reuse is rejected.
+- A deadlock or retryable database failure may trigger a bounded retry of the entire transaction with fresh reads and the same idempotency key. Never retry only part of the workflow. Business and stale-version conflicts are not automatically retried.
+
+The same ServiceOrder-first lock convention must be used by related payment, deposit, refund, reservation and Pickup commands; otherwise the transfer lock cannot prevent races with commands that bypass the aggregate synchronization point. Exact provider implementation and retry limits remain in DATA-05 review.
+
 ## 5. Proposed redesign (REDESIGN)
 
 Use the following approved candidate lifecycle for the transfer aggregate:
