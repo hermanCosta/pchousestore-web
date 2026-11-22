@@ -1,6 +1,6 @@
 # Feature: Cross-Shop ServiceOrder Transfer
 
-**Status:** DRAFT — BR-01 through BR-14 business rules and transfer lifecycle approved 2026-11-21; technical/data approval and audit governance remain OPEN
+**Status:** DRAFT — BR-01 through BR-15 business rules and transfer lifecycle approved 2026-11-21; technical/data approval and audit governance remain OPEN
 **Owner:** Product Owner
 
 ## 1. Objective and scope
@@ -45,6 +45,7 @@ Legacy source references are recorded in `specs/01-discovery/deep-dive-findings.
 | BR-12 | For each ServiceDeposit, transfer only its actual outstanding held/unapplied liability at acceptance, derived from immutable deposit events and applications—not the original amount received or target amount. Previously applied, refunded or forfeited amounts are excluded. `RELEASED` means administrative unhold/release only and does not extinguish the financial obligation or reduce transferable liability. Actual extinguishment is recorded as `FORFEITED`, with a mandatory reason and the authorization required by the deposit lifecycle; it reduces the liability. Preserve immutable origin Shop and all receipt/payment history; update only current responsible Shop and transfer net outstanding liability. | Product Owner approval, 2026-11-21 | DECIDED — net-liability and RELEASED/FORFEITED distinction |
 | BR-13 | Each deposit is transferred independently. Calculate and move only that deposit's own outstanding held/unapplied balance; do not pool, redistribute, offset or reallocate balances between deposits. Preserve every prior application against its original deposit and its original ServiceOrder allocation. Partial applications remain historical and are not recalculated or moved to another deposit as part of Shop transfer. | Product Owner approval, 2026-11-21 | DECIDED |
 | BR-14 | At transfer acceptance, treat the ServiceOrder's outstanding customer balance and each ServiceDeposit's outstanding liability as separate financial components. Transfer the ServiceOrder balance exactly once using the authoritative `balance_due`/financial-ledger calculation, which already reflects settled payments and deposit applications credited to the order. Separately transfer only each deposit's remaining held/unapplied liability under BR-12/BR-13. Never add deposit applications to `balance_due` again, subtract them twice, or include the same amount in both components. Their combined values must reconcile to the underlying order and deposit ledgers without overlap. | Product Owner approval, 2026-11-21 | DECIDED |
+| BR-15 | On successful acceptance, create one immutable `ServiceOrderTransferFinancialEvent` for the transfer, separate from cash/payment transactions. It records the source/destination Shops, ServiceOrder, acting employee ID and name snapshot, timestamp and currency, and has component detail for the transferred ServiceOrder outstanding balance and each independently transferred deposit liability, with references to the underlying financial ledger records. It must be uniquely linked to one transfer/acceptance and created in the same atomic transaction as Shop/liability reassignment. It does not create cash movement, drawer activity, a receipt or a `PaymentTransaction`. | Product Owner approval, 2026-11-21 | DECIDED — business record and audit requirements; exact schema subject to technical approval |
 
 ## 5. Proposed redesign (REDESIGN)
 
@@ -80,6 +81,19 @@ For each deposit linked to the ServiceOrder, calculate the outstanding liability
 - The sum of per-deposit outstanding liabilities must reconcile to the deposit-liability component recorded in the transfer's internal non-cash liability event. The ServiceOrder outstanding balance is transferred once from the canonical `balance_due`/financial-ledger result, which already reflects any deposit applications credited to the order. The remaining held/unapplied liability is calculated separately per deposit. Do not add applied amounts to `balance_due` again or include any amount in both components. Each deposit is calculated independently: never pool, offset, redistribute or reallocate one deposit's balance to another. Existing partial/full applications remain attached to the original deposit and retain their original allocation; transfer does not rewrite or replay them.
 
 If the ledger is inconsistent, contains unresolved events, or cannot determine the outstanding liability unambiguously, acceptance must fail and roll back; it must not guess or silently write off the difference.
+
+### Internal financial transfer event (BR-15)
+
+Create one `ServiceOrderTransferFinancialEvent` header per successfully accepted transfer, with one or more component detail rows:
+
+- Header: transfer ID (unique), ServiceOrder ID, source and destination Shop IDs, acting employee ID and immutable employee-name snapshot, occurrence timestamp and currency code.
+- Component details: component type (`ORDER_BALANCE` or `DEPOSIT_LIABILITY`), amount, optional ServiceDeposit ID (required for a deposit-liability component), and references to the authoritative source ledger records used in the calculation.
+- Exactly one `ORDER_BALANCE` component represents the canonical ServiceOrder `balance_due` transferred. Each deposit-liability component represents one deposit's own net outstanding liability; do not aggregate multiple deposits into one detail row.
+- The sum of detail amounts must reconcile to the header totals and source ledger snapshots. Keep source references sufficient to explain the calculation later.
+- The event is an internal reassignment of responsibility, not a payment: it must not create a `PaymentTransaction`, cash receipt, cash movement, drawer entry, invoice payment or provider transaction.
+- Enforce one financial transfer event per accepted transfer (unique transfer ID) and append-only immutability. Link it from the transfer acceptance audit event and retain the financial event ID in the transfer record or event payload.
+
+Create the header and detail rows inside the same acceptance transaction described above. If any event/header/detail insert or reconciliation check fails, roll back the entire acceptance. A retry must resolve to the same accepted transfer/event and must never create a second financial event.
 
 ### Atomic acceptance and liability handoff (BR-11)
 
@@ -123,11 +137,12 @@ Source-Shop flow: create, review and dispatch; cancel only while `DRAFT`; track 
 - [x] AC-14: `RELEASED` is administrative only and does not reduce liability; only a valid `FORFEITED` event with mandatory reason and required authorization extinguishes liability.
 - [x] AC-15: Each deposit's liability is calculated and transferred independently; no pooling, offsetting, redistribution or reallocation between deposits occurs, and historical applications remain attached to their original deposit.
 - [x] AC-16: ServiceOrder `balance_due` and each deposit's outstanding held/unapplied liability are transferred as separate, non-overlapping components. Deposit applications already credited to `balance_due` are never counted again in the deposit transfer or added to the order balance.
+- [x] AC-17: One immutable non-cash financial transfer event is created per accepted transfer, with an order-balance component and a separate detail for each transferred deposit; it references source ledger records and creates no payment, receipt or drawer movement.
 - [ ] AC-07: Every transition is attributable to an employee authorization and timestamp.
 
 ## 10. Test scenarios
 
-Test the exhaustive transition matrix, including invalid transitions; cancel-before-dispatch; prohibited cancel-after-dispatch; reject with mandatory reason; agreed acceptance after rejection while destination retains custody; prohibit acceptance after return dispatch; return dispatch and source receipt; no timeout closure; atomic Shop/liability handoff only on `RECEIVED`; forced rollback on failure at each transaction stage; retry/concurrent acceptance idempotency; no duplicate liability event or reservation release; settled history preservation; per-deposit net liability reconciliation (including partial applications, refunds, forfeitures, administrative `RELEASED` events and authorized `FORFEITED` events); verify `balance_due` already reflects credited deposit applications and no amount is double-counted or omitted across the two components; verify no pooling, offset, redistribution or reallocation and preservation of historical application-to-deposit links; audit event completeness and stale-state handling.
+Test the exhaustive transition matrix, including invalid transitions; cancel-before-dispatch; prohibited cancel-after-dispatch; reject with mandatory reason; agreed acceptance after rejection while destination retains custody; prohibit acceptance after return dispatch; return dispatch and source receipt; no timeout closure; atomic Shop/liability handoff only on `RECEIVED`; forced rollback on failure at each transaction stage; retry/concurrent acceptance idempotency; no duplicate liability event or reservation release; settled history preservation; per-deposit net liability reconciliation (including partial applications, refunds, forfeitures, administrative `RELEASED` events and authorized `FORFEITED` events); verify `balance_due` already reflects credited deposit applications and no amount is double-counted or omitted across the two components; verify no pooling, offset, redistribution or reallocation and preservation of historical application-to-deposit links; audit event completeness and stale-state handling; exactly one financial transfer event per accepted transfer; component-to-ledger reconciliation; no PaymentTransaction/cash/drawer side effects;
 
 ## 11. Open questions
 
@@ -142,10 +157,11 @@ Test the exhaustive transition matrix, including invalid transitions; cancel-bef
 - [x] Which deposit amount moves? Only each deposit's actual outstanding held/unapplied liability, net of applied/refunded/forfeited amounts. `RELEASED` is administrative and preserves liability; `FORFEITED` extinguishes it with reason and required authorization.
 - [x] Are deposits pooled or reallocated during transfer? No. Each deposit is transferred independently; prior applications remain attached to the original deposit and are not redistributed.
 - [x] How are ServiceOrder balance and deposit liability reconciled? Transfer canonical `balance_due` once, separately transfer each deposit's remaining held/unapplied liability, and never count applied amounts in both components.
+- [x] What records the financial handoff? One immutable non-cash financial transfer event per accepted transfer, with separate order-balance and per-deposit detail components, source-ledger references, employee snapshot and timestamp; it is not a payment or cash event.
 - [ ] How are audit visibility, retention and financial reconciliation exposed? These remain technical/data-governance decisions.
 
 ## 12. Approval
 
-- Product approval: BUSINESS RULES APPROVED — BR-01 through BR-12, transfer state lifecycle, atomic acceptance and net deposit-liability principle, RELEASED/FORFEITED distinction and independent per-deposit treatment and non-overlapping order-balance/deposit-liability reconciliation approved 2026-11-21; audit visibility/retention governance remains open
+- Product approval: BUSINESS RULES APPROVED — BR-01 through BR-12, transfer state lifecycle, atomic acceptance and net deposit-liability principle, RELEASED/FORFEITED distinction and independent per-deposit treatment, non-overlapping order-balance/deposit-liability reconciliation and immutable non-cash financial transfer event approved 2026-11-21; audit visibility/retention governance remains open
 - Technical approval: PENDING
 - Data-model approval: PENDING
