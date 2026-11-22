@@ -40,7 +40,7 @@ See the detailed method inventory in [`customer-catalog-feature-audit.md`](../01
 - Fault description remains the primary display/search/selection value. Fault code is generated automatically as `FLT-` plus a Company sequence padded to at least six digits (for example `FLT-000001`); it is immutable, unique within the Company and never reused.
 - SKU is optional for Products and Services. When present, it must match `SKU-[A-Z0-9]{8}`, is normalized to uppercase and unique per Company, including inactive records.
 - Shop inventory is separate, per Shop, and quantity tracking uses whole units.
-- Minimum stock is set per Shop; low-stock reporting compares that Shop's on-hand Product quantity with its configured minimum.
+- Shop stock records contain only the physical on-hand quantity (`quantity_on_hand`) and active reservation quantity (`quantity_reserved`). There is no minimum-stock (`min_qty` / `minimum_quantity`) field, threshold or low-stock alert/report in the approved model.
 - Customer directory access is governed by the authenticated Shop session, not by an employee role. Customer/catalogue records marked inactive remain visible in existing records and history but cannot be selected for new operations. Legacy `OTHER` entries are excluded and not migrated.
 - An authenticated Shop session may create/edit/deactivate/reactivate customer records, Products, Services, categories, sale prices and Fault catalogue entries without an employee challenge. Payment refunds and deposit refunds are permitted to `MANAGER` and `ADMIN`; deposit forfeiture remains `MANAGER`-only. All require the fresh direct employee credential validation defined by FIN-01.
 - V1 uses soft deletion. Historical sale/service-order lines must retain stable snapshots/references as defined in their feature specifications.
@@ -49,7 +49,7 @@ See the detailed method inventory in [`customer-catalog-feature-audit.md`](../01
 ## 5. Approved target design
 
 - Customer directory with Company-wide search, details, create/edit and deactivate actions.
-- Product and Service catalogue screens share search and lifecycle controls while showing type-specific fields. Product forms manage category and stock-tracking configuration; per-Shop quantities/minimums are managed in inventory workflows.
+- Product and Service catalogue screens share search and lifecycle controls while showing type-specific fields. Product forms manage category and stock-tracking configuration; physical quantities and reservations are managed per Shop in inventory workflows. No minimum-stock setting is provided.
 - Fault catalogue is a Company-shared list for service-order selection. Service-order technical findings remain a separate operational record referencing a catalogue fault when applicable.
 - Normalize phone input for matching while preserving a formatted display value. Do not merge customer identities automatically.
 - Store immutable descriptive and price snapshots on committed Sale/ServiceOrder lines so later catalogue edits do not rewrite history.
@@ -72,7 +72,7 @@ Inactive records remain visible on existing records and history, but cannot be s
 3. Customer email is optional and may repeat; no email unique constraint.
 4. Remove `OTHER` from the target and do not migrate legacy `OTHER` entries.
 5. SKU is optional. When present, it matches `SKU-[A-Z0-9]{8}`; normalize uppercase, unique per Company and reserved after deactivation.
-6. Product minimum stock is configured per Shop and drives that Shop's low-stock report.
+6. No minimum-stock field or low-stock threshold exists. `quantity_on_hand` represents physical stock; `quantity_reserved` represents active reservations; available quantity is `quantity_on_hand - quantity_reserved`.
 7. Fault descriptions are the primary display/search/selection values. Generate immutable Company-unique `FLT-` sequence codes, padded to at least six digits, with no reuse.
 8. An authenticated active Shop session may manage Products, Services, categories and prices and create/edit Fault catalogue entries without an employee challenge. Payment refunds and deposit refunds are authorized to `MANAGER` and `ADMIN` under FIN-01, with fresh direct employee credential validation; deposit forfeiture remains `MANAGER`-only.
 9. Inactive records remain visible on existing records/history and cannot be selected for new operations. Existing drafts may display already-linked inactive records but cannot add another reference to them. An authenticated active Shop session may reactivate records without an employee challenge.
@@ -91,7 +91,7 @@ The current logical draft in `specs/02-architecture/database-model.md` contains:
 - `product(catalog_item_id, product_category_id, inventory_tracking_mode, ...)` for Product-only fields.
 - `service(catalog_item_id, description)` for Service-only fields.
 - `product_category(company_id, parent_category_id, name, code, description, is_active)`.
-- `shop_inventory(shop_id, product_catalog_item_id, quantity_on_hand, quantity_reserved, minimum_quantity)` for Shop stock; minimum quantity is per Shop and drives low-stock reporting.
+- `shop_inventory(shop_id, product_catalog_item_id, quantity_on_hand, quantity_reserved)` for Shop stock. `quantity_on_hand` is the physical quantity and may be negative; `quantity_reserved` is non-negative and represents active reservations. No minimum-stock field is defined.
 - `fault(company_id, code, description, active)`; code is automatically generated as `FLT-` plus a Company sequence padded to at least six digits, immutable and never reused. Description is the primary display/search/selection value.
 
 This is a logical draft. Enforce Company and phone uniqueness, case-insensitive SKU uniqueness including inactive rows, and a transactional Company-scoped Fault code sequence. Exact physical indexes, audit fields and foreign-key delete constraints are implementation details to review with the migration.
@@ -107,7 +107,7 @@ All endpoints are under `/api/v1`, require the authenticated and active Shop ses
 | Product categories | `POST /product-categories/queries`; `POST /product-categories`; `PUT /product-categories/{id}`; `POST /product-categories/{id}/deactivate`; `POST /product-categories/{id}/reactivate` | Active Shop session only; no employee challenge. DTO contains name, code, optional parentCategoryId, description and isActive. |
 | Faults | `POST /faults/queries`; `POST /faults`; `GET /faults/{id}`; `PUT /faults/{id}`; `POST /faults/{id}/deactivate`; `POST /faults/{id}/reactivate` | Active Shop session only; no employee challenge. Create/update accepts description only; server generates and returns immutable code. Description is the primary search/selection field. |
 
-Query DTOs return paged results and include inactive records only when `includeInactive=true`; inactive items remain available to history readers but are omitted from new-operation selectors. Return 404 for IDs outside the active Company. Validation errors use the API's Problem Details format. Per-Shop minimum quantity belongs to ShopInventory/inventory APIs, not the shared catalogue-item endpoint.
+Query DTOs return paged results and include inactive records only when `includeInactive=true`; inactive items remain available to history readers but are omitted from new-operation selectors. Return 404 for IDs outside the active Company. Validation errors use the API's Problem Details format. Per-Shop physical quantity and reservations belong to ShopInventory/inventory APIs, not the shared catalogue-item endpoint; there is no minimum-stock field or low-stock threshold.
 
 ## 9. UI flows and states
 
@@ -122,7 +122,7 @@ Query DTOs return paged results and include inactive records only when `includeI
 
 - One catalogue supports Product and Service types only. `OTHER` is not offered.
 - SKU is optional. If entered, use placeholder `SKU-AB12CD34`; normalize uppercase and validate the exact eight-character suffix.
-- Product fields include name, SKU, sale price and category. Service fields include name, SKU, sale price and description. Product stock/minimum belongs to Shop inventory workflows.
+- Product fields include name, SKU, sale price and category. Service fields include name, SKU, sale price and description. Product physical stock and reservations belong to Shop inventory workflows; no minimum-stock setting is available.
 - Categories are Company-wide. Inactive items are available in history views but cannot be selected in new operations. An authenticated Shop session can reactivate an item; existing drafts may display a previously selected inactive item but cannot add another line/reference to it.
 
 ### Fault Catalogue
@@ -150,7 +150,7 @@ Acceptance criteria:
 - Catalogue items can be saved without an SKU. A supplied SKU matches `SKU-[A-Z0-9]{8}`, is normalized uppercase, and cannot be duplicated within the Company even if the previous item is inactive.
 - New Faults receive immutable, unique `FLT-` sequence codes; description remains primary in search/selection.
 - `OTHER` is neither offered nor imported into the target catalogue.
-- Low-stock comparison uses the active Shop's `ShopInventory.minimum_quantity`.
+- `ShopInventory` stores physical on-hand quantity and reserved quantity only; no minimum-stock threshold or low-stock comparison is implemented.
 - Inactive customer/catalogue records cannot be used in new operations but remain readable from existing history.
 - An authenticated active Shop session can reactivate an inactive record; an existing draft can display its linked inactive item but cannot add another reference to it.
 - Customer and catalogue CRUD works without an employee challenge but is restricted to the authenticated Shop's Company and is audited against the ShopSession; payment refunds and deposit refunds require `MANAGER` or `ADMIN` credentials under FIN-01; deposit forfeiture remains `MANAGER`-only.
@@ -162,7 +162,7 @@ Acceptance criteria:
 
 ## 12. Test scenarios
 
-Expected coverage includes Company-scope isolation; Irish/international phone parsing and duplicate blocking; repeated email acceptance; saving catalogue items without SKU; supplied-SKU validation/case normalization/uniqueness including inactive rows; concurrent Fault code generation; Product-vs-Service constraints; Shop-specific stock minimum; inactive-item handling in new vs existing records; ShopSession-only write authorization; and ShopSession audit attribution. Add tests after this SPEC is approved.
+Expected coverage includes Company-scope isolation; Irish/international phone parsing and duplicate blocking; repeated email acceptance; saving catalogue items without SKU; supplied-SKU validation/case normalization/uniqueness including inactive rows; concurrent Fault code generation; Product-vs-Service constraints; per-Shop physical stock and reservation invariants with no minimum-stock field; inactive-item handling in new vs existing records; ShopSession-only write authorization; and ShopSession audit attribution. Add tests after this SPEC is approved.
 
 ## 13. Approval
 
