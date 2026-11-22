@@ -33,9 +33,9 @@ See the detailed method inventory in [`customer-catalog-feature-audit.md`](../01
 ## 4. Approved target constraints
 
 - Customers and catalogues are shared by all Shops in the Company.
-- Customer profile fields: required first name, last name and phone; optional email. The target should use C# `decimal` and PostgreSQL `NUMERIC` for money; no floating-point money.
+- Customer profile fields: required first name, last name and phone; optional email. Catalogue Product and Service sale prices are required, must be greater than or equal to zero, and use C# `decimal` with PostgreSQL `NUMERIC(19,2)`; negative prices are invalid and zero-price items are allowed. No floating-point money.
 - Customer email may repeat; do not enforce email uniqueness.
-- Catalogue model separates `CatalogItem` kind `PRODUCT`/`SERVICE`; `OTHER` is removed. SKU is optional. When present, it matches the approved format and uniqueness rules. Only Products have stock. Product categories are configurable Company data, not a hard-coded enum.
+- Catalogue model separates `CatalogItem` kind `PRODUCT`/`SERVICE`; `OTHER` is removed. SKU is optional. When present, it matches the approved format and uniqueness rules. Product and Service sale prices are required and non-negative; zero is allowed. Only Products have stock. Product categories are configurable Company data, not a hard-coded enum.
 - A Customer with the same Company phone in E.164 form cannot be created or updated to duplicate another Customer's phone; a match blocks the operation, including when the other Customer is soft-deleted. When editing, the current Customer record is excluded from the duplicate check so its phone can remain unchanged. Phone input defaults to Ireland; an “International number” checkbox switches the phone text field to international input. No automatic customer merge is performed.
 - Fault description remains the primary display/search/selection value. Fault code is generated automatically as `FLT-` plus a Company sequence padded to at least six digits (for example `FLT-000001`); it is immutable, unique within the Company and never reused.
 - SKU is optional for Products and Services. When present, it must match `SKU-[A-Z0-9]{8}`, is normalized to uppercase and unique per Company, including inactive records.
@@ -52,7 +52,7 @@ See the detailed method inventory in [`customer-catalog-feature-audit.md`](../01
 - Product and Service catalogue screens share search and lifecycle controls while showing type-specific fields. Product forms manage category and stock-tracking configuration; physical quantities and reservations are managed per Shop in inventory workflows. No minimum-stock setting is provided.
 - Fault catalogue is a Company-shared list for service-order selection. Service-order technical findings remain a separate operational record referencing a catalogue fault when applicable.
 - Normalize phone input for matching while preserving a formatted display value. Do not merge customer identities automatically.
-- Store immutable customer-detail snapshots (name and contact details) on committed Sale/ServiceOrder records, alongside the stable Customer reference, so later Customer edits do not rewrite historical records. Store immutable descriptive and price snapshots on committed Sale/ServiceOrder lines so later catalogue edits do not rewrite history.
+- Store immutable customer-detail snapshots (name and contact details) on committed Sale/ServiceOrder records, alongside the stable Customer reference, so later Customer edits do not rewrite historical records. Store immutable descriptive and price snapshots on committed Sale/ServiceOrder lines so later catalogue edits, including sale-price changes, do not rewrite history.
 
 Inactive records remain visible on existing records and history, but cannot be selected in new operations. Committed order-line snapshots and references remain unchanged.
 
@@ -126,7 +126,7 @@ Query DTOs return paged results and include inactive records only when `includeI
 
 - One catalogue supports Product and Service types only. `OTHER` is not offered.
 - SKU is optional. If entered, use placeholder `SKU-AB12CD34`; normalize uppercase and validate the exact eight-character suffix.
-- Product fields include name, SKU, sale price and category. Service fields include name, SKU, sale price and description. Product physical stock and reservations belong to Shop inventory workflows; no minimum-stock setting is available.
+- Product fields include name, SKU, sale price and category. Service fields include name, SKU, sale price and description. Sale price is required, accepts zero, rejects negative values, and uses decimal/`NUMERIC(19,2)`. Product physical stock and reservations belong to Shop inventory workflows; no minimum-stock setting is available.
 - Categories are Company-wide. Inactive items are available in history views but cannot be selected in new operations. An authenticated Shop session can reactivate an item; existing drafts may display a previously selected inactive item but cannot add another line/reference to it.
 
 ### Fault Catalogue
@@ -151,7 +151,7 @@ Acceptance criteria:
 - Customer phone defaults to Ireland; international checkbox accepts international input; both normalize to E.164.
 - A matching E.164 customer phone in the Company, including an inactive record, returns a hard conflict on create or phone update and creates no duplicate. Updating a customer while retaining its own existing phone succeeds; the edited record is excluded from its duplicate check.
 - Repeated customer email is accepted.
-- Catalogue items can be saved without an SKU. A supplied SKU matches `SKU-[A-Z0-9]{8}`, is normalized uppercase, and cannot be duplicated within the Company even if the previous item is inactive.
+- Catalogue items can be saved without an SKU. A supplied SKU matches `SKU-[A-Z0-9]{8}`, is normalized uppercase, and cannot be duplicated within the Company even if the previous item is inactive. Product and Service sale prices are required, non-negative and stored as `NUMERIC(19,2)`; zero is valid and negative values are rejected.
 - New Faults receive immutable, unique `FLT-` sequence codes; description remains primary in search/selection.
 - `OTHER` is neither offered nor imported into the target catalogue.
 - `ShopInventory` stores physical on-hand quantity and reserved quantity only; no minimum-stock threshold or low-stock comparison is implemented.
@@ -160,7 +160,7 @@ Acceptance criteria:
 - An authenticated active Shop session can reactivate an inactive record without an employee challenge. Customer reactivation restores the same record and preserves its ID, contact details, history and existing references; it does not create a replacement. Block reactivation when a Company-scoped uniqueness invariant would be violated. An existing draft can display its linked inactive item but cannot add another reference to it.
 - Customer and catalogue CRUD works without an employee challenge but is restricted to the authenticated Shop's Company and is audited against the ShopSession; payment refunds and deposit refunds require `MANAGER` or `ADMIN` credentials under FIN-01; deposit forfeiture remains `MANAGER`-only.
 - A Shop cannot assign inventory to a Service or to a Product belonging to another Company.
-- Money uses decimal/Numeric, never binary floating point.
+- Money uses C# `decimal` and PostgreSQL `NUMERIC(19,2)`, never binary floating point. Product and Service sale prices are required and cannot be negative; zero is allowed.
 - Inactive records do not disappear from historical committed records.
 - Mutations are audited with the ShopSession actor; no employee identity or one-use employee authorization is required for CAT-01 writes.
 - User-facing screens and validation messages are in English.
