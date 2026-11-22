@@ -35,7 +35,7 @@ Legacy source references are recorded in `specs/01-discovery/deep-dive-findings.
 | BR-02 | Destination assumes operational responsibility after an accepted transfer; future transactions use destination Shop. | Product-owner decision recorded in discovery | DECIDED |
 | BR-03 | Settled transactions remain attributed to the source Shop. | Product-owner decision recorded in discovery | DECIDED |
 | BR-04 | Outstanding balance and held/unapplied deposit liability move through an audited internal event and do not create a cash receipt. | Product-owner decision recorded in discovery | DECIDED |
-| BR-05 | The physical device must be received/accepted by the destination before operational responsibility changes. | No evidence located | OPEN |
+| BR-05 | The source Shop records dispatch and the transfer enters `IN_TRANSIT`. The destination Shop must physically receive the device, record its condition and any observations, and confirm acceptance. Only then does the transfer enter `RECEIVED` and operational responsibility move to the destination. If the device does not arrive or a discrepancy is found, the transfer remains pending and responsibility does not change automatically. | Product Owner approval, 2026-11-21 | DECIDED |
 | BR-06 | Define what happens to service-part reservations, received parts and procurement requests owned by the source Shop. | No evidence located | OPEN |
 | BR-07 | Define eligible statuses and whether transfer is allowed with payments, refunds, deposits, open complaints or procurement activity. | No complete transition matrix | OPEN |
 | BR-08 | EMPLOYEE, MANAGER and ADMIN may initiate a transfer from the source Shop. EMPLOYEE, MANAGER and ADMIN may accept it at the destination Shop. Each protected command requires a fresh direct credential challenge from the acting employee; the backend validates active status, Company membership, the employee's role and source/destination Shop context. | Product Owner approval, 2026-11-21; employee-management authorization model | DECIDED |
@@ -63,7 +63,7 @@ Candidate source-Shop flow: select eligible order and destination Shop, review o
 - [ ] AC-01: Transfer is restricted to two Shops in the same Company.
 - [ ] AC-02: Historical settled transactions remain attributed to their original Shop.
 - [ ] AC-03: Outstanding balance and eligible held deposit liability are reconciled through a non-cash audited event.
-- [ ] AC-04: Physical custody and destination acceptance are recorded before destination operational ownership begins.
+- [x] AC-04: Physical custody, device condition/observations and explicit destination acceptance are recorded before destination operational ownership begins.
 - [ ] AC-05: Parts, procurement and authorization behavior match approved policies.
 - [ ] AC-06: Duplicate or concurrent commands cannot create multiple transfers or move liability twice.
 - [ ] AC-07: Every transition is attributable to an employee authorization and timestamp.
@@ -74,7 +74,7 @@ After approval: same-Company and cross-Company validation; status eligibility; s
 
 ## 11. Open questions
 
-- [ ] What exact event establishes physical custody and destination acceptance?
+- [x] What exact event establishes physical custody and destination acceptance? Destination records physical receipt, device condition and observations, then explicitly confirms acceptance; this transitions the transfer to `RECEIVED`.
 - [ ] Which source-Shop reservations, parts and procurement requests move, release or remain behind?
 - [ ] Which ServiceOrder statuses and financial states are eligible?
 - [x] Who can initiate/accept, and does each side require a fresh employee challenge? All three profiles may initiate at source and accept at destination; each command requires a fresh direct employee credential challenge.
@@ -83,6 +83,6 @@ After approval: same-Company and cross-Company validation; status eligibility; s
 
 ## 12. Approval
 
-- Product approval: PARTIAL — BR-01 through BR-04 and BR-08 decided; remaining business rules are open
+- Product approval: PARTIAL — BR-01 through BR-05 and BR-08 decided; remaining business rules are open
 - Technical approval: PENDING
 - Data-model approval: PENDING
