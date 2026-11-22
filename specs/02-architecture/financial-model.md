@@ -89,12 +89,12 @@ physical_cash_received = amount_applied + cash_rounding_adjustment
 
 cash_refundable_remaining =
     physical_cash_received
-    - sum(settled cash refunds linked to this original allocation)
+    - sum(PENDING and SETTLED cash refund allocations linked to this original allocation)
 ```
 
 - The signed adjustment is the rounded cash amount minus the unrounded amount applied to the customer balance. Example: €10.02 applied, -€0.02 cash-rounding adjustment, €10.00 physically received.
 - In that example, the maximum cumulative cash refund is €10.00, not €10.02. The €0.02 rounding concession is not money received and cannot be refunded.
-- For CARD, the refundable cap is the amount actually approved/settled on the original card allocation, less settled refunds linked to that allocation. CARD has no cash-rounding adjustment.
+- For CARD, the refundable cap is the amount actually approved/settled on the original card allocation, less PENDING and SETTLED refund allocations linked to that allocation. CARD has no cash-rounding adjustment.
 - For a transaction split across CASH and CARD, enforce each tender's remaining refundable amount independently; no refund may exceed the original allocation's actual received/settled amount. Mixed-tender cash rounding remains disabled in v1.
 - Apply the same original-tender cap to `REFUND` and `DEPOSIT_REFUND`. A refund must reference the original transaction and allocation; alternative tender is not allowed in v1.
 - Calculate the cap under the ServiceOrder-first lock order (when ServiceOrder-linked), then lock original transaction/allocation rows in stable ID order. Concurrent refunds must not over-refund any tender allocation.
@@ -238,7 +238,7 @@ No interest, APR, setup fee, late fee, default charge, repossession, title reten
 
 Every refund is a separate positive-magnitude `PaymentTransaction` with kind `REFUND` and a reference to the original settled incoming `PAYMENT`. Multiple partial refunds are allowed until the amount remaining refundable reaches zero.
 
-`refundable_remaining(original, allocation) = original_allocation_received_amount - sum(settled_refunds_referencing_original_allocation)`; the original transaction's overall cap is the sum of its per-allocation remaining caps.
+`refundable_remaining(original, allocation) = original_allocation_received_amount - sum(PENDING and SETTLED refund allocations referencing that original allocation)`; the original transaction's overall cap is the sum of its per-allocation remaining caps. PENDING refunds reserve capacity immediately; FAILED and VOIDED refunds release it; REVERSED refunds keep capacity blocked pending explicit reconciliation/correction.
 
 Validation must lock the original transaction and affected original `PaymentAllocation` rows in deterministic ID order, then recalculate capacity after locks. For ServiceOrder-linked refunds, lock the `ServiceOrder` first, following the shared lock order; for other targets, lock the original transaction before allocation rows. A PENDING refund reserves capacity in the same transaction as its header and allocations, so concurrent requests cannot reserve the same amount. A full refund is an amount equal to the remaining refundable capacity. Partial refunds may be item-linked through `PaymentRefundLine`; order-level refunds are allowed with a documented reason.
 
