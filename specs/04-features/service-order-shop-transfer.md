@@ -1,6 +1,6 @@
 # Feature: Cross-Shop ServiceOrder Transfer
 
-**Status:** DRAFT — BR-01 through BR-10 business rules and transfer lifecycle approved 2026-11-21; technical/data approval and audit governance remain OPEN
+**Status:** DRAFT — BR-01 through BR-11 business rules and transfer lifecycle approved 2026-11-21; technical/data approval and audit governance remain OPEN
 **Owner:** Product Owner
 
 ## 1. Objective and scope
@@ -41,6 +41,7 @@ Legacy source references are recorded in `specs/01-discovery/deep-dive-findings.
 | BR-08 | EMPLOYEE, MANAGER and ADMIN may initiate a transfer from the source Shop. EMPLOYEE, MANAGER and ADMIN may accept it at the destination Shop. Each protected command requires a fresh direct credential challenge from the acting employee; the backend validates active status, Company membership, the employee's role and source/destination Shop context. | Product Owner approval, 2026-11-21; employee-management authorization model | DECIDED |
 | BR-09 | Before dispatch, the source Shop may cancel the transfer. After dispatch, the source Shop cannot cancel it unilaterally. The destination Shop may reject physical receipt and must provide a reason; rejection does not automatically cancel the transfer or change ServiceOrder responsibility. The transfer remains pending until the source Shop records physical return of the device or both Shops complete and document an agreed resolution. No automatic cancellation or closure occurs due to timeout. | Product Owner approval, 2026-11-21 | DECIDED |
 | BR-10 | Maintain an immutable, append-only audit history for the transfer. Each event records the transfer ID, ServiceOrder ID, source and destination Shop IDs, previous and resulting state/action, acting employee ID and employee-name snapshot, timestamp, and references to related financial-liability events. Rejection and cancellation events include the mandatory reason; destination receipt/acceptance events include the recorded device condition and observations; return or agreed-resolution events include their supporting references and outcome. Events cannot be edited or deleted. Audit visibility and retention policy remain subject to technical/data governance review. | Product Owner approval, 2026-11-21; technical visibility/retention pending | DECIDED — event payload; OPEN — visibility/retention |
+| BR-11 | Destination acceptance (`RECEIVED`) must atomically update the ServiceOrder's current Shop, transfer eligible outstanding balance and held/unapplied deposit liability through a non-cash internal financial event, release source-Shop service-part reservations, update transfer state and append the required audit/ServiceOrder history. If any operation fails, the complete transaction rolls back. Settled payments remain attributed to the source Shop and are not recreated or moved. | Product Owner approval, 2026-11-21 | DECIDED |
 
 ## 5. Proposed redesign (REDESIGN)
 
@@ -61,6 +62,21 @@ No other state transitions are allowed. In particular, the source cannot cancel 
 Only transition to `RECEIVED` transfers operational responsibility, changes the ServiceOrder's current Shop and moves the outstanding balance/held deposit liability. Those changes must commit atomically. `CANCELLED` and `RETURNED_TO_SOURCE` leave the ServiceOrder and its financial liability with the source. Preserve one ServiceOrder identity and all settled transaction attribution. This lifecycle is business-approved; exact persistence/concurrency implementation remains subject to technical and data approval.
 
 ## 6. Data requirements
+
+### Atomic acceptance and liability handoff (BR-11)
+
+The destination's acceptance command is one database transaction. The implementation must:
+
+1. Begin a transaction and lock the transfer aggregate and its ServiceOrder (or use an equivalent concurrency-control strategy that prevents competing transitions and duplicate liability movement).
+2. Validate the current transfer state and allowed transition, expected version, source/destination relationship to the same Company, current ServiceOrder ownership/status, destination Shop context, fresh employee credential authorization, and recorded physical receipt/condition/explicit acceptance.
+3. Recalculate the outstanding balance and eligible held/unapplied deposit liability from authoritative records inside the transaction; do not trust client-supplied totals. Preserve settled PaymentTransactions and their source-Shop attribution.
+4. Record a non-cash, immutable internal liability-transfer event with source/destination, amounts and references to the underlying balance/deposit records. Do not create a cash receipt, cash movement or new payment transaction.
+5. Release active service-part reservations at the source Shop as required by BR-06.
+6. Update the ServiceOrder's current `shop_id` to the destination and update the current Shop ownership of eligible held/unapplied deposits, without changing their immutable origin or rewriting historical receipt/payment attribution.
+7. Append the transfer acceptance event and the corresponding ServiceOrder history/Note, including the acting employee and financial-event references; set the transfer to `RECEIVED` and persist the resulting version.
+8. Commit only after every operation succeeds. Any validation, persistence, concurrency or audit failure must roll back all changes, leaving the transfer unaccepted and all operational/financial responsibility at the source.
+
+The command must be safe under retries and concurrent requests: a repeated acceptance must not duplicate the liability event, release stock twice, or transfer the Shop twice. Use a stable transfer/acceptance identity and a database-enforced uniqueness/concurrency invariant; exact keys, locking strategy and event-table design remain technical decisions. The financial event is a liability reassignment, not a cash transaction. Only outstanding balance and held/unapplied deposit liability move; settled payments and historical transactions remain with the source.
 
 Candidate records: `ServiceOrderTransfer` (order, source Shop, destination Shop, status, created/dispatched/received timestamps, employee authorizations, version) and append-only transfer events. Each event must retain the approved audit payload in BR-10, including immutable employee attribution and links to related financial-liability events. Financial liability movement must be represented separately from cash transactions and linked to the source balances/deposit allocations. Exact schema, concurrency constraints, audit visibility and retention remain OPEN pending technical review and DATA-05.
 
@@ -83,11 +99,13 @@ Source-Shop flow: create, review and dispatch; cancel only while `DRAFT`; track 
 - [x] AC-08: Transfer lifecycle follows only the approved transitions in Section 5; cancellation is pre-dispatch only, rejection requires a reason, and no timeout auto-closes a transfer.
 - [x] AC-09: A rejected transfer can be accepted only after documented agreement while destination retains custody, or returned through `RETURN_IN_TRANSIT` and source-confirmed `RETURNED_TO_SOURCE`.
 - [x] AC-10: Only `RECEIVED` changes current Shop and transfers outstanding balance/held deposit liability atomically; cancellation and return to source leave responsibility at source.
+- [x] AC-11: Acceptance recalculates liability from authoritative records and commits Shop reassignment, liability event, eligible deposit ownership, source reservation release, transfer state and audit/history records in one transaction; any failure rolls back all changes.
+- [x] AC-12: Retries/concurrent acceptance cannot duplicate financial liability events or stock reservation release; settled payment history remains attributed to source.
 - [ ] AC-07: Every transition is attributable to an employee authorization and timestamp.
 
 ## 10. Test scenarios
 
-Test the exhaustive transition matrix, including invalid transitions; cancel-before-dispatch; prohibited cancel-after-dispatch; reject with mandatory reason; agreed acceptance after rejection while destination retains custody; prohibit acceptance after return dispatch; return dispatch and source receipt; no timeout closure; atomic Shop/liability handoff only on `RECEIVED`; settled history preservation; deposit reconciliation; duplicate/concurrent commands; audit event completeness and stale-state handling.
+Test the exhaustive transition matrix, including invalid transitions; cancel-before-dispatch; prohibited cancel-after-dispatch; reject with mandatory reason; agreed acceptance after rejection while destination retains custody; prohibit acceptance after return dispatch; return dispatch and source receipt; no timeout closure; atomic Shop/liability handoff only on `RECEIVED`; forced rollback on failure at each transaction stage; retry/concurrent acceptance idempotency; no duplicate liability event or reservation release; settled history preservation; deposit reconciliation; audit event completeness and stale-state handling.
 
 ## 11. Open questions
 
@@ -98,10 +116,11 @@ Test the exhaustive transition matrix, including invalid transitions; cancel-bef
 - [x] Can a dispatched transfer be rejected, cancelled or timed out, and how are liabilities reversed? Source may cancel only before dispatch; destination may reject receipt with a mandatory reason; after dispatch there is no unilateral source cancellation and no automatic timeout closure. The transfer remains pending until physical return is recorded or both Shops document an agreed resolution. Financial liability does not move before destination acceptance.
 - [x] What is the approved event/audit payload? Every immutable event records transfer/order IDs, both Shop IDs, action and previous/resulting state, employee ID/name snapshot, timestamp, relevant financial-event references, and action-specific reasons, device condition/observations or return/resolution references. Events cannot be edited or deleted.
 - [x] What transfer states and transitions govern dispatch, acceptance, rejection and physical return? See the exhaustive lifecycle table in Section 5.
+- [x] How is Shop and financial responsibility handed over? In one atomic destination-acceptance transaction as specified in BR-11 and Section 6; settled payments remain attributed to source.
 - [ ] How are audit visibility, retention and financial reconciliation exposed? These remain technical/data-governance decisions.
 
 ## 12. Approval
 
-- Product approval: BUSINESS RULES APPROVED — BR-01 through BR-10 and transfer state lifecycle approved 2026-11-21; audit visibility/retention governance remains open
+- Product approval: BUSINESS RULES APPROVED — BR-01 through BR-11, transfer state lifecycle and atomic acceptance behavior approved 2026-11-21; audit visibility/retention governance remains open
 - Technical approval: PENDING
 - Data-model approval: PENDING
