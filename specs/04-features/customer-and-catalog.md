@@ -36,7 +36,7 @@ See the detailed method inventory in [`customer-catalog-feature-audit.md`](../01
 - Customer profile fields: required first name, last name and phone; optional email. The target should use C# `decimal` and PostgreSQL `NUMERIC` for money; no floating-point money.
 - Customer email may repeat; do not enforce email uniqueness.
 - Catalogue model separates `CatalogItem` kind `PRODUCT`/`SERVICE`; `OTHER` is removed. SKU is optional. When present, it matches the approved format and uniqueness rules. Only Products have stock. Product categories are configurable Company data, not a hard-coded enum.
-- A Customer with the same Company phone in E.164 form cannot be created twice; a match blocks the create, including when the existing Customer is soft-deleted. Phone input defaults to Ireland; an “International number” checkbox switches the phone text field to international input. No automatic customer merge is performed.
+- A Customer with the same Company phone in E.164 form cannot be created or updated to duplicate another Customer's phone; a match blocks the operation, including when the other Customer is soft-deleted. When editing, the current Customer record is excluded from the duplicate check so its phone can remain unchanged. Phone input defaults to Ireland; an “International number” checkbox switches the phone text field to international input. No automatic customer merge is performed.
 - Fault description remains the primary display/search/selection value. Fault code is generated automatically as `FLT-` plus a Company sequence padded to at least six digits (for example `FLT-000001`); it is immutable, unique within the Company and never reused.
 - SKU is optional for Products and Services. When present, it must match `SKU-[A-Z0-9]{8}`, is normalized to uppercase and unique per Company, including inactive records.
 - Shop inventory is separate, per Shop, and quantity tracking uses whole units.
@@ -67,7 +67,7 @@ Inactive records remain visible on existing records and history, but cannot be s
 
 ### Resolved business rules
 
-1. Customer phone defaults to Irish input. The “International number” checkbox switches the field to international input. Store and compare as E.164. A matching Company phone blocks Customer creation, including when the existing record is inactive; no automatic merge.
+1. Customer phone defaults to Irish input. The “International number” checkbox switches the field to international input. Store and compare as E.164. A matching Company phone blocks both Customer creation and phone changes during updates, including when the other matching record is inactive. During an update, exclude the Customer being edited from the duplicate check so an unchanged phone is accepted. No automatic merge.
 2. An authenticated active Shop session can read the Company customer directory and create/edit customer records; no individual employee identity or role is required for CAT-01.
 3. Customer email is optional and may repeat; no email unique constraint.
 4. Remove `OTHER` from the target and do not migrate legacy `OTHER` entries.
@@ -102,7 +102,7 @@ All endpoints are under `/api/v1`, require the authenticated and active Shop ses
 
 | Resource | Contract | Authorization / behavior |
 |---|---|---|
-| Customers | `POST /customers/queries` with `{ search?, includeInactive?, page, pageSize }`; `POST /customers`; `GET /customers/{id}`; `PUT /customers/{id}`; `POST /customers/{id}/deactivate`; `POST /customers/{id}/reactivate` | Active Shop session only; no employee challenge. Input: firstName, lastName, phone, isInternational, email?. API canonicalizes phone to E.164 and returns 409 `duplicate_customer_phone` on collision. DTO exposes `phoneE164`; no cross-Company data is returned. |
+| Customers | `POST /customers/queries` with `{ search?, includeInactive?, page, pageSize }`; `POST /customers`; `GET /customers/{id}`; `PUT /customers/{id}`; `POST /customers/{id}/deactivate`; `POST /customers/{id}/reactivate` | Active Shop session only; no employee challenge. Input: firstName, lastName, phone, isInternational, email?. API canonicalizes phone to E.164 and returns 409 `duplicate_customer_phone` on collision for both create and update. On update, the record being edited is excluded from the uniqueness check; any other Company Customer with that phone, active or inactive, causes the conflict. DTO exposes `phoneE164`; no cross-Company data is returned. |
 | Catalogue items | `POST /catalog-items/queries`; `POST /catalog-items`; `GET /catalog-items/{id}`; `PUT /catalog-items/{id}`; `POST /catalog-items/{id}/deactivate`; `POST /catalog-items/{id}/reactivate` | Active Shop session only; no employee challenge. DTO has kind PRODUCT/SERVICE, name, optional SKU, decimal listPrice, isActive and subtype fields. If supplied, normalize SKU uppercase and validate `SKU-[A-Z0-9]{8}`. |
 | Product categories | `POST /product-categories/queries`; `POST /product-categories`; `PUT /product-categories/{id}`; `POST /product-categories/{id}/deactivate`; `POST /product-categories/{id}/reactivate` | Active Shop session only; no employee challenge. DTO contains name, code, optional parentCategoryId, description and isActive. |
 | Faults | `POST /faults/queries`; `POST /faults`; `GET /faults/{id}`; `PUT /faults/{id}`; `POST /faults/{id}/deactivate`; `POST /faults/{id}/reactivate` | Active Shop session only; no employee challenge. Create/update accepts description only; server generates and returns immutable code. Description is the primary search/selection field. |
@@ -115,7 +115,7 @@ Query DTOs return paged results and include inactive records only when `includeI
 
 - Search Company-wide by name, entered/canonical phone and email. Results show name, phone and email; inactive records are hidden by default and available through an inactive filter.
 - Create/edit requires first name, last name and phone; email is optional and may repeat. These operations use the authenticated Shop session and do not request employee credentials.
-- Phone input defaults to Ireland. “International number” checkbox switches the phone field to international input. Validate and canonicalize to E.164; duplicate phone blocks save with an English error.
+- Phone input defaults to Ireland. “International number” checkbox switches the phone field to international input. Validate and canonicalize to E.164 on create and edit; duplicate phone blocks save with an English error, including collisions with inactive customers. Editing a customer's other fields or retaining its unchanged phone must not trigger a false duplicate conflict.
 - Create, edit and deactivate require the active Shop session and do not invoke an employee credential challenge.
 
 ### Product/Service Catalogue and Categories
@@ -145,7 +145,7 @@ Acceptance criteria:
 
 - No cross-Company customer/catalogue/fault reads or mutations.
 - Customer phone defaults to Ireland; international checkbox accepts international input; both normalize to E.164.
-- A matching E.164 customer phone in the Company, including an inactive record, returns a hard conflict and creates no duplicate.
+- A matching E.164 customer phone in the Company, including an inactive record, returns a hard conflict on create or phone update and creates no duplicate. Updating a customer while retaining its own existing phone succeeds; the edited record is excluded from its duplicate check.
 - Repeated customer email is accepted.
 - Catalogue items can be saved without an SKU. A supplied SKU matches `SKU-[A-Z0-9]{8}`, is normalized uppercase, and cannot be duplicated within the Company even if the previous item is inactive.
 - New Faults receive immutable, unique `FLT-` sequence codes; description remains primary in search/selection.
@@ -162,7 +162,7 @@ Acceptance criteria:
 
 ## 12. Test scenarios
 
-Expected coverage includes Company-scope isolation; Irish/international phone parsing and duplicate blocking; repeated email acceptance; saving catalogue items without SKU; supplied-SKU validation/case normalization/uniqueness including inactive rows; concurrent Fault code generation; Product-vs-Service constraints; per-Shop physical stock and reservation invariants with no minimum-stock field; inactive-item handling in new vs existing records; ShopSession-only write authorization; and ShopSession audit attribution. Add tests after this SPEC is approved.
+Expected coverage includes Company-scope isolation; Irish/international phone parsing and duplicate blocking on create and update, including unchanged-phone edits and collisions with inactive records; repeated email acceptance; saving catalogue items without SKU; supplied-SKU validation/case normalization/uniqueness including inactive rows; concurrent Fault code generation; Product-vs-Service constraints; per-Shop physical stock and reservation invariants with no minimum-stock field; inactive-item handling in new vs existing records; ShopSession-only write authorization; and ShopSession audit attribution. Add tests after this SPEC is approved.
 
 ## 13. Approval
 
