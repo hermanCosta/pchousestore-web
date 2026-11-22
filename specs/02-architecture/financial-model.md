@@ -81,6 +81,31 @@ Alternative terminal outcomes include `REFUNDED` and `FORFEITED`; a partially re
 - `FORFEITED` requires a fresh `MANAGER` code/password challenge, reason, terms snapshot and documented evidence/cost. This is an explicit feature-specific restriction; `ADMIN` cannot forfeit deposits. No second approver is required.
 - Deposit amount reconciliation: `available_held = settled_receipts - applied - settled_refunds - approved_forfeitures`.
 
+### Canonical ServiceDeposit liability reconciliation (technical review 3 — decision 3 approved)
+
+The Product Owner approved on 2026-11-22 the following formula, calculated independently for each deposit:
+
+```text
+available_held = settled_receipts
+               - applied
+               - settled_refunds
+               - approved_forfeitures
+```
+
+- `settled_receipts`: deposit receipt amounts whose linked `DEPOSIT_RECEIPT` PaymentTransactions are `SETTLED`.
+- `applied`: committed DepositApplication amounts linked to this exact deposit.
+- `settled_refunds`: `DEPOSIT_REFUND` amounts linked to this exact deposit and backed by settled refund transactions.
+- `approved_forfeitures`: amounts in valid, authorized `FORFEITED` events with mandatory reason and required Manager authorization.
+- `RELEASED` has zero financial effect. It is an administrative unhold only and must not reduce liability.
+- Pending, failed, voided or otherwise unsettled receipt/refund transactions do not affect the formula. An event cannot count an amount unless its required source transaction/application is valid and committed.
+- The deposit event ledger is the reconciliation trail. A referenced PaymentTransaction or DepositApplication is evidence for the event, not a second amount to add. Never sum the same financial effect once from the event and again from its referenced transaction/application.
+- All components must use the deposit's currency. Deposits are reconciled independently; no pooling, offsetting or reallocation between deposits is allowed.
+- The result must be non-negative. Any event/transaction mismatch, duplicate reference, unsupported event, currency mismatch or negative result is a reconciliation failure—not a value to clamp to zero.
+- Before deposit receipt/refund/application/forfeiture or transfer acceptance, recalculate under the ServiceOrder-first and deposit-row lock strategy. If the calculated result differs from any materialized held balance, block the command and require explicit reconciliation.
+- Materialized deposit balance is a cache/projection only. A read-only reconciliation process reports mismatches; it must not auto-correct or create compensating ledger events.
+
+A ServiceOrder transfer may move only this per-deposit `available_held` value. It must preserve all historical receipt, application, refund, forfeiture and RELEASED records and must not treat a released deposit as extinguished.
+
 ### ServiceOrder balance and refund separation (technical review 3 — decision 1 approved)
 
 The Product Owner approved on 2026-11-22 that a `REFUND` or `DEPOSIT_REFUND` is an outgoing-funds event and must not directly mutate or recalculate `ServiceOrder.balance_due`.
