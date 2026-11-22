@@ -43,7 +43,7 @@ See the detailed method inventory in [`customer-catalog-feature-audit.md`](../01
 - Shop stock records contain only the physical on-hand quantity (`quantity_on_hand`) and active reservation quantity (`quantity_reserved`). There is no minimum-stock (`min_qty` / `minimum_quantity`) field, threshold or low-stock alert/report in the approved model.
 - Customer directory access is governed by the authenticated Shop session, not by an employee role. Customer/catalogue records marked inactive remain visible in existing records and history but cannot be selected for new operations. Legacy `OTHER` entries are excluded and not migrated.
 - An authenticated Shop session may create/edit/deactivate/reactivate customer records, Products, Services, categories, sale prices and Fault catalogue entries without an employee challenge. Customer reactivation restores the same Customer record and preserves its ID, contact details, history and existing business references; it does not create a replacement record. Reactivation is blocked if it would violate a Company-scoped uniqueness invariant. Payment refunds and deposit refunds are permitted to `MANAGER` and `ADMIN`; deposit forfeiture remains `MANAGER`-only. All require the fresh direct employee credential validation defined by FIN-01.
-- V1 uses soft deletion. Historical sale/service-order lines must retain stable snapshots/references as defined in their feature specifications.
+- V1 uses soft deletion. Historical sale/service-order records must retain the customer identity reference and an immutable snapshot of the customer details used when the transaction/order was committed, including the customer's name and contact details available at that time. Later Customer edits must not rewrite these historical snapshots. Historical sale/service-order lines must retain stable snapshots/references as defined in their feature specifications.
 - All queries and mutation targets must be scoped to the authenticated Company. Shop-specific inventory is scoped to the active Shop.
 
 ## 5. Approved target design
@@ -52,7 +52,7 @@ See the detailed method inventory in [`customer-catalog-feature-audit.md`](../01
 - Product and Service catalogue screens share search and lifecycle controls while showing type-specific fields. Product forms manage category and stock-tracking configuration; physical quantities and reservations are managed per Shop in inventory workflows. No minimum-stock setting is provided.
 - Fault catalogue is a Company-shared list for service-order selection. Service-order technical findings remain a separate operational record referencing a catalogue fault when applicable.
 - Normalize phone input for matching while preserving a formatted display value. Do not merge customer identities automatically.
-- Store immutable descriptive and price snapshots on committed Sale/ServiceOrder lines so later catalogue edits do not rewrite history.
+- Store immutable customer-detail snapshots (name and contact details) on committed Sale/ServiceOrder records, alongside the stable Customer reference, so later Customer edits do not rewrite historical records. Store immutable descriptive and price snapshots on committed Sale/ServiceOrder lines so later catalogue edits do not rewrite history.
 
 Inactive records remain visible on existing records and history, but cannot be selected in new operations. Committed order-line snapshots and references remain unchanged.
 
@@ -76,6 +76,7 @@ Inactive records remain visible on existing records and history, but cannot be s
 7. Fault descriptions are the primary display/search/selection values. Generate immutable Company-unique `FLT-` sequence codes, padded to at least six digits, with no reuse.
 8. An authenticated active Shop session may manage Products, Services, categories and prices and create/edit Fault catalogue entries without an employee challenge. Payment refunds and deposit refunds are authorized to `MANAGER` and `ADMIN` under FIN-01, with fresh direct employee credential validation; deposit forfeiture remains `MANAGER`-only.
 9. Inactive records remain visible on existing records/history and cannot be selected for new operations. Existing drafts may display already-linked inactive records but cannot add another reference to them. An authenticated active Shop session may reactivate records without an employee challenge. Customer reactivation restores the same Customer record, preserving its ID, phone, email, history and existing references; it never creates a new Customer. Block reactivation if a Company-scoped uniqueness invariant would be violated.
+10. Editing a Customer updates only the current Company customer-directory record. It must not rewrite customer-detail snapshots or other historical data already committed to Sales or ServiceOrders. New committed operations capture the latest Customer details in their own immutable snapshot while retaining the stable Customer reference.
 
 ### Deferred details
 
@@ -118,6 +119,7 @@ Query DTOs return paged results and include inactive records only when `includeI
 - Phone input defaults to Ireland. “International number” checkbox switches the phone field to international input. Validate and canonicalize to E.164 on create and edit; duplicate phone blocks save with an English error, including collisions with inactive customers. Editing a customer's other fields or retaining its unchanged phone must not trigger a false duplicate conflict.
 - Create, edit and deactivate require the active Shop session and do not invoke an employee credential challenge.
 - Reactivation uses the same Customer record and preserves its ID, phone, email, history and existing sale/service-order references. It makes the customer available for new operations again. If a Company-scoped uniqueness invariant would be violated, block reactivation and return an actionable English conflict; do not create a replacement customer.
+- Editing a Customer changes only the current directory record. Committed Sales and ServiceOrders retain the customer name and contact details captured at their own commit time, as well as the stable Customer reference; later edits never rewrite those historical snapshots. New committed operations capture the latest customer details.
 
 ### Product/Service Catalogue and Categories
 
@@ -153,6 +155,7 @@ Acceptance criteria:
 - `OTHER` is neither offered nor imported into the target catalogue.
 - `ShopInventory` stores physical on-hand quantity and reserved quantity only; no minimum-stock threshold or low-stock comparison is implemented.
 - Inactive customer/catalogue records cannot be used in new operations but remain readable from existing history.
+- Editing a Customer does not change customer-detail snapshots on previously committed Sales or ServiceOrders; new committed operations capture the latest customer details and retain the stable Customer reference.
 - An authenticated active Shop session can reactivate an inactive record without an employee challenge. Customer reactivation restores the same record and preserves its ID, contact details, history and existing references; it does not create a replacement. Block reactivation when a Company-scoped uniqueness invariant would be violated. An existing draft can display its linked inactive item but cannot add another reference to it.
 - Customer and catalogue CRUD works without an employee challenge but is restricted to the authenticated Shop's Company and is audited against the ShopSession; payment refunds and deposit refunds require `MANAGER` or `ADMIN` credentials under FIN-01; deposit forfeiture remains `MANAGER`-only.
 - A Shop cannot assign inventory to a Service or to a Product belonging to another Company.
@@ -163,7 +166,7 @@ Acceptance criteria:
 
 ## 12. Test scenarios
 
-Expected coverage includes Company-scope isolation; Irish/international phone parsing and duplicate blocking on create and update, including unchanged-phone edits and collisions with inactive records; repeated email acceptance; saving catalogue items without SKU; supplied-SKU validation/case normalization/uniqueness including inactive rows; concurrent Fault code generation; Product-vs-Service constraints; per-Shop physical stock and reservation invariants with no minimum-stock field; inactive-item handling in new vs existing records, including same-record Customer reactivation, preservation of existing references and uniqueness-conflict blocking; ShopSession-only write authorization; and ShopSession audit attribution. Add tests after this SPEC is approved.
+Expected coverage includes Company-scope isolation; Irish/international phone parsing and duplicate blocking on create and update, including unchanged-phone edits and collisions with inactive records; repeated email acceptance; saving catalogue items without SKU; supplied-SKU validation/case normalization/uniqueness including inactive rows; concurrent Fault code generation; Product-vs-Service constraints; per-Shop physical stock and reservation invariants with no minimum-stock field; inactive-item handling in new vs existing records, including same-record Customer reactivation, preservation of existing references and uniqueness-conflict blocking; immutable customer-detail snapshots on committed Sales/ServiceOrders; ShopSession-only write authorization; and ShopSession audit attribution. Add tests after this SPEC is approved.
 
 ## 13. Approval
 
