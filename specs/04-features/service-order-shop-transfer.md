@@ -40,7 +40,7 @@ Legacy source references are recorded in `specs/01-discovery/deep-dive-findings.
 | BR-07 | A ServiceOrder may be transferred from lifecycle statuses `CREATED`, `IN_PROGRESS`, `AWAITING_PARTS`, `FIXED` or `NOT_FIXED`. Transfer is not allowed after physical customer handover (`PICKED`) or cancellation (`CANCELLED`). `FINISHED` is a legacy-only status and is not part of the target lifecycle. Existing payments (partial or full), deposits (held or applied), recorded refunds, open complaints and pending procurement activity do not by themselves block transfer; their existing financial and operational records remain governed by their owning feature rules and the approved transfer-liability rules. `REFUNDED` is a financial outcome/event, not a lifecycle status. | Product Owner approval, 2026-11-21; service-orders.md target lifecycle | DECIDED |
 | BR-08 | EMPLOYEE, MANAGER and ADMIN may initiate a transfer from the source Shop. EMPLOYEE, MANAGER and ADMIN may accept it at the destination Shop. Each protected command requires a fresh direct credential challenge from the acting employee; the backend validates active status, Company membership, the employee's role and source/destination Shop context. | Product Owner approval, 2026-11-21; employee-management authorization model | DECIDED |
 | BR-09 | Before dispatch, the source Shop may cancel the transfer. After dispatch, the source Shop cannot cancel it unilaterally. The destination Shop may reject physical receipt and must provide a reason; rejection does not automatically cancel the transfer or change ServiceOrder responsibility. The transfer remains pending until the source Shop records physical return of the device or both Shops complete and document an agreed resolution. No automatic cancellation or closure occurs due to timeout. | Product Owner approval, 2026-11-21 | DECIDED |
-| BR-10 | Define mandatory event fields, reference identifiers and audit visibility/retention. | Internal event requirement exists; details absent | OPEN |
+| BR-10 | Maintain an immutable, append-only audit history for the transfer. Each event records the transfer ID, ServiceOrder ID, source and destination Shop IDs, previous and resulting state/action, acting employee ID and employee-name snapshot, timestamp, and references to related financial-liability events. Rejection and cancellation events include the mandatory reason; destination receipt/acceptance events include the recorded device condition and observations; return or agreed-resolution events include their supporting references and outcome. Events cannot be edited or deleted. Audit visibility and retention policy remain subject to technical/data governance review. | Product Owner approval, 2026-11-21; technical visibility/retention pending | DECIDED — event payload; OPEN — visibility/retention |
 
 ## 5. Proposed redesign (REDESIGN)
 
@@ -48,7 +48,7 @@ Treat transfer as an explicit audited workflow with `DRAFT -> IN_TRANSIT -> RECE
 
 ## 6. Data requirements
 
-Candidate records: `ServiceOrderTransfer` (order, source Shop, destination Shop, status, created/dispatched/received timestamps, employee authorizations, version) and append-only transfer events. Financial liability movement must be represented separately from cash transactions and linked to the source balances/deposit allocations. Exact schema and concurrency constraints remain OPEN pending rules above and DATA-05.
+Candidate records: `ServiceOrderTransfer` (order, source Shop, destination Shop, status, created/dispatched/received timestamps, employee authorizations, version) and append-only transfer events. Each event must retain the approved audit payload in BR-10, including immutable employee attribution and links to related financial-liability events. Financial liability movement must be represented separately from cash transactions and linked to the source balances/deposit allocations. Exact schema, concurrency constraints, audit visibility and retention remain OPEN pending technical review and DATA-05.
 
 ## 7. API contracts
 
@@ -79,10 +79,11 @@ After approval: same-Company and cross-Company validation; status eligibility; s
 - [x] Which ServiceOrder statuses and financial states are eligible? Eligible lifecycle statuses: `CREATED`, `IN_PROGRESS`, `AWAITING_PARTS`, `FIXED`, `NOT_FIXED`; `PICKED` and `CANCELLED` are excluded. Payments, deposits, refunds, open complaints and procurement activity do not independently block transfer.
 - [x] Who can initiate/accept, and does each side require a fresh employee challenge? All three profiles may initiate at source and accept at destination; each command requires a fresh direct employee credential challenge.
 - [x] Can a dispatched transfer be rejected, cancelled or timed out, and how are liabilities reversed? Source may cancel only before dispatch; destination may reject receipt with a mandatory reason; after dispatch there is no unilateral source cancellation and no automatic timeout closure. The transfer remains pending until physical return is recorded or both Shops document an agreed resolution. Financial liability does not move before destination acceptance.
-- [ ] What is the approved event/audit payload and how is reconciliation exposed?
+- [x] What is the approved event/audit payload? Every immutable event records transfer/order IDs, both Shop IDs, action and previous/resulting state, employee ID/name snapshot, timestamp, relevant financial-event references, and action-specific reasons, device condition/observations or return/resolution references. Events cannot be edited or deleted.
+- [ ] How are audit visibility, retention and financial reconciliation exposed? These remain technical/data-governance decisions.
 
 ## 12. Approval
 
-- Product approval: PARTIAL — BR-01 through BR-09 decided; BR-10 and technical details remain open
+- Product approval: PARTIAL — BR-01 through BR-10 business event payload decided; audit visibility/retention and technical/data details remain open
 - Technical approval: PENDING
 - Data-model approval: PENDING
