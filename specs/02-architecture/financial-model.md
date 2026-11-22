@@ -79,6 +79,31 @@ Target application behavior:
 5. Allow exact-change handling when requested; do not round card, bank transfer or other electronic allocations.
 6. Keep cash received/change and amount applied to the customer balance separately reconcilable. A rounding adjustment is not a line discount and is not a change to VAT base.
 
+### Approved cash-rounding refund cap (technical review 4 — decision 1)
+
+The Product Owner approved on 2026-11-22 that refunds are capped by the amount actually received/settled through each original tender allocation, not solely by the amount credited to the order.
+
+```text
+physical_cash_received = amount_applied + cash_rounding_adjustment
+                       = amount_tendered - change_amount
+
+cash_refundable_remaining =
+    physical_cash_received
+    - sum(settled cash refunds linked to this original allocation)
+```
+
+- The signed adjustment is the rounded cash amount minus the unrounded amount applied to the customer balance. Example: €10.02 applied, -€0.02 cash-rounding adjustment, €10.00 physically received.
+- In that example, the maximum cumulative cash refund is €10.00, not €10.02. The €0.02 rounding concession is not money received and cannot be refunded.
+- For CARD, the refundable cap is the amount actually approved/settled on the original card allocation, less settled refunds linked to that allocation. CARD has no cash-rounding adjustment.
+- For a transaction split across CASH and CARD, enforce each tender's remaining refundable amount independently; no refund may exceed the original allocation's actual received/settled amount. Mixed-tender cash rounding remains disabled in v1.
+- Apply the same original-tender cap to `REFUND` and `DEPOSIT_REFUND`. A refund must reference the original transaction and allocation; alternative tender is not allowed in v1.
+- Calculate the cap under the ServiceOrder-first lock order (when ServiceOrder-linked), then lock original transaction/allocation rows in stable ID order. Concurrent refunds must not over-refund any tender allocation.
+- The original `amount_applied`, order total, tax base and deposit/order ledger credits are not rewritten by a refund. Refunds remain separate outgoing-funds transactions.
+
+This rule governs the maximum refundable cash/card received. Consumer-law or contractual entitlement may require a different business resolution; the application must not pay more through the original tender than was actually received.
+
+`refundable_remaining(original) = original_settled_amount - sum(settled_refunds_referencing_original)`
+`refundable_remaining(original, allocation) = original_allocation_received_amount - sum(settled_refunds_referencing_original_allocation)`; the original transaction's overall cap is the sum of its per-allocation remaining caps.
 ## 3. Configurable tender methods
 
 `PaymentMethod` is a catalogue seeded with exactly two active methods in v1: `CASH` and `CARD`. `ShopPaymentMethod` enables/disables these methods per branch. Other tenders (bank transfer, store credit, cheque, online payment) are out of initial scope.
