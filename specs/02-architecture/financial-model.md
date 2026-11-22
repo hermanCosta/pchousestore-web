@@ -22,6 +22,19 @@ The model supports one Company with multiple Shops, a persistent Shop session an
 
 - Company defaults: `country_code = 'IE'`, `default_currency_code = 'EUR'`, `time_zone = 'Europe/Dublin'`.
 - Use C# `decimal` and PostgreSQL `NUMERIC(19,2)` for transaction amounts in EUR. Never use binary floating point for amounts.
+
+### Approved monetary precision and rounding policy (technical review 3 — decision 4)
+
+The Product Owner approved on 2026-11-22:
+
+- All persisted monetary amounts denominated in EUR use exactly two fractional decimal places and PostgreSQL `NUMERIC(19,2)`; application code uses C# `decimal`. Never use `float`, `double` or binary floating point for monetary values.
+- Intermediate calculations (for example percentage/tax calculations, prorations and aggregate calculations) retain higher decimal precision. Do not round at each arithmetic step or at each intermediate subtotal. Convert to the two-decimal persisted amount only at the defined monetary posting boundary for the relevant operation, using the rounding rule explicitly specified for that operation.
+- The unrounded calculation inputs/results needed to explain a posted amount must remain reproducible from immutable price, quantity, discount, tax-code/rate and transaction snapshots. Do not silently recompute historical documents using current configuration.
+- The standard persisted transaction amount and customer balance use two decimals. The optional Irish cash-rounding adjustment is a separate signed amount, also persisted to two decimals; it does not mutate the order total, line prices, taxable base, tax calculation or canonical ServiceOrder balance formula.
+- Cash rounding remains optional per Shop and applies only to an eligible bill paid entirely in CASH, rounding the final bill to the nearest €0.05 using the Irish cent-ending pattern already specified below. Mixed CASH/CARD tender is not rounded in v1. CARD and other electronic tenders are never rounded. Exact-change handling remains available.
+- Keep distinct values reconcilable: unrounded document total, posted amount applied to the customer balance, cash tendered, change returned and signed cash-rounding adjustment. The cash drawer amount must be derived consistently from cash tender/change and the adjustment; never fold the adjustment into a line discount or tax base.
+- The specific tax rounding boundary/method and accounting presentation must be confirmed with the Irish accountant before VAT-enabled production documents are finalized. This decision does not choose a tax rounding method or legal/accounting treatment.
+
 - Store `currency_code` on sales, service orders, deposits, payment transactions, refunds and instalment plans so historical documents remain self-describing. Multi-currency settlement is out of the initial scope.
 - Initial product-owner instruction: no VAT is to be added/charged by the application while the Company-level `CompanyTaxConfiguration.vat_enabled` flag is `false`. The configuration defaults to `false` and `setup_status = NOT_REVIEWED`. This describes current software behavior only; it does not establish that the business is legally outside VAT or exempt. Before production tax documents are finalized, an Irish accountant must confirm the Company's position and either document the lawful disabled state or configure and enable the applicable VAT setup.
 - Before production tax-document finalization is enabled, the Company tax setup must be reviewed and marked READY by an authorized administrator based on Irish accountant advice. If VAT is enabled, tax codes, effective-dated rates, registration details and price display mode must be populated. If VAT is disabled, the reason/legal basis must be recorded after review.
