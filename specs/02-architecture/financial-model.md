@@ -102,7 +102,6 @@ cash_refundable_remaining =
 
 This rule governs the maximum refundable cash/card received. Consumer-law or contractual entitlement may require a different business resolution; the application must not pay more through the original tender than was actually received.
 
-`refundable_remaining(original) = original_settled_amount - sum(settled_refunds_referencing_original)`
 `refundable_remaining(original, allocation) = original_allocation_received_amount - sum(settled_refunds_referencing_original_allocation)`; the original transaction's overall cap is the sum of its per-allocation remaining caps.
 ## 3. Configurable tender methods
 
