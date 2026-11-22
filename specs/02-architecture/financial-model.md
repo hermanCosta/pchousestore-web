@@ -236,7 +236,7 @@ No interest, APR, setup fee, late fee, default charge, repossession, title reten
 
 Every refund is a separate positive-magnitude `PaymentTransaction` with kind `REFUND` and a reference to the original settled incoming `PAYMENT`. Multiple partial refunds are allowed until the amount remaining refundable reaches zero.
 
-`refundable_remaining(original) = original_settled_amount - sum(settled_refunds_referencing_original)`
+`refundable_remaining(original, allocation) = original_allocation_received_amount - sum(settled_refunds_referencing_original_allocation)`; the original transaction's overall cap is the sum of its per-allocation remaining caps.
 
 Validation must lock or use optimistic concurrency on the original transaction so concurrent refund requests cannot over-refund it. A full refund is simply a refund whose amount equals the remaining refundable amount. Partial refunds may be item-linked through `PaymentRefundLine`; order-level refunds are allowed with a documented reason.
 
