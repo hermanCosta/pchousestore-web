@@ -35,10 +35,9 @@ See the detailed method inventory in [`customer-catalog-feature-audit.md`](../01
 - Customers and catalogues are shared by all Shops in the Company.
 - Customer profile fields: required first name, last name and phone; optional email. Catalogue Product and Service sale prices are required, must be greater than or equal to zero, and use C# `decimal` with PostgreSQL `NUMERIC(19,2)`; negative prices are invalid and zero-price items are allowed. No floating-point money.
 - Customer email may repeat; do not enforce email uniqueness.
-- Catalogue model separates `CatalogItem` kind `PRODUCT`/`SERVICE`; `OTHER` is removed. SKU is optional. When present, it matches the approved format and uniqueness rules. Product and Service sale prices are required and non-negative; zero is allowed. Only Products have stock. Product categories are configurable Company data, not a hard-coded enum.
+- Catalogue model separates `CatalogItem` kind `PRODUCT`/`SERVICE`; `OTHER` is removed. No SKU field or SKU workflow exists in the target catalogue. Product and Service sale prices are required and non-negative; zero is allowed. Only Products have stock. Product categories are configurable Company data, not a hard-coded enum.
 - A Customer with the same Company phone in E.164 form cannot be created or updated to duplicate another Customer's phone; a match blocks the operation, including when the other Customer is soft-deleted. When editing, the current Customer record is excluded from the duplicate check so its phone can remain unchanged. Phone input defaults to Ireland; an “International number” checkbox switches the phone text field to international input. No automatic customer merge is performed.
 - Fault description remains the primary display/search/selection value. Fault code is generated automatically as `FLT-` plus a Company sequence padded to at least six digits (for example `FLT-000001`); it is immutable, unique within the Company and never reused.
-- SKU is optional for Products and Services. When present, it must match `SKU-[A-Z0-9]{8}`, is normalized to uppercase and unique per Company, including inactive records.
 - Shop inventory is separate, per Shop, and quantity tracking uses whole units.
 - Shop stock records contain only the physical on-hand quantity (`quantity_on_hand`) and active reservation quantity (`quantity_reserved`). There is no minimum-stock (`min_qty` / `minimum_quantity`) field, threshold or low-stock alert/report in the approved model.
 - Customer directory access is governed by the authenticated Shop session, not by an employee role. Customer/catalogue records marked inactive remain visible in existing records and history but cannot be selected for new operations. Legacy `OTHER` entries are excluded and not migrated.
@@ -71,7 +70,6 @@ Inactive records remain visible on existing records and history, but cannot be s
 2. An authenticated active Shop session can read the Company customer directory and create/edit customer records; no individual employee identity or role is required for CAT-01.
 3. Customer email is optional and may repeat; no email unique constraint.
 4. Remove `OTHER` from the target and do not migrate legacy `OTHER` entries.
-5. SKU is optional. When present, it matches `SKU-[A-Z0-9]{8}`; normalize uppercase, unique per Company and reserved after deactivation.
 6. No minimum-stock field or low-stock threshold exists. `quantity_on_hand` represents physical stock; `quantity_reserved` represents active reservations; available quantity is `quantity_on_hand - quantity_reserved`.
 7. Fault descriptions are the primary display/search/selection values. Generate immutable Company-unique `FLT-` sequence codes, padded to at least six digits, with no reuse.
 8. An authenticated active Shop session may manage Products, Services, categories and prices and create/edit Fault catalogue entries without an employee challenge. Payment refunds and deposit refunds are authorized to `MANAGER` and `ADMIN` under FIN-01, with fresh direct employee credential validation; deposit forfeiture remains `MANAGER`-only.
@@ -89,14 +87,14 @@ Inactive records remain visible on existing records and history, but cannot be s
 The current logical draft in `specs/02-architecture/database-model.md` contains:
 
 - `customer(company_id, person_id, phone_e164, notes, active)` linked to Company and Person. `phone_e164` is required and unique per Company, including soft-deleted records. Optional email may repeat.
-- `catalog_item(company_id, kind, name, optional sku, list_price, active)` with any supplied SKU matching `SKU-[A-Z0-9]{8}`, normalized uppercase, Company-unique and reserved after deactivation; `kind` is PRODUCT or SERVICE. No `OTHER` kind.
+- `catalog_item(company_id, kind, name, list_price, active)`; `kind` is PRODUCT or SERVICE. No SKU column or `OTHER` kind is defined.
 - `product(catalog_item_id, product_category_id, inventory_tracking_mode, ...)` for Product-only fields.
 - `service(catalog_item_id, description)` for Service-only fields.
 - `product_category(company_id, parent_category_id, name, code, description, is_active)`.
 - `shop_inventory(shop_id, product_catalog_item_id, quantity_on_hand, quantity_reserved)` for Shop stock. `quantity_on_hand` is the physical quantity and may be negative; `quantity_reserved` is non-negative and represents active reservations. No minimum-stock field is defined.
 - `fault(company_id, code, description, active)`; code is automatically generated as `FLT-` plus a Company sequence padded to at least six digits, immutable and never reused. Description is the primary display/search/selection value.
 
-This is a logical draft. Enforce Company and phone uniqueness, case-insensitive SKU uniqueness including inactive rows, and a transactional Company-scoped Fault code sequence. Exact physical indexes, audit fields and foreign-key delete constraints are implementation details to review with the migration.
+This is a logical draft. Enforce Company and customer-phone uniqueness and a transactional Company-scoped Fault code sequence. No SKU uniqueness constraint or index is required. Exact physical indexes, audit fields and foreign-key delete constraints are implementation details to review with the migration.
 
 ## 8. API contracts
 
@@ -105,7 +103,7 @@ All endpoints are under `/api/v1`, require the authenticated and active Shop ses
 | Resource | Contract | Authorization / behavior |
 |---|---|---|
 | Customers | `POST /customers/queries` with `{ search?, includeInactive?, page, pageSize }`; `POST /customers`; `GET /customers/{id}`; `PUT /customers/{id}`; `POST /customers/{id}/deactivate`; `POST /customers/{id}/reactivate` | Active Shop session only; no employee challenge. Reactivates the same Customer row/identity and preserves its existing relationships and history; returns a conflict if a Company-scoped uniqueness invariant prevents reactivation. Input: firstName, lastName, phone, isInternational, email?. API canonicalizes phone to E.164 and returns 409 `duplicate_customer_phone` on collision for both create and update. On update, the record being edited is excluded from the uniqueness check; any other Company Customer with that phone, active or inactive, causes the conflict. DTO exposes `phoneE164`; no cross-Company data is returned. |
-| Catalogue items | `POST /catalog-items/queries`; `POST /catalog-items`; `GET /catalog-items/{id}`; `PUT /catalog-items/{id}`; `POST /catalog-items/{id}/deactivate`; `POST /catalog-items/{id}/reactivate` | Active Shop session only; no employee challenge. DTO has kind PRODUCT/SERVICE, name, optional SKU, decimal listPrice, isActive and subtype fields. If supplied, normalize SKU uppercase and validate `SKU-[A-Z0-9]{8}`. |
+| Catalogue items | `POST /catalog-items/queries`; `POST /catalog-items`; `GET /catalog-items/{id}`; `PUT /catalog-items/{id}`; `POST /catalog-items/{id}/deactivate`; `POST /catalog-items/{id}/reactivate` | Active Shop session only; no employee challenge. DTO has kind PRODUCT/SERVICE, name, decimal listPrice, isActive and subtype fields. |
 | Product categories | `POST /product-categories/queries`; `POST /product-categories`; `PUT /product-categories/{id}`; `POST /product-categories/{id}/deactivate`; `POST /product-categories/{id}/reactivate` | Active Shop session only; no employee challenge. DTO contains name, code, optional parentCategoryId, description and isActive. |
 | Faults | `POST /faults/queries`; `POST /faults`; `GET /faults/{id}`; `PUT /faults/{id}`; `POST /faults/{id}/deactivate`; `POST /faults/{id}/reactivate` | Active Shop session only; no employee challenge. Create/update accepts description only; server generates and returns immutable code. Description is the primary search/selection field. |
 
@@ -125,8 +123,7 @@ Query DTOs return paged results and include inactive records only when `includeI
 ### Product/Service Catalogue and Categories
 
 - One catalogue supports Product and Service types only. `OTHER` is not offered.
-- SKU is optional. If entered, use placeholder `SKU-AB12CD34`; normalize uppercase and validate the exact eight-character suffix.
-- Product fields include name, SKU, sale price and category. Service fields include name, SKU, sale price and description. Sale price is required, accepts zero, rejects negative values, and uses decimal/`NUMERIC(19,2)`. Product physical stock and reservations belong to Shop inventory workflows; no minimum-stock setting is available.
+- Product fields include name, sale price and category. Service fields include name, sale price and description. Sale price is required, accepts zero, rejects negative values, and uses decimal/`NUMERIC(19,2)`. Product physical stock and reservations belong to Shop inventory workflows; no minimum-stock setting is available.
 - Categories are Company-wide. Inactive items are available in history views but cannot be selected in new operations. An authenticated Shop session can reactivate an item; existing drafts may display a previously selected inactive item but cannot add another line/reference to it.
 
 ### Fault Catalogue
@@ -151,7 +148,7 @@ Acceptance criteria:
 - Customer phone defaults to Ireland; international checkbox accepts international input; both normalize to E.164.
 - A matching E.164 customer phone in the Company, including an inactive record, returns a hard conflict on create or phone update and creates no duplicate. Updating a customer while retaining its own existing phone succeeds; the edited record is excluded from its duplicate check.
 - Repeated customer email is accepted.
-- Catalogue items can be saved without an SKU. A supplied SKU matches `SKU-[A-Z0-9]{8}`, is normalized uppercase, and cannot be duplicated within the Company even if the previous item is inactive. Product and Service sale prices are required, non-negative and stored as `NUMERIC(19,2)`; zero is valid and negative values are rejected.
+- Product and Service sale prices are required, non-negative and stored as `NUMERIC(19,2)`; zero is valid and negative values are rejected. The target catalogue has no SKU field.
 - New Faults receive immutable, unique `FLT-` sequence codes; description remains primary in search/selection.
 - `OTHER` is neither offered nor imported into the target catalogue.
 - `ShopInventory` stores physical on-hand quantity and reserved quantity only; no minimum-stock threshold or low-stock comparison is implemented.
@@ -167,7 +164,7 @@ Acceptance criteria:
 
 ## 12. Test scenarios
 
-Expected coverage includes Company-scope isolation; Irish/international phone parsing and duplicate blocking on create and update, including unchanged-phone edits and collisions with inactive records; repeated email acceptance; saving catalogue items without SKU; supplied-SKU validation/case normalization/uniqueness including inactive rows; concurrent Fault code generation; Product-vs-Service constraints; per-Shop physical stock and reservation invariants with no minimum-stock field; inactive-item handling in new vs existing records, including Customer deactivation despite existing Sales/ServiceOrders, preservation of existing references, same-record Customer reactivation and uniqueness-conflict blocking; immutable customer-detail snapshots on committed Sales/ServiceOrders; ShopSession-only write authorization; and ShopSession audit attribution. Add tests after this SPEC is approved.
+Expected coverage includes Company-scope isolation; Irish/international phone parsing and duplicate blocking on create and update, including unchanged-phone edits and collisions with inactive records; repeated email acceptance; concurrent Fault code generation; Product-vs-Service constraints; per-Shop physical stock and reservation invariants with no minimum-stock field; inactive-item handling in new vs existing records, including Customer deactivation despite existing Sales/ServiceOrders, preservation of existing references, same-record Customer reactivation and uniqueness-conflict blocking; immutable customer-detail snapshots on committed Sales/ServiceOrders; ShopSession-only write authorization; and ShopSession audit attribution. Add tests after this SPEC is approved.
 
 ## 13. Approval
 
