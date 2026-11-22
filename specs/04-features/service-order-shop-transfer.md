@@ -1,6 +1,6 @@
 # Feature: Cross-Shop ServiceOrder Transfer
 
-**Status:** DRAFT — discovery recorded; business-critical transfer rules remain OPEN
+**Status:** DRAFT — discovery recorded; initiation and acceptance permissions approved 2026-11-21; other business-critical transfer rules remain OPEN
 **Owner:** Product Owner
 
 ## 1. Objective and scope
@@ -38,7 +38,7 @@ Legacy source references are recorded in `specs/01-discovery/deep-dive-findings.
 | BR-05 | The physical device must be received/accepted by the destination before operational responsibility changes. | No evidence located | OPEN |
 | BR-06 | Define what happens to service-part reservations, received parts and procurement requests owned by the source Shop. | No evidence located | OPEN |
 | BR-07 | Define eligible statuses and whether transfer is allowed with payments, refunds, deposits, open complaints or procurement activity. | No complete transition matrix | OPEN |
-| BR-08 | Define which employee roles can initiate and accept transfer and the authorization challenge(s) required. | Action-level role policy pending approval | OPEN |
+| BR-08 | EMPLOYEE, MANAGER and ADMIN may initiate a transfer from the source Shop. EMPLOYEE, MANAGER and ADMIN may accept it at the destination Shop. Each protected command requires a fresh direct credential challenge from the acting employee; the backend validates active status, Company membership, the employee's role and source/destination Shop context. | Product Owner approval, 2026-11-21; employee-management authorization model | DECIDED |
 | BR-09 | Define transfer cancellation/rejection, timeout and recovery after dispatch. | No evidence located | OPEN |
 | BR-10 | Define mandatory event fields, reference identifiers and audit visibility/retention. | Internal event requirement exists; details absent | OPEN |
 
@@ -77,12 +77,12 @@ After approval: same-Company and cross-Company validation; status eligibility; s
 - [ ] What exact event establishes physical custody and destination acceptance?
 - [ ] Which source-Shop reservations, parts and procurement requests move, release or remain behind?
 - [ ] Which ServiceOrder statuses and financial states are eligible?
-- [ ] Who can initiate/accept, and does each side require a fresh employee challenge?
+- [x] Who can initiate/accept, and does each side require a fresh employee challenge? All three profiles may initiate at source and accept at destination; each command requires a fresh direct employee credential challenge.
 - [ ] Can a dispatched transfer be rejected, cancelled or timed out, and how are liabilities reversed?
 - [ ] What is the approved event/audit payload and how is reconciliation exposed?
 
 ## 12. Approval
 
-- Product approval: PENDING — open business rules
+- Product approval: PARTIAL — BR-01 through BR-04 and BR-08 decided; remaining business rules are open
 - Technical approval: PENDING
 - Data-model approval: PENDING
