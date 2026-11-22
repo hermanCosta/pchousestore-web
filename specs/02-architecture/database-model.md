@@ -225,6 +225,14 @@ All financial command idempotency is persisted in the shared `idempotency_record
 
 **ServiceOrder refund/balance invariant (Product Owner decision, 2026-11-22):** a settled `REFUND` against a ServiceOrder payment does not reverse the original payment credit in `balance_due` and does not create a new customer debt. A `DEPOSIT_REFUND` reduces only the originating deposit's un-applied held liability; it does not change `balance_due`. Refunds are outgoing-funds records, not order-price or balance adjustments. Do not subtract refunds when reconciling `balance_due`. Any future change to the amount owed requires a separately approved, authorized and auditable balance-adjustment operation; no such table or behavior is approved by this decision. The balance cache is updated atomically with qualifying ServiceOrder payment credits and deposit applications under the ServiceOrder aggregate lock.
 
+**Canonical ServiceOrder balance formula (Product Owner decision, 2026-11-22):**
+```text
+balance_due = service_order.total
+            - SUM(SETTLED PAYMENT.amount_applied for that ServiceOrder)
+            - SUM(committed DepositApplication.amount_applied for that ServiceOrder)
+```
+Only settled `PAYMENT` transactions targeting that ServiceOrder are counted; tender allocations are not summed separately. `DEPOSIT_RECEIPT` is excluded until explicitly applied. Refunds, deposit refunds and internal transfer-financial-event lines are excluded. Payment/application commands must reject amounts exceeding the current balance so the result cannot be negative. The formula is recalculated under the ServiceOrder aggregate lock; the materialized `balance_due` is updated in the same transaction as the qualifying ledger write. A mismatch between the stored value and the formula blocks new financial commands and requires explicit reconciliation; no automatic correction is allowed. All amounts must use the ServiceOrder currency.
+
 **Instalment balance:** `installment_outstanding = scheduled_amount - sum(settled InstallmentSettlement.amount_applied)`. No amount can be settled twice. The plan, schedule and receipts remain immutable/auditable; corrections are reversal/adjustment events, not edits to historical receipts.
 
 ## 3. Relationship cardinalities
