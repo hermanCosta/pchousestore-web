@@ -25,6 +25,10 @@
 - Prefer `RESTRICT` for deleting financial/history records; use soft deactivation for master data referenced by history.
 - No polymorphic source references for core transaction ownership. Use explicit nullable FKs where the source type is known.
 
+### Financial reconciliation records
+
+The two reconciliation tables above retain immutable execution history and detailed findings. A reconciliation run is read-only with respect to source financial ledgers. A PASSED run certifies only its recorded scope and check-set version; FAILED/INCOMPLETE findings remain available for investigation. The application must derive whether an aggregate is blocked from unresolved findings and any subsequent successful reconciliation, without editing or deleting the original run/finding rows. Finding resolution is recorded separately and must reference the finding and the authorized corrective action; never mark a finding resolved merely because a new run exists unless that run explicitly verifies the same aggregate/check and records the superseding evidence.
+
 ## 2. Proposed tables
 
 Field names are canonical English snake_case. The final DDL must make FK types, uniqueness and Shop consistency constraints explicit. Operational tables derive `shop_id` from the validated ShopSession, not from an independently trusted browser value.
@@ -218,6 +222,8 @@ All financial command idempotency is persisted in the shared `idempotency_record
 | `daily_closing` | `id`, `shop_id`, `business_date`, status (`OPEN`/`CLOSED`), `opening_float`, opened_by_employee_id, opened_at, expected_cash, counted_cash, `cash_variance`, closing_employee_id?, electronic_tender_snapshot_json, transaction_count, notes, closed_at? | Unique `(shop_id,business_date)`; created at opening; one physical till per Shop/day; expected cash = opening float + settled cash receipts net of change + cash-in − cash-out − settled cash refunds − settled cash deposit refunds − safe drops; non-zero variance requires reason; immutable after CLOSED |
 | `daily_closing_cash_count` | `id`, `daily_closing_id`, denomination DECIMAL(6,2), quantity, subtotal | Denomination count used to calculate counted_cash; unique `(daily_closing_id,denomination)` |
 | `daily_closing_correction` | `id`, `daily_closing_id`, signed_amount, reason, employee_id, created_at | Append-only Manager-only correction referencing the immutable close; never rewrites original expected/count/variance |
+| `financial_reconciliation_run` | `id`, `company_id`, nullable `shop_id`, nullable `business_date`, scope_json, trigger (`MANUAL`/`SCHEDULED`), initiated_by_employee_id?, system_identity?, check_set_version, status (`RUNNING`/`PASSED`/`FAILED`/`INCOMPLETE`), started_at, completed_at?, summary_json, findings_reference? | Append-only run record; exactly one initiator identity (employee or system); records scope, check version, counts and durable findings reference; no source-ledger mutation; reruns create new rows |
+| `financial_reconciliation_finding` | `id`, `run_id`, severity, check_code, aggregate_type, aggregate_id, shop_id?, currency_code?, expected_amount?, observed_amount?, source_references_json, details_json, created_at | Append-only finding linked to one run; no secret/credential data; identifies exact affected aggregate and evidence; does not itself adjust or block by mutation—the application derives the affected scope's reconciliation state from unresolved findings |
 
 **Payment/target constraints:** `PAYMENT` and `REFUND` target exactly one Sale or ServiceOrder; `DEPOSIT_RECEIPT` and `DEPOSIT_REFUND` target exactly one ServiceDeposit. A `REFUND` references the original settled `PAYMENT`; a `DEPOSIT_REFUND` references the original settled `DEPOSIT_RECEIPT`. All records inherit the target Shop. Store amounts as positive magnitudes; sign is derived from transaction kind in reporting.
 
