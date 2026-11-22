@@ -101,10 +101,11 @@ Only transition to `RECEIVED` transfers operational responsibility, changes the 
 
 For each deposit linked to the ServiceOrder, calculate the outstanding liability from authoritative, immutable deposit ledger records inside the acceptance transaction. Do not use `target_amount` or the original receipt amount as the transfer amount.
 
-- Start from successfully received/settled deposit funds.
-- Exclude amounts already applied to the ServiceOrder, refunded, or forfeited.
-- Include only the remaining amount that is still held/unapplied and represents an outstanding obligation.
+- Use the approved per-deposit formula from [Financial Model](../02-architecture/financial-model.md): `available_held = settled_receipts - applied - settled_refunds - approved_forfeitures`. Start from deposit receipts whose linked `DEPOSIT_RECEIPT` transactions are `SETTLED`; subtract committed applications, settled deposit refunds and valid authorized forfeitures for this exact deposit. Pending/failed/voided transactions do not count.
+- The deposit event ledger is the reconciliation trail. Its referenced transaction/application validates the event and must not be counted a second time. Currency must match; result must be non-negative. Any duplicate, missing, inconsistent or unsupported ledger evidence blocks transfer acceptance.
+- Include only the remaining amount that is still held/unapplied and represents an outstanding obligation. A materialized held-balance mismatch also blocks acceptance pending explicit reconciliation; do not auto-correct.
 - `RELEASED` is an administrative unhold/release only. It does not extinguish the obligation and must not reduce the deposit's outstanding liability or transferable amount.
+- Reconcile each deposit independently; never pool, offset or reallocate between deposits. `RELEASED` has zero financial effect and is never subtracted from liability.
 - `FORFEITED` records actual extinguishment of the customer's deposit entitlement/obligation. It requires a mandatory reason and the authorization required by the deposit lifecycle; its amount reduces outstanding liability.
 - Never use `RELEASED` as a synonym for forfeiture. Preserve both events in the immutable ledger.
 - Transfer each deposit's net outstanding liability and update its current responsible `shop_id` to the destination; preserve immutable `origin_shop_id`, original receipt transaction, applications, refunds, forfeitures and all historical events.
