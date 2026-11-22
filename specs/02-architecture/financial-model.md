@@ -18,6 +18,30 @@ The model supports one Company with multiple Shops, a persistent Shop session an
 | VAT feature | Company-level `vat_enabled` flag; initial behavior is OFF (no VAT amount is added by the application) | NO-CHARGE SOFTWARE SETTING DECIDED; legal status/reason still OPEN |
 | Reconciliation formula | Ledger-derived per Shop/day; external accounting reconciliation deferred | Operational close defined; accountant mapping deferred |
 
+### Approved financial reconciliation controls (technical review 3 — decision 5)
+
+The Product Owner approved on 2026-11-22 a read-only reconciliation capability, executable on demand and on a scheduled daily basis.
+
+**Required reconciliation checks**
+
+1. **ServiceOrder balance:** compare materialized `balance_due` with the canonical formula: order total less settled `PAYMENT` credits and committed `DepositApplication` credits. Exclude unapplied deposit receipts, refunds, deposit refunds and internal transfer events.
+2. **Deposit liability:** calculate `available_held` independently for every deposit from settled receipts, committed applications, settled deposit refunds and valid authorized forfeitures. Verify event-to-source references, currency and materialized held-balance projection; `RELEASED` has no effect.
+3. **Payment integrity:** compare each PaymentTransaction amount with its PaymentAllocations; verify allocation sums, tender/change/rounding values, original-transaction links, settlement status and cumulative refund caps. Check that only SETTLED transactions contribute to balances and drawer totals.
+4. **Cash and closing:** compare settled cash tender, change, cash-rounding adjustment, cash refunds/deposit refunds and cash movements against the DailyClosing expected-cash calculation. Do not duplicate PaymentTransactions as CashMovements.
+5. **Shop transfer:** compare each accepted transfer's immutable financial event header and component lines with the canonical order balance and each per-deposit liability snapshot at acceptance. Verify one event per accepted transfer, exact source references, currency, line/header totals and no duplicate or omitted liability.
+6. **Cross-ledger consistency:** verify each financial effect is represented once across transaction, allocation, deposit event/application, ServiceOrder balance projection, cash closing and transfer event. A source reference validates a ledger event; it must not cause the same amount to be summed twice.
+
+**Execution and evidence**
+
+- Run on demand by an authorized Manager/Admin and automatically once per business day after the Shop's DailyClosing window. The scheduled run is read-only and must not delay or mutate a closed DailyClosing.
+- A run records its scope (Company/Shop/business date and applicable aggregate IDs), start/completion timestamps, trigger (manual/scheduled), initiating actor or system identity, check set/version, outcome, counts by severity and a durable reference to detailed findings.
+- Preserve run history and findings append-only. A rerun creates a new run; it never overwrites an earlier result. Do not persist secrets or raw credential material in findings.
+- Outcomes distinguish `PASSED`, `FAILED` and `INCOMPLETE` (for example, a technical failure preventing a complete scan). Findings identify affected records, expected and observed amounts, currency, check code and source references without modifying the source ledger.
+- A mismatch blocks only the affected financial aggregate/operation and any transfer that depends on it. Unrelated Shops and aggregates continue operating. A technical `INCOMPLETE` run does not certify the scope as reconciled; sensitive operations in an unverified affected scope must fail closed until a complete check or explicit safe validation is available.
+- Reconciliation never auto-corrects balances, inserts compensating events, changes transaction status, rewrites transfer events or deletes history. Resolution must use a separately authorized business operation or controlled data-correction procedure with its own audit trail. Re-run reconciliation afterward.
+- This is internal operational reconciliation. External accounting, bank/acquirer settlement and Irish tax/accounting mapping remain separate integrations/reviews and are not claimed by a PASSED result.
+
+
 ## 2. Ireland localization and monetary precision
 
 - Company defaults: `country_code = 'IE'`, `default_currency_code = 'EUR'`, `time_zone = 'Europe/Dublin'`.
