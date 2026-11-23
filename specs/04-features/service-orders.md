@@ -864,6 +864,18 @@ Pickup is the physical customer handover command and is allowed from either tech
 
 #### Multiple partial consumption records per reservation — approved (2026-11-23)
 
+#### Correcting a recorded part consumption — approved (2026-11-23)
+
+A confirmed Product-part consumption record must never be edited or deleted. If a consumption was recorded incorrectly, an employee may create a separate compensating reversal operation.
+
+- The reversal must reference the exact original consumption record and may reverse all or part of its quantity. The cumulative reversed quantity cannot exceed the original consumed quantity.
+- A mandatory non-empty reason is required. The acting employee must pass a fresh employee code/password challenge; the backend resolves the employee and records the actor and server UTC timestamp.
+- A successful reversal increases physical Product `qty` by the reversed quantity and restores the same quantity to the associated ServiceOrder reservation, without exceeding that reservation's original reserved quantity. The restored quantity becomes active reserved stock and remains earmarked for that ServiceOrder.
+- The original consumption, every reversal, and all related stock movements remain immutable and auditable. A reversal does not delete or rewrite the original consumption record.
+- Persist the compensating stock movement, restored reservation quantity, immutable employee-attributed ServiceOrder event and append-only `Notes` entry atomically. Any failure rolls back all effects.
+- Reversal must be concurrency-safe and idempotent so the same consumed quantity cannot be restored more than once. A reversal cannot exceed the unreversed remainder of its original consumption.
+
+
 The same active reservation may receive multiple separate consumption records over the course of the repair. Each record represents only the additional quantity consumed in that operation; it does not replace or repeat earlier consumption.
 
 - Example: for a reservation of 5 units, an employee may record 2 units consumed in one operation and 1 unit in a later operation. The remaining active reserved quantity is then 2.
