@@ -271,6 +271,25 @@ All monetary values use EUR decimal precision defined by FIN-01. The response mu
 
 
 
+### 7.12 Create ServiceOrder — error contract
+
+The create endpoint must use the following HTTP status mapping and a consistent error response body:
+- `400 Bad Request`: malformed request, missing required fields, invalid primitive formats or request-shape validation failures.
+- `401 Unauthorized`: missing or invalid authenticated ShopSession.
+- `403 Forbidden`: the employee credential challenge is valid but the resolved employee is not authorized to create ServiceOrders.
+- `404 Not Found`: a referenced Customer, Device, Fault or catalogue item does not exist within the applicable Company scope. Do not disclose whether a foreign-Company record exists.
+- `409 Conflict`: concurrency or idempotency conflict, display-number allocation conflict, or another conflict with the current persisted resource state.
+- `422 Unprocessable Entity`: structurally valid request rejected by a business rule, including inactive/non-selectable references, invalid catalogue state, conditional `badSector` requirement failure, or invalid Product/Service quantity or combination.
+
+Every error response must include:
+- `code`: stable machine-readable error identifier suitable for client handling.
+- `message`: concise human-readable explanation.
+- `errors`: optional field-level validation details; omit when no field-specific details apply.
+
+The response must not expose credentials, password-validation details that facilitate credential guessing, internal exception messages, stack traces, database details or whether a foreign-Company identifier belongs to another Company. Validation failures and rejected commands must not create a ServiceOrder, allocate/consume a display number, or append an event or Note. All failures after transaction processing begins must roll back every creation side effect. The same error envelope and status semantics should be reused by the other ServiceOrder commands unless their owning feature contract explicitly defines a justified exception.
+
+
+
 ### 7.1 Pickup HTTP contract — approved
 
 **Request**
