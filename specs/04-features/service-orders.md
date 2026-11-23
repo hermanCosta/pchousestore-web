@@ -341,6 +341,28 @@ The response must represent the committed transaction and must not contain emplo
 
 
 
+### 7.16 Start Work command — error contract
+
+A rejected Start Work command must return the shared API error envelope and must not change the ServiceOrder or create a transition event or append-only Note.
+
+**Error response envelope**
+- `code`: stable machine-readable error code.
+- `message`: concise human-readable explanation.
+- `errors`: optional field-level validation details; omit when not applicable.
+
+**HTTP status mapping**
+- `400 Bad Request` — malformed request, missing/invalid required header or invalid request shape.
+- `401 Unauthorized` — missing or invalid employee credentials, or employee is inactive.
+- `403 Forbidden` — credentials are valid, but the employee lacks Start Work permission or does not belong to the active Shop's Company.
+- `404 Not Found` — the ServiceOrder does not exist or is outside the active Shop scope. Do not disclose whether an out-of-scope order exists.
+- `409 Conflict` — the ServiceOrder is no longer in `CREATED` (for example, work was already started or the order was cancelled), a distinct concurrent command committed first, or the idempotency key was reused with a different normalized payload/resource scope.
+- `422 Unprocessable Entity` — the request shape is valid, but an operational business rule prevents starting work.
+
+Use stable, operation-specific error codes, including `service_order_not_found`, `service_order_start_work_conflict`, `idempotency_key_reused` and `start_work_business_rule_violation` where applicable. The response must not expose credentials, stack traces, internal database details or persistence implementation information.
+
+For every rejected or rolled-back attempt, persist no status change, transition event, Note or committed idempotency result. A rolled-back attempt may be retried using the same key.
+
+
 ### 7.1 Pickup HTTP contract — approved
 
 **Request**
