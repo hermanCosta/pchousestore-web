@@ -200,6 +200,7 @@ Money uses C# decimal and PostgreSQL NUMERIC(19,2) in EUR. Store event timestamp
 | POST /api/v1/service-orders/{serviceOrderId}/status-transitions | Execute an allowed status command | Fresh employee code/password; action-specific profile |
 | POST /api/v1/service-orders/{serviceOrderId}/start-work | Explicitly start work: CREATED → IN_PROGRESS | ShopSession plus fresh employee code/password in the request; EMPLOYEE, MANAGER or ADMIN; `Idempotency-Key` header required |
 | POST /api/v1/service-orders/{serviceOrderId}/notes | Add a technical/operational note | Fresh employee code/password; EMPLOYEE, MANAGER or ADMIN |
+| POST /api/v1/service-orders/{serviceOrderId}/diagnosis | Append a technical diagnosis observation while IN_PROGRESS | ShopSession plus fresh employee code/password in the request; EMPLOYEE, MANAGER or ADMIN; `Idempotency-Key` header required |
 | POST /api/v1/service-orders/{serviceOrderId}/part-requirements | Add/update required Product parts | Fresh employee code/password; EMPLOYEE, MANAGER or ADMIN |
 | POST /api/v1/service-orders/{serviceOrderId}/resume | Explicitly resume from AWAITING_PARTS | Fresh employee code/password; EMPLOYEE, MANAGER or ADMIN |
 | POST /api/v1/service-orders/{serviceOrderId}/pickup | Record physical customer handover from FIXED or NOT_FIXED | ShopSession plus fresh employee code/password in the request; EMPLOYEE, MANAGER or ADMIN; `Idempotency-Key` header required |
@@ -410,6 +411,67 @@ Technical diagnosis is recorded while the ServiceOrder is in `IN_PROGRESS`. It i
 - Every submission requires a fresh employee code/password challenge. The backend validates employee active status, Company membership and permission using the existing employee-command authorization model.
 - Recording diagnosis does not change lifecycle status or technical outcome. Moving to `AWAITING_PARTS`, `FIXED` or `NOT_FIXED` remains a separate explicit command with its own applicable validation, authorization and audit behavior.
 - A rejected or rolled-back diagnosis submission must not persist an event or Note.
+
+
+### 7.19 Register Diagnosis HTTP contract — approved
+
+**Endpoint**
+`POST /api/v1/service-orders/{serviceOrderId}/diagnosis`
+
+This endpoint appends one technical diagnosis observation to a ServiceOrder. It is available only while the order is in `IN_PROGRESS`. It does not change lifecycle status or technical outcome.
+
+**Headers**
+- `Authorization`: authenticated ShopSession, required.
+- `Idempotency-Key`: required UUID, scoped to the active Shop, Register Diagnosis operation and target ServiceOrder.
+
+**Request body**
+```json
+{
+  "employeeCode": "EMP001",
+  "employeePassword": "employee-secret",
+  "description": "HDD presents bad sectors. Disk health is degraded."
+}
+```
+
+- `employeeCode` and `employeePassword` are required for every attempt. The backend resolves the employee and validates active status, Company membership and permission.
+- `description` is required and must contain non-whitespace text after trimming leading/trailing whitespace. Maximum length is 5,000 characters after trimming.
+- Each request appends exactly one diagnosis observation. Additional observations require separate requests.
+- Do not accept client-supplied EmployeeId/actor, timestamp, lifecycle status, technical outcome, event ID, Note text, ShopId or CompanyId.
+- Raw credentials must never be persisted, included in request snapshots/idempotency hashes, returned in responses or logged. Every replay still requires fresh credential validation.
+
+**Successful response — HTTP 201 Created**
+
+Return a dedicated response representing the committed diagnosis event and corresponding Note. Do not serialize EF Core entities directly.
+
+Response fields:
+- `id`: identifier of the immutable diagnosis event.
+- `serviceOrderId`: target ServiceOrder identifier.
+- `eventType`: `SERVICE_ORDER_DIAGNOSIS_RECORDED`.
+- `description`: trimmed diagnosis text.
+- `createdAt`: server-generated UTC timestamp.
+- `createdBy`: server-resolved employee identifier and display-name snapshot.
+- `note`: the corresponding append-only Note, including its identifier, text and server-generated UTC timestamp.
+
+The standard Note text is `Diagnosis recorded by {Employee}.` The event, Note and idempotency record must commit atomically. On an idempotent replay, return the original HTTP status and response body without creating another event or Note.
+
+**Idempotency**
+- Same key and same normalized business payload returns the original successful response.
+- Same key with a different normalized description or resource scope returns `409 Conflict` with `idempotency_key_reused`.
+- A failed or rolled-back attempt leaves no committed idempotency record and may be retried with the same key.
+- Guard concurrent requests so the same key cannot append duplicate diagnosis events or Notes.
+- Retain a committed idempotency record for 24 hours from successful completion. Do not expire a key while processing.
+- Exclude employee credentials from the normalized payload hash and stored request snapshot.
+
+**Error contract**
+Use the shared error envelope: `code`, `message` and optional field-level `errors`.
+- `400 Bad Request` — malformed body, missing/invalid Idempotency-Key or invalid request shape.
+- `401 Unauthorized` — missing/invalid employee credentials or inactive employee.
+- `403 Forbidden` — valid employee lacks permission or does not belong to the active Shop's Company.
+- `404 Not Found` — ServiceOrder does not exist or is outside the active Shop scope; do not disclose out-of-scope existence.
+- `409 Conflict` — ServiceOrder is no longer `IN_PROGRESS`, a distinct command won a concurrency race, or the idempotency key was reused with a different normalized payload/resource scope.
+- `422 Unprocessable Entity` — description is empty/whitespace-only after trimming or exceeds 5,000 characters.
+
+A rejected or rolled-back request must not persist a diagnosis event, Note or committed idempotency result. The command must not modify Fault references, ServiceOrder lines, Customer, Device, financial records, stock/reservations, lifecycle status or technical outcome.
 
 
 ### 7.1 Pickup HTTP contract — approved
