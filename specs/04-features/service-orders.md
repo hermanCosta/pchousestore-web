@@ -250,6 +250,27 @@ Every ServiceOrder creation attempt is a protected employee command and requires
 
 
 
+### 7.11 Create ServiceOrder — response contract
+
+On successful creation, return HTTP `201 Created` with a dedicated `ServiceOrderCreatedResponse` DTO; never serialize or expose the EF Core entity directly. Set the HTTP `Location` header to the canonical URI of the newly created ServiceOrder resource.
+
+The response body must contain:
+- `id`: globally unique internal ServiceOrder identifier.
+- `displayNumber`: immutable Shop-scoped sequential display number allocated by the backend.
+- `status`: the committed initial lifecycle status, either `CREATED` or `AWAITING_PARTS` when a blocking Product-part requirement is not fully reserved as part of creation.
+- `technicalOutcome`: initially `null`.
+- `customer`: customer identifier and display name.
+- `device`: Device identifier, brand, model and serial number.
+- `total`: server-calculated ServiceOrder total.
+- `balanceDue`: initial outstanding balance calculated by the backend; creation itself records no payment or deposit.
+- `createdAt`: server-generated creation timestamp.
+- `createdBy`: server-resolved employee identifier and display-name snapshot.
+- `notes`: the initial Note created by this command, if supplied and non-empty after trimming; otherwise an empty collection.
+
+All monetary values use EUR decimal precision defined by FIN-01. The response must not contain employee credentials, raw passwords, internal persistence/navigation properties, or payment/deposit records that were not created. Values representing ownership or actor identity must come from server-resolved context, not client-supplied fields. The response reflects the committed result of the atomic creation transaction.
+
+
+
 ### 7.1 Pickup HTTP contract — approved
 
 **Request**
