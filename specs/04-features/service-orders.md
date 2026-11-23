@@ -239,6 +239,15 @@ ServiceOrder creation must not accept or process an initial deposit, payment amo
 
 The ServiceOrder display number is generated exclusively by the backend from a sequential counter scoped to the active Shop. The client must not submit or override the display number. Allocate the next number atomically within the ServiceOrder creation transaction so concurrent creations in the same Shop cannot receive the same number. A number allocated to a committed ServiceOrder is immutable and is never reused, including after cancellation. The global internal ServiceOrder identifier remains separate from this human-facing Shop-scoped display number. The ServiceOrder is created first; any deposit receipt is recorded afterward through the dedicated FIN-01 financial workflow and its own authorized transaction. This separation preserves independent financial transaction identity, tender/method attribution, ledger integrity and audit history. ServiceOrder creation must not create a Payment, DepositReceipt, DepositApplication or cash-drawer movement as a side effect. The server trims leading and trailing whitespace. If the value is omitted, `null`, empty or whitespace-only after trimming, no Note is created for this field. If non-empty, create exactly one append-only, employee-attributed Note as part of the same atomic ServiceOrder creation transaction, using the server-resolved employee identity/name snapshot and server timestamp. The Note cannot be edited or deleted. Raw employee credentials must not be included in the Note. It is conditionally required when at least one selected Service has `requiresBadSectorCount = true`; otherwise it may be omitted or sent as `null`. Negative, fractional and non-numeric values are rejected. No additional upper bound is defined. The server must evaluate the requirement against the current Service catalogue configuration during creation; the client cannot override the `requiresBadSectorCount` rule. Every selected catalogue item must exist, be active and belong to the same Company as the active Shop; inactive or foreign-Company items are rejected. Product lines require a positive whole-unit quantity. Service lines always have quantity `1`; fractional or multiple quantities for a Service line are not supported in v1. The ServiceOrder line must preserve immutable creation-time snapshots of the catalogue item name/description and unit price, plus the submitted quantity and calculated line total. Subsequent catalogue edits must not change the committed order-line snapshots. Every selected Fault must exist, be active and belong to the same Company as the active Shop. Inactive or foreign-Company Faults must be rejected. Duplicate Fault identifiers within one create request are invalid; each Fault may be linked to the ServiceOrder only once. During booking, the operator may explicitly select/reuse an existing Device record or register a new Device. Serial numbers are not unique within the Company; duplicate serial values are allowed. The backend must verify that a selected Device belongs to the same Company as the active Shop. ServiceOrder creation must not silently merge Device records based on matching serial numbers. It must not create, update, merge or otherwise mutate Customer master data as part of ServiceOrder creation. If the customer does not yet exist, the operator must create the Customer through CAT-01 and then select that record when creating the ServiceOrder. The backend must verify that the referenced Customer belongs to the active Shop's Company and is active/selectable for new operations; reject missing, inactive or foreign-Company Customer references.
 
+
+
+**PostgreSQL allocation and concurrency contract**
+
+- The authoritative counter is shop.next_service_order_display_number; do not introduce a PostgreSQL SEQUENCE for this value. PostgreSQL sequence increments are not rolled back and would consume numbers on failed transactions, contrary to the approved rule.
+- Inside the same transaction that creates the ServiceOrder, atomically allocate the current value and increment the Shop counter with one parameterized PostgreSQL statement equivalent to: UPDATE shop SET next_service_order_display_number = next_service_order_display_number + 1 WHERE id = @shopId RETURNING next_service_order_display_number - 1. Verify exactly one Shop row was updated.
+- The row-level update lock serializes allocations for the same Shop. Different Shops allocate independently. The unique database constraint on (shop_id, display_number) is the final integrity safeguard.
+- If the transaction rolls back, the counter increment rolls back and the number remains available. Once the ServiceOrder transaction commits, its display number is immutable and is never reused, including after cancellation.
+- A display-number allocation race is not a client-visible conflict. Handle transient database concurrency failures through the bounded whole-transaction retry policy in §7.13; do not retry domain validation or business-rule conflicts.
 ### 7.10 Create ServiceOrder — authorization
 
 Every ServiceOrder creation attempt is a protected employee command and requires a fresh employee credential challenge in the create request:
@@ -252,25 +261,88 @@ Every ServiceOrder creation attempt is a protected employee command and requires
 
 
 
-### 7.11 Create ServiceOrder — response contract
+### 7.11 Create ServiceOrder — canonical HTTP response contract
 
-On successful creation, return HTTP `201 Created` with a dedicated `ServiceOrderCreatedResponse` DTO; never serialize or expose the EF Core entity directly. Set the HTTP `Location` header to the canonical URI of the newly created ServiceOrder resource.
+**Request**
+`POST /api/v1/service-orders`
 
-The response body must contain:
-- `id`: globally unique internal ServiceOrder identifier.
-- `displayNumber`: immutable Shop-scoped sequential display number allocated by the backend.
-- `status`: the committed initial lifecycle status, either `CREATED` or `AWAITING_PARTS` when a blocking Product-part requirement is not fully reserved as part of creation.
-- `technicalOutcome`: initially `null`.
-- `customer`: customer identifier and display name.
-- `device`: Device identifier, brand, model and serial number.
-- `total`: server-calculated ServiceOrder total.
-- `balanceDue`: initial outstanding balance calculated by the backend; creation itself records no payment or deposit.
-- `createdAt`: server-generated creation timestamp.
-- `createdBy`: server-resolved employee identifier and display-name snapshot.
-- `notes`: the initial Note created by this command, if supplied and non-empty after trimming; otherwise an empty collection.
+The request is executed within the authenticated active `ShopSession` and includes the fresh `employeeCode` and `employeePassword` challenge defined in section 7.10. The Shop and Company scope and acting employee are resolved by the server; the client cannot submit or override them.
 
-All monetary values use EUR decimal precision defined by FIN-01. The response must not contain employee credentials, raw passwords, internal persistence/navigation properties, or payment/deposit records that were not created. Values representing ownership or actor identity must come from server-resolved context, not client-supplied fields. The response reflects the committed result of the atomic creation transaction.
+**Successful response — HTTP 201 Created**
 
+Return the complete canonical ServiceOrder resource as committed by the database. The response must be sufficient for the frontend to render the newly created order and navigate to its detail view without an immediate follow-up GET request.
+
+Include the `Location` header pointing to the newly created ServiceOrder detail resource.
+
+Response JSON shape:
+
+```json
+{
+  "id": "service-order-uuid",
+  "displayNumber": 125,
+  "status": "CREATED",
+  "technicalOutcome": null,
+  "createdAtUtc": "2026-11-23T10:30:00Z",
+  "customer": {
+    "id": "customer-uuid",
+    "name": "John Smith",
+    "phone": "+353..."
+  },
+  "device": {
+    "id": "device-uuid",
+    "brand": "Dell",
+    "model": "Inspiron 15",
+    "serialNumber": "ABC123"
+  },
+  "lines": [
+    {
+      "id": "service-order-line-uuid",
+      "itemType": "PRODUCT",
+      "catalogueItemId": "product-uuid",
+      "name": "SSD 500GB",
+      "description": null,
+      "quantity": 1,
+      "unitPrice": 50.00,
+      "lineTotal": 50.00
+    }
+  ],
+  "faults": [
+    {
+      "id": "fault-uuid",
+      "name": "Hard drive failure"
+    }
+  ],
+  "badSector": null,
+  "totalAmount": 50.00,
+  "balanceDue": 50.00,
+  "notes": [
+    {
+      "id": "note-uuid",
+      "content": "Service order created by John.",
+      "employeeName": "John",
+      "createdAtUtc": "2026-11-23T10:30:00Z"
+    }
+  ]
+}
+```
+
+The example values are illustrative. The response must follow these rules:
+
+- `id`, child identifiers, `displayNumber`, timestamps, status and technical outcome come from the committed server-side state. The globally unique internal ID and Shop-scoped display number are distinct.
+- `customer` and `device` contain the persisted records referenced by the new order, limited to the fields needed by the ServiceOrder detail/booking UI. Do not return or mutate Customer master data beyond this read.
+- `lines` contains every committed Product/Service line, including its persisted identifier, catalogue reference, item type, immutable creation-time name/description snapshots, quantity, unit price and calculated line total. Values must reflect the committed snapshots, not a fresh catalogue lookup.
+- `faults` contains every Fault linked to the committed order, with its identifier and display name.
+- `badSector` is the persisted whole-number value or `null`.
+- `totalAmount` is calculated by the server from the committed lines. `balanceDue` is the initial outstanding amount and therefore equals the order total at creation, because creation does not record or apply any payment or deposit.
+- `notes` contains the initial Note only when one was created under section 7.7/7.9. It is an empty array when no initial Note was supplied. The Note includes the server-resolved employee name snapshot and server timestamp.
+- The initial lifecycle status is `CREATED`; `technicalOutcome` is `null`.
+- The response represents only the committed ServiceOrder and its operational children. It must not include fabricated Payment, DepositReceipt, DepositApplication, refund or cash-drawer records.
+
+The response must never include `employeePassword`, raw credentials, credential hashes, internal authorization data, or server-side security details. Do not echo the request body. Employee identity is exposed only as the approved actor/name snapshot on the initial Note.
+
+The backend must send the response only after the entire creation transaction commits. If any part of creation fails, no partial resource is returned and the transaction must roll back the ServiceOrder, display-number allocation, event and initial Note.
+
+The response is the canonical result of creation. The frontend must use the returned resource as the newly created order state; it must not reconstruct server-generated values or assume that submitted values were persisted unchanged.
 
 
 ### 7.12 Create ServiceOrder — error contract
@@ -336,19 +408,48 @@ Example:
 - The same envelope, stable-code convention and status semantics apply to every HTTP contract in the application. Feature-specific contracts may add operation-specific codes and field errors but must not redefine the common envelope or status meanings without an explicitly approved architectural exception.
 
 
-### 7.13 Create ServiceOrder — idempotency
+### 7.13 Create ServiceOrder — idempotency, transaction and concurrency
 
-The create endpoint requires an `Idempotency-Key` request header containing a valid UUID for every creation attempt. The key is scoped to the authenticated Shop and the ServiceOrder create operation.
+The create endpoint requires an Idempotency-Key request header containing a valid UUID for every attempt. Its persistence scope is the authenticated Shop plus operation code SERVICE_ORDER_CREATE; the idempotency row uses resource_type = Shop and resource_id = active Shop ID, because no ServiceOrder resource exists before creation. The key is not client-scoped and the client cannot submit or override any scope field.
 
-- The backend must persist the idempotency record and the complete creation result atomically with the ServiceOrder, display-number allocation, initial event and optional initial Note.
-- Repeating a committed request with the same key and the same normalized business payload returns the original HTTP status, response body and `Location` header. It must not create another ServiceOrder, allocate another display number, or append duplicate events/Notes.
-- Reusing the same key with a different normalized business payload or a different resource scope returns `409 Conflict` with a stable error code such as `idempotency_key_reused`.
-- A request that fails or rolls back before commit must not leave a committed idempotency record; the same key may be retried after correcting transient conditions.
-- Concurrent requests using the same key must be serialized/guarded so that at most one creation transaction commits. A concurrent retry must return the committed original result when available, or a documented conflict/retryable response while the first request is still processing; it must never create a duplicate.
-- The normalized business-payload hash and stored request snapshot must exclude `employeeCode` and `employeePassword`. Raw credentials must never be persisted, hashed into the idempotency payload, echoed or logged. Each attempt must still perform fresh employee credential validation before returning or executing the command, according to the direct employee-challenge policy.
-- The idempotency key itself must be validated and scoped server-side; the client cannot choose Shop ownership or operation scope.
-- A committed idempotency record is retained for 24 hours from the time the original command completes successfully. Do not expire or purge a key while its command is still processing. After the retention period, the idempotency record may be purged and the same key may be treated as a new attempt; the committed ServiceOrder and its business/audit history remain unaffected. The frontend should generate a new UUID for a genuinely new creation attempt.
+**Canonical payload and replay rules**
 
+- Calculate SHA-256 over a deterministic canonical representation of the normalized business payload. Include every business-significant input that affects the result (Customer/Device references, Fault identifiers, Product/Service lines and quantities, badSector, and trimmed optional initial Note). Normalize collection ordering only where order is semantically irrelevant; preserve line order where it is part of the submitted/displayed order.
+- Exclude employeeCode, employeePassword, credential hashes, ShopSession/bearer tokens and other secrets from the hash input and from all persisted request snapshots/logs. Credentials are never stored in the idempotency row.
+- Revalidate the ShopSession and fresh employee code/password challenge, including current employee active status, Company membership and permission, on every attempt before returning a stored result. A previous success does not bypass authentication or authorization.
+- Same Shop + operation + key + same request hash returns the exact original committed HTTP status, response body and Location header. It must not create another ServiceOrder, allocate a display number, append another event/Note or repeat any business effect.
+- Same Shop + operation + key with a different hash returns 409 Conflict / idempotency_key_reused; do not overwrite the original row or response. Operation and Shop scope are enforced by the server-side unique key.
+- Retain completed successful records for 24 hours from completed_at. Never expire an in-flight/uncommitted request. After expiry, the idempotency record may be purged and the key may be treated as a new attempt; the committed ServiceOrder and its immutable event/history remain unaffected.
+
+**Single-transaction claim protocol**
+
+- Use the shared idempotency_record table. The initial claim is an INSERT performed inside the same uncommitted PostgreSQL transaction as the business operation; do not commit a separate PROCESSING row or create a second transaction for the claim.
+- Enforce uniqueness for the creation scope with the shared unique key on (shop_id, operation_code, resource_type, resource_id, idempotency_key), using SERVICE_ORDER_CREATE, Shop and the active Shop ID as the scope values.
+- If another request with the same key is concurrently executing, PostgreSQL's unique-key conflict handling waits for the competing transaction. If that transaction commits, the waiting request reads the now-committed row: compare hashes and either replay the stored result or return idempotency_key_reused. If the competing transaction rolls back, the waiting request may acquire the claim and execute normally.
+- Do not return idempotency_request_in_progress during normal unique-key waiting. Use that response only when a bounded lock/statement wait expires or another transient condition prevents determining the committed result within the request budget; the client may retry with the same key.
+- Persist the canonical response status, JSONB response body and Location value on the idempotency row before commit. The response is replayable only after the business transaction commits successfully. A failed/rolled-back attempt leaves no committed idempotency record.
+
+**Atomic creation transaction**
+
+Use one PostgreSQL transaction and the same scoped EF Core DbContext for the idempotency claim, aggregate creation and all dependent records. Use PostgreSQL READ COMMITTED with explicit row-level locking/conditional writes where required; do not globally raise isolation to SERIALIZABLE. The transaction performs the following logical steps:
+
+1. Validate the active ShopSession and freshly supplied employee credentials/permission. Resolve Shop, Company and employee identity on the server.
+2. Begin the transaction and attempt the idempotency claim. If a committed matching row exists, return its stored response only after the fresh authorization checks; if the hash differs, return the key-reuse conflict.
+3. Validate Customer, Device, Faults and active Company-scoped catalogue references against current persisted state. Evaluate conditional badSector configuration and all line constraints.
+4. Atomically allocate the Shop display number using the Shop counter update described in §7.9.
+5. Persist the ServiceOrder, immutable line snapshots, Fault links, required initial event and optional trimmed employee-attributed Note.
+6. Build the canonical complete response DTO from the persisted transaction state. Persist its HTTP status, JSONB body, canonical Location and completion/expiry timestamps in the idempotency row.
+7. Commit the transaction. Only after successful commit may the API send the response to the client.
+
+Any failure after transaction start rolls back the idempotency claim, counter increment, ServiceOrder, children, event, Note and response snapshot together. The operation must not create or mutate payment, deposit, refund or cash-drawer records.
+
+**Retry and concurrency behavior**
+
+- Bound retries for retryable PostgreSQL deadlock/serialization/transient connection failures. Retry the entire transaction, not an individual statement, using a fresh transaction, fresh reads/locks and the same idempotency key. Re-run authorization and all state-dependent validation on each attempt.
+- Do not retry deterministic validation failures, missing/inactive references, authorization failures, changed-payload key reuse or domain/business conflicts. Return the applicable stable error contract.
+- A genuine persisted-state conflict remaining after the bounded retry budget returns 409 service_order_creation_conflict. A display-number race that can be resolved by the counter lock/retry is handled internally.
+- Concurrent creations with different keys in one Shop serialize only on the Shop counter allocation and receive distinct committed display numbers. Same-key concurrent requests produce at most one ServiceOrder and one committed replay result.
+- The database uniqueness constraint on (shop_id, display_number) is a final defense against implementation defects; a violation must trigger whole-transaction handling and must never be exposed as an ordinary number-allocation race.
 
 
 ### 7.14 Start Work command — idempotency
@@ -516,91 +617,6 @@ Use the shared error envelope: `code`, `message` and optional field-level `error
 - `422 Unprocessable Entity` — description is empty/whitespace-only after trimming or exceeds 5,000 characters.
 
 A rejected or rolled-back request must not persist a diagnosis event, Note or committed idempotency result. The command must not modify Fault references, ServiceOrder lines, Customer, Device, financial records, stock/reservations, lifecycle status or technical outcome.
-
-### 7.11 Create ServiceOrder — HTTP response contract — approved
-
-**Request**
-`POST /api/v1/service-orders`
-
-The request is executed within the authenticated active `ShopSession` and includes the fresh `employeeCode` and `employeePassword` challenge defined in section 7.10. The Shop and Company scope and acting employee are resolved by the server; the client cannot submit or override them.
-
-**Successful response — HTTP 201 Created**
-
-Return the complete canonical ServiceOrder resource as committed by the database. The response must be sufficient for the frontend to render the newly created order and navigate to its detail view without an immediate follow-up GET request.
-
-Include the `Location` header pointing to the newly created ServiceOrder detail resource.
-
-Response JSON shape:
-
-```json
-{
-  "id": "service-order-uuid",
-  "displayNumber": 125,
-  "status": "CREATED",
-  "technicalOutcome": null,
-  "createdAtUtc": "2026-11-23T10:30:00Z",
-  "customer": {
-    "id": "customer-uuid",
-    "name": "John Smith",
-    "phone": "+353..."
-  },
-  "device": {
-    "id": "device-uuid",
-    "brand": "Dell",
-    "model": "Inspiron 15",
-    "serialNumber": "ABC123"
-  },
-  "lines": [
-    {
-      "id": "service-order-line-uuid",
-      "itemType": "PRODUCT",
-      "catalogueItemId": "product-uuid",
-      "name": "SSD 500GB",
-      "description": null,
-      "quantity": 1,
-      "unitPrice": 50.00,
-      "lineTotal": 50.00
-    }
-  ],
-  "faults": [
-    {
-      "id": "fault-uuid",
-      "name": "Hard drive failure"
-    }
-  ],
-  "badSector": null,
-  "totalAmount": 50.00,
-  "balanceDue": 50.00,
-  "notes": [
-    {
-      "id": "note-uuid",
-      "content": "Service order created by John.",
-      "employeeName": "John",
-      "createdAtUtc": "2026-11-23T10:30:00Z"
-    }
-  ]
-}
-```
-
-The example values are illustrative. The response must follow these rules:
-
-- `id`, child identifiers, `displayNumber`, timestamps, status and technical outcome come from the committed server-side state. The globally unique internal ID and Shop-scoped display number are distinct.
-- `customer` and `device` contain the persisted records referenced by the new order, limited to the fields needed by the ServiceOrder detail/booking UI. Do not return or mutate Customer master data beyond this read.
-- `lines` contains every committed Product/Service line, including its persisted identifier, catalogue reference, item type, immutable creation-time name/description snapshots, quantity, unit price and calculated line total. Values must reflect the committed snapshots, not a fresh catalogue lookup.
-- `faults` contains every Fault linked to the committed order, with its identifier and display name.
-- `badSector` is the persisted whole-number value or `null`.
-- `totalAmount` is calculated by the server from the committed lines. `balanceDue` is the initial outstanding amount and therefore equals the order total at creation, because creation does not record or apply any payment or deposit.
-- `notes` contains the initial Note only when one was created under section 7.7/7.9. It is an empty array when no initial Note was supplied. The Note includes the server-resolved employee name snapshot and server timestamp.
-- The initial lifecycle status is `CREATED`; `technicalOutcome` is `null`.
-- The response represents only the committed ServiceOrder and its operational children. It must not include fabricated Payment, DepositReceipt, DepositApplication, refund or cash-drawer records.
-
-The response must never include `employeePassword`, raw credentials, credential hashes, internal authorization data, or server-side security details. Do not echo the request body. Employee identity is exposed only as the approved actor/name snapshot on the initial Note.
-
-The backend must send the response only after the entire creation transaction commits. If any part of creation fails, no partial resource is returned and the transaction must roll back the ServiceOrder, display-number allocation, event and initial Note.
-
-The response is the canonical result of creation. The frontend must use the returned resource as the newly created order state; it must not reconstruct server-generated values or assume that submitted values were persisted unchanged.
-
-
 
 ### 7.1 Pickup HTTP contract — approved
 
