@@ -255,7 +255,7 @@ Every ServiceOrder creation attempt is a protected employee command and requires
 - `EMPLOYEE`, `MANAGER` and `ADMIN` may create ServiceOrders. `ADMIN` inherits the `MANAGER` permission set.
 - The backend must validate the credentials directly, resolve the employee, and verify that the employee is active, belongs to the Company that owns the active ShopSession, and is authorized to create ServiceOrders.
 - The active Shop and Company scope are derived from the authenticated ShopSession, never from client-supplied ownership fields.
-- The server-resolved employee is the actor for the creation event and any initial Note. The client cannot supply or override the actor identity.
+- The server-resolved employee is the actor for the mandatory creation event and creation-history entry, and for the optional manual-note entry. The client cannot supply or override the actor identity.
 - Invalid credentials, inactive or foreign-Company employees, and unauthorized profiles must reject the command without creating a ServiceOrder, display number, event or Note.
 - Never persist, echo or log the raw employee password. Credential fields must be excluded from request snapshots, idempotency payload hashes and application/audit logs.
 
@@ -406,7 +406,7 @@ Example:
 - Never expose raw credentials, password-validation details that facilitate credential guessing, credential hashes, internal exception messages, stack traces, database/provider details, or whether a foreign-Company identifier belongs to another Company.
 - Missing/invalid ShopSession and invalid employee credentials are separate authentication failures, both using `401` with distinct stable codes. A valid employee who lacks permission or Company scope receives `403`.
 - Validation failures and rejected commands must not create a ServiceOrder, consume a display number, append an event or Note, or leave any other creation side effect.
-- All failures after transaction processing begins must roll back every creation side effect, including the ServiceOrder, display-number allocation, event, initial Note and idempotency record.
+- All failures after transaction processing begins must roll back every creation side effect, including the ServiceOrder, display-number allocation, mandatory creation event, mandatory creation-history entry, optional manual-note history entry and idempotency record.
 - The same envelope, stable-code convention and status semantics apply to every HTTP contract in the application. Feature-specific contracts may add operation-specific codes and field errors but must not redefine the common envelope or status meanings without an explicitly approved architectural exception.
 
 
