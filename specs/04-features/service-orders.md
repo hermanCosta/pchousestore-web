@@ -398,6 +398,20 @@ The server generates all identifiers and timestamps. The response represents the
 The state transition, event, Note and idempotency record commit atomically. The error behavior is defined in §7.16.
 
 
+### 7.18 Technical diagnosis — approved behavior
+
+Technical diagnosis is recorded while the ServiceOrder is in `IN_PROGRESS`. It is distinct from the Faults reported at booking and does not overwrite, replace or delete those original Fault references.
+
+- An authorized employee may append multiple free-text diagnosis observations as the technical investigation and repair progress.
+- Diagnosis observations are immutable and append-only. They cannot be edited or deleted. A correction or clarification must be recorded as a new observation.
+- Each diagnosis record is attributed to the server-resolved employee and server-generated UTC timestamp. Do not accept actor identity or timestamp from the client.
+- Each successful diagnosis submission creates an immutable `SERVICE_ORDER_DIAGNOSIS_RECORDED` event and a corresponding append-only `Notes` entry in the same database transaction.
+- Diagnosis uses the existing ServiceOrder event and Notes history. Do not introduce a separate diagnosis entity or parallel diagnosis-history store in v1.
+- Every submission requires a fresh employee code/password challenge. The backend validates employee active status, Company membership and permission using the existing employee-command authorization model.
+- Recording diagnosis does not change lifecycle status or technical outcome. Moving to `AWAITING_PARTS`, `FIXED` or `NOT_FIXED` remains a separate explicit command with its own applicable validation, authorization and audit behavior.
+- A rejected or rolled-back diagnosis submission must not persist an event or Note.
+
+
 ### 7.1 Pickup HTTP contract — approved
 
 **Request**
