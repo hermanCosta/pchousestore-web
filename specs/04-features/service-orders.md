@@ -290,6 +290,20 @@ The response must not expose credentials, password-validation details that facil
 
 
 
+### 7.13 Create ServiceOrder — idempotency
+
+The create endpoint requires an `Idempotency-Key` request header containing a valid UUID for every creation attempt. The key is scoped to the authenticated Shop and the ServiceOrder create operation.
+
+- The backend must persist the idempotency record and the complete creation result atomically with the ServiceOrder, display-number allocation, initial event and optional initial Note.
+- Repeating a committed request with the same key and the same normalized business payload returns the original HTTP status, response body and `Location` header. It must not create another ServiceOrder, allocate another display number, or append duplicate events/Notes.
+- Reusing the same key with a different normalized business payload or a different resource scope returns `409 Conflict` with a stable error code such as `idempotency_key_reused`.
+- A request that fails or rolls back before commit must not leave a committed idempotency record; the same key may be retried after correcting transient conditions.
+- Concurrent requests using the same key must be serialized/guarded so that at most one creation transaction commits. A concurrent retry must return the committed original result when available, or a documented conflict/retryable response while the first request is still processing; it must never create a duplicate.
+- The normalized business-payload hash and stored request snapshot must exclude `employeeCode` and `employeePassword`. Raw credentials must never be persisted, hashed into the idempotency payload, echoed or logged. Each attempt must still perform fresh employee credential validation before returning or executing the command, according to the direct employee-challenge policy.
+- The idempotency key itself must be validated and scoped server-side; the client cannot choose Shop ownership or operation scope.
+
+
+
 ### 7.1 Pickup HTTP contract — approved
 
 **Request**
