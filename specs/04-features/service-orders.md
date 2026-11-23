@@ -198,6 +198,7 @@ Money uses C# decimal and PostgreSQL NUMERIC(19,2) in EUR. Store event timestamp
 | POST /api/v1/service-orders | Create order and initial related records | Fresh employee code/password; EMPLOYEE, MANAGER or ADMIN |
 | PUT /api/v1/service-orders/{serviceOrderId} | Update permitted order/device/line data (never Customer master data) | Fresh employee code/password; EMPLOYEE, MANAGER or ADMIN, subject to edit-state rules |
 | POST /api/v1/service-orders/{serviceOrderId}/status-transitions | Execute an allowed status command | Fresh employee code/password; action-specific profile |
+| POST /api/v1/service-orders/{serviceOrderId}/start-work | Explicitly start work: CREATED → IN_PROGRESS | ShopSession plus fresh employee code/password in the request; EMPLOYEE, MANAGER or ADMIN; `Idempotency-Key` header required |
 | POST /api/v1/service-orders/{serviceOrderId}/notes | Add a technical/operational note | Fresh employee code/password; EMPLOYEE, MANAGER or ADMIN |
 | POST /api/v1/service-orders/{serviceOrderId}/part-requirements | Add/update required Product parts | Fresh employee code/password; EMPLOYEE, MANAGER or ADMIN |
 | POST /api/v1/service-orders/{serviceOrderId}/resume | Explicitly resume from AWAITING_PARTS | Fresh employee code/password; EMPLOYEE, MANAGER or ADMIN |
@@ -361,6 +362,40 @@ A rejected Start Work command must return the shared API error envelope and must
 Use stable, operation-specific error codes, including `service_order_not_found`, `service_order_start_work_conflict`, `idempotency_key_reused` and `start_work_business_rule_violation` where applicable. The response must not expose credentials, stack traces, internal database details or persistence implementation information.
 
 For every rejected or rolled-back attempt, persist no status change, transition event, Note or committed idempotency result. A rolled-back attempt may be retried using the same key.
+
+
+### 7.17 Start Work HTTP contract — approved
+
+**Endpoint**
+`POST /api/v1/service-orders/{serviceOrderId}/start-work`
+
+This dedicated endpoint is the approved route for the explicit `CREATED` → `IN_PROGRESS` transition. Start Work must not be submitted through the generic status-transition endpoint.
+
+**Headers**
+- `Authorization`: authenticated ShopSession, required.
+- `Idempotency-Key`: required UUID, scoped to the active Shop, Start Work operation and target ServiceOrder.
+
+**Request body**
+```json
+{
+  "employeeCode": "EMP001",
+  "employeePassword": "employee-secret"
+}
+```
+
+- Both employee credentials are required on every attempt. The backend resolves the employee and validates active status, Company membership and Start Work permission.
+- The request contains only the employee credential challenge. Do not accept client-supplied status, actor/employee ID, Shop/Company ID, event data, timestamps, Note text or financial/stock fields.
+- Start Work creates its standard Note automatically; there is no free-text Note field in this command.
+- Raw credentials must never be persisted, included in request snapshots/idempotency hashes, returned in responses or logged. A replay still requires fresh credential validation.
+
+**Successful response**
+Return HTTP `200 OK` using the dedicated `ServiceOrderStatusResponse` DTO defined in §7.15. The response must include the committed transition from `CREATED` to `IN_PROGRESS`, server-resolved employee snapshot, immutable event and automatically generated append-only Note. Use event type `SERVICE_ORDER_STARTED` and the standard Note text:
+
+`Work started by {Employee}.`
+
+The server generates all identifiers and timestamps. The response represents the committed transaction; an idempotent replay returns the original successful response without creating another event or Note.
+
+The state transition, event, Note and idempotency record commit atomically. The error behavior is defined in §7.16.
 
 
 ### 7.1 Pickup HTTP contract — approved
