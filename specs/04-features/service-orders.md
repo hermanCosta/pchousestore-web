@@ -390,7 +390,7 @@ Example:
   - Do not disclose whether an out-of-scope/foreign-Company record exists; present it as not found within the caller's authorized scope.
 - `409 Conflict`
   - `idempotency_key_reused`: the key was previously committed for a different normalized business payload or scope.
-  - `idempotency_request_in_progress`: another request using the same key is still being processed and no committed original result is available yet. The client may retry the same request with the same key.
+  - `idempotency_request_in_progress`: a bounded PostgreSQL lock/statement wait or request deadline expires before the server can determine whether the competing same-key transaction committed or rolled back. This is a retryable timeout condition, not the normal response to an ordinary concurrent duplicate; the client may retry with the same key.
   - `service_order_creation_conflict`: a genuine persisted-state or concurrency conflict prevents creation after safe server-side retry/reconciliation.
   - Display-number allocation races must be handled and retried internally where possible; do not expose an ordinary sequence-allocation race as a client conflict.
 - `422 Unprocessable Entity`
@@ -425,7 +425,8 @@ The create endpoint requires an Idempotency-Key request header containing a vali
 
 - Use the shared idempotency_record table. The initial claim is an INSERT performed inside the same uncommitted PostgreSQL transaction as the business operation; do not commit a separate PROCESSING row or create a second transaction for the claim.
 - Enforce uniqueness for the creation scope with the shared unique key on (shop_id, operation_code, resource_type, resource_id, idempotency_key), using SERVICE_ORDER_CREATE, Shop and the active Shop ID as the scope values.
-- If another request with the same key is concurrently executing, PostgreSQL's unique-key conflict handling waits for the competing transaction. If that transaction commits, the waiting request reads the now-committed row: compare hashes and either replay the stored result or return idempotency_key_reused. If the competing transaction rolls back, the waiting request may acquire the claim and execute normally.
+- Acquire the claim with a parameterized `INSERT ... ON CONFLICT (shop_id, operation_code, resource_type, resource_id, idempotency_key) DO NOTHING RETURNING id`. Do not allow an ordinary unique-constraint exception to escape the statement and abort the transaction that must perform the replay lookup.
+- If the INSERT returns an ID, this transaction owns the claim and proceeds. If it returns no row, the unique-key conflict has waited for the competing transaction to resolve. Issue a separate subsequent `SELECT` statement in the same transaction to read the committed idempotency row; under `READ COMMITTED`, this new statement receives a fresh snapshot. Compare hashes and either replay the stored result or return `idempotency_key_reused`. Do not combine the conflict INSERT and lookup into a single snapshot-dependent CTE. If the competing transaction rolled back, the waiting INSERT can acquire the claim and return its new ID.
 - Do not return idempotency_request_in_progress during normal unique-key waiting. Use that response only when a bounded lock/statement wait expires or another transient condition prevents determining the committed result within the request budget; the client may retry with the same key.
 - Persist the canonical response status, JSONB response body and Location value on the idempotency row before commit. The response is replayable only after the business transaction commits successfully. A failed/rolled-back attempt leaves no committed idempotency record.
 
