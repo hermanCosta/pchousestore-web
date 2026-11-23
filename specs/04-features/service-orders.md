@@ -858,6 +858,17 @@ Pickup is the physical customer handover command and is allowed from either tech
 
 ### Editing Product-part requirement quantities — approved (2026-11-23)
 
+### Removing a Product-part requirement — approved (2026-11-23)
+
+An operator may remove a Product-part requirement while its ServiceOrder is in `CREATED`, `IN_PROGRESS` or `AWAITING_PARTS`.
+
+- All active reservations associated with the removed requirement are released atomically with the removal. Releasing a reservation does not change the Product's physical `qty`.
+- Removal is logical, not physical deletion: preserve the requirement, its Product identity/name snapshot, reservation history and related stock events for audit/history. The requirement is marked as removed/inactive and is excluded from current uncovered-demand calculations.
+- Persist the removal, reservation releases, immutable employee-attributed event and append-only `Notes` entry in one transaction. A failed operation must not leave a partially removed requirement or partially released reservations.
+- Requirement removal is prohibited when the ServiceOrder is `FIXED`, `NOT_FIXED`, `PICKED` or `CANCELLED`.
+- Removing a requirement never changes the ServiceOrder lifecycle status automatically. Existing status and stock-settlement rules remain authoritative.
+
+
 An operator may increase or decrease a Product-part requirement quantity while the ServiceOrder is in `CREATED`, `IN_PROGRESS` or `AWAITING_PARTS`. Requirement quantities remain positive whole numbers greater than zero.
 
 - When the required quantity is increased, the system automatically attempts to reserve the additional quantity from currently available Shop stock, following the automatic reservation and concurrency rules above. Any uncovered remainder stays pending.
