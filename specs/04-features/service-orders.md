@@ -689,3 +689,10 @@ Pickup is the physical customer handover command and is allowed from either tech
 - `NOT_FIXED` with active reservations and zero usage: append `All reserved parts released.`
 - `NOT_FIXED` with no active reservations: use only the general Note.
 - The timestamp is structured metadata and need not be repeated in Note text.
+
+
+## Product-part requirements during repair — approved (2026-11-23)
+
+A ServiceOrder may contain multiple Product-part requirements. Each requirement references an existing active Product catalogue item belonging to the same Company and records a required `qty` as a positive whole number greater than zero. Requirements may be added at different times during diagnosis and repair; adding a later requirement does not replace or overwrite previously recorded requirements.
+
+Each requirement preserves an immutable snapshot of the referenced Product identity and name at the time the requirement is recorded. Later catalogue renames or other Product master-data changes must not rewrite the historical requirement snapshot. Product eligibility is validated by the backend when the requirement is recorded; the client cannot override Company ownership or active status.
