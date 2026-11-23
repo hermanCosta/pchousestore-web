@@ -275,21 +275,65 @@ All monetary values use EUR decimal precision defined by FIN-01. The response mu
 
 ### 7.12 Create ServiceOrder — error contract
 
-The create endpoint must use the following HTTP status mapping and a consistent error response body:
-- `400 Bad Request`: malformed request, missing required fields, invalid primitive formats or request-shape validation failures.
-- `401 Unauthorized`: missing or invalid authenticated ShopSession.
-- `403 Forbidden`: the employee credential challenge is valid but the resolved employee is not authorized to create ServiceOrders.
-- `404 Not Found`: a referenced Customer, Device, Fault or catalogue item does not exist within the applicable Company scope. Do not disclose whether a foreign-Company record exists.
-- `409 Conflict`: concurrency or idempotency conflict, display-number allocation conflict, or another conflict with the current persisted resource state.
-- `422 Unprocessable Entity`: structurally valid request rejected by a business rule, including inactive/non-selectable references, invalid catalogue state, conditional `badSector` requirement failure, or invalid Product/Service quantity or combination.
+The create endpoint follows the application-wide HTTP error response standard defined in `specs/02-architecture/backend-guidelines.md`. Use the same envelope and status semantics across all HTTP contracts unless an owning feature SPEC documents a justified exception.
 
-Every error response must include:
-- `code`: stable machine-readable error identifier suitable for client handling.
-- `message`: concise human-readable explanation.
-- `errors`: optional field-level validation details; omit when no field-specific details apply.
+**Error response envelope**
 
-The response must not expose credentials, password-validation details that facilitate credential guessing, internal exception messages, stack traces, database details or whether a foreign-Company identifier belongs to another Company. Validation failures and rejected commands must not create a ServiceOrder, allocate/consume a display number, or append an event or Note. All failures after transaction processing begins must roll back every creation side effect. The same error envelope and status semantics should be reused by the other ServiceOrder commands unless their owning feature contract explicitly defines a justified exception.
+Every error response must contain:
+- `code`: stable machine-readable error identifier.
+- `message`: concise, safe, human-readable explanation.
+- `errors`: optional array of field-level details; omit it when no field-specific details apply. Each item contains `field`, `code` and `message`.
 
+Example:
+
+```json
+{
+  "code": "business_rule_violation",
+  "message": "The ServiceOrder cannot be created.",
+  "errors": [
+    {
+      "field": "badSector",
+      "code": "required",
+      "message": "Bad-sector count is required for the selected service."
+    }
+  ]
+}
+```
+
+**HTTP status mapping and stable error codes**
+
+- `400 Bad Request`
+  - `invalid_request`: malformed JSON/body, missing required fields, invalid primitive formats, invalid request shape, or missing/malformed `Idempotency-Key`.
+  - `validation_failed`: request-boundary validation failure, such as invalid field type or format. Include field-level `errors` when applicable.
+- `401 Unauthorized`
+  - `shop_session_required`: authenticated ShopSession is missing, invalid, expired or revoked.
+  - `invalid_employee_credentials`: employee code/password challenge is invalid or the employee is inactive. Do not distinguish unknown employee codes from incorrect passwords.
+- `403 Forbidden`
+  - `action_not_permitted`: employee credentials are valid, but the employee is not authorized for ServiceOrder creation or does not belong to the Company associated with the active ShopSession.
+- `404 Not Found`
+  - `customer_not_found`: referenced Customer does not exist within the applicable Company scope.
+  - `device_not_found`: explicitly selected Device does not exist within the applicable Company scope.
+  - `fault_not_found`: one or more referenced Faults do not exist within the applicable Company scope.
+  - `catalogue_item_not_found`: one or more referenced Product/Service catalogue items do not exist within the applicable Company scope.
+  - Do not disclose whether an out-of-scope/foreign-Company record exists; present it as not found within the caller's authorized scope.
+- `409 Conflict`
+  - `idempotency_key_reused`: the key was previously committed for a different normalized business payload or scope.
+  - `idempotency_request_in_progress`: another request using the same key is still being processed and no committed original result is available yet. The client may retry the same request with the same key.
+  - `service_order_creation_conflict`: a genuine persisted-state or concurrency conflict prevents creation after safe server-side retry/reconciliation.
+  - Display-number allocation races must be handled and retried internally where possible; do not expose an ordinary sequence-allocation race as a client conflict.
+- `422 Unprocessable Entity`
+  - `business_rule_violation`: structurally valid request rejected by a domain/business rule, including inactive or non-selectable Customer/Device/Fault/catalogue references, conditional `badSector` requirement failure, negative/fractional `badSector`, invalid Product quantity, Service quantity other than one, or invalid Product/Service combination.
+  - Include field-level `errors` whenever the violated rule can be associated with a request field or collection item.
+- `500 Internal Server Error`
+  - `internal_error`: unexpected server failure. Return a generic message and a correlation/trace identifier if the API infrastructure provides one; never expose exception details.
+
+**Security and transaction behavior**
+
+- Never expose raw credentials, password-validation details that facilitate credential guessing, credential hashes, internal exception messages, stack traces, database/provider details, or whether a foreign-Company identifier belongs to another Company.
+- Missing/invalid ShopSession and invalid employee credentials are separate authentication failures, both using `401` with distinct stable codes. A valid employee who lacks permission or Company scope receives `403`.
+- Validation failures and rejected commands must not create a ServiceOrder, consume a display number, append an event or Note, or leave any other creation side effect.
+- All failures after transaction processing begins must roll back every creation side effect, including the ServiceOrder, display-number allocation, event, initial Note and idempotency record.
+- The same envelope, stable-code convention and status semantics apply to every HTTP contract in the application. Feature-specific contracts may add operation-specific codes and field errors but must not redefine the common envelope or status meanings without an explicitly approved architectural exception.
 
 
 ### 7.13 Create ServiceOrder — idempotency
