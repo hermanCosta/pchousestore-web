@@ -301,6 +301,7 @@ The create endpoint requires an `Idempotency-Key` request header containing a va
 - Concurrent requests using the same key must be serialized/guarded so that at most one creation transaction commits. A concurrent retry must return the committed original result when available, or a documented conflict/retryable response while the first request is still processing; it must never create a duplicate.
 - The normalized business-payload hash and stored request snapshot must exclude `employeeCode` and `employeePassword`. Raw credentials must never be persisted, hashed into the idempotency payload, echoed or logged. Each attempt must still perform fresh employee credential validation before returning or executing the command, according to the direct employee-challenge policy.
 - The idempotency key itself must be validated and scoped server-side; the client cannot choose Shop ownership or operation scope.
+- A committed idempotency record is retained for 24 hours from the time the original command completes successfully. Do not expire or purge a key while its command is still processing. After the retention period, the idempotency record may be purged and the same key may be treated as a new attempt; the committed ServiceOrder and its business/audit history remain unaffected. The frontend should generate a new UUID for a genuinely new creation attempt.
 
 
 
