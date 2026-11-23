@@ -862,6 +862,17 @@ Pickup is the physical customer handover command and is allowed from either tech
 
 ### Explicit Product-part consumption during repair — approved (2026-11-23)
 
+#### Multiple partial consumption records per reservation — approved (2026-11-23)
+
+The same active reservation may receive multiple separate consumption records over the course of the repair. Each record represents only the additional quantity consumed in that operation; it does not replace or repeat earlier consumption.
+
+- Example: for a reservation of 5 units, an employee may record 2 units consumed in one operation and 1 unit in a later operation. The remaining active reserved quantity is then 2.
+- Every new consumption command validates against the current remaining active reserved quantity, not the original reservation quantity.
+- Each partial consumption is independently attributed to the acting employee and timestamped, with its own immutable stock movement, ServiceOrder event and append-only `Notes` entry.
+- All effects of each individual consumption command are atomic and concurrency-safe. Competing commands cannot consume more than the remaining active reserved quantity.
+- The cumulative consumed quantity plus the remaining active reserved quantity plus any released quantity must reconcile to the original reserved quantity. Previously consumed quantities are never available for another consumption or release.
+
+
 An employee may explicitly record actual Product-part consumption while the ServiceOrder is in `IN_PROGRESS`. This is a distinct stock operation; creating a requirement or reserving stock does not itself consume physical stock.
 
 - Consumption must reference an active reservation belonging to the same ServiceOrder and Shop. The requested consumed quantity must be a positive whole number and cannot exceed the remaining active reserved quantity.
