@@ -13,7 +13,9 @@
 - Use CancellationToken on asynchronous I/O.
 - Use transactions for multi-aggregate workflows where atomicity is required.
 - Use optimistic concurrency where concurrent updates are possible.
-- Centralize exception handling and return Problem Details.
+- Centralize exception handling and return the application's standard HTTP error envelope: `code`, `message`, and optional field-level `errors`. Keep this envelope consistent across all HTTP feature contracts. It may be implemented using RFC 9457 Problem Details internally or through compatible extensions, but clients must receive the documented stable fields and semantics.
+- Use the standard status semantics: `400` for malformed/invalid request shape; `401` for missing/invalid authentication or credential challenge; `403` for an authenticated/valid actor lacking permission or scope; `404` for a resource not found within the caller's authorized scope; `409` for idempotency/state/concurrency conflicts; `422` for structurally valid requests rejected by business rules; and `500` for unexpected server failures with a generic public message. A feature contract may define a justified, explicitly documented exception.
+- Error codes are stable machine-readable identifiers. Messages are concise and safe for users. Field errors identify the affected field and may include a stable field-level code. Never expose secrets, credential-validation details useful for guessing, stack traces, internal exception text, database/provider details or cross-tenant resource existence.
 - Validate input at API boundary and enforce domain invariants independently.
 - Use structured logging with sensitive-data redaction.
 - Add unit tests for domain/application behavior and integration tests for persistence/API.
