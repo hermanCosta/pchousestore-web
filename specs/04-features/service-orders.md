@@ -322,6 +322,25 @@ This command applies only to `CREATED` → `IN_PROGRESS`. Resuming from `AWAITIN
 
 
 
+### 7.15 Start Work command — response contract
+
+On successful Start Work, return HTTP `200 OK` with a dedicated `ServiceOrderStatusResponse` DTO. Do not serialize or expose EF Core entities directly.
+
+The response body must contain:
+- `id`: globally unique internal ServiceOrder identifier.
+- `displayNumber`: Shop-scoped ServiceOrder display number.
+- `previousStatus`: `CREATED`.
+- `status`: `IN_PROGRESS`.
+- `technicalOutcome`: current technical outcome, initially `null`.
+- `updatedAt`: server-generated timestamp for the committed transition.
+- `updatedBy`: server-resolved employee identifier and display-name snapshot.
+- `event`: the immutable transition event created by this command, including its identifier, event type and timestamp.
+- `note`: the append-only employee-attributed Note created by this command, including its identifier, text and timestamp.
+
+The response must represent the committed transaction and must not contain employee credentials, raw passwords, internal persistence/navigation properties or unrelated financial data. On an idempotent replay, return the original successful status code and response body without creating another transition event or Note.
+
+
+
 ### 7.1 Pickup HTTP contract — approved
 
 **Request**
