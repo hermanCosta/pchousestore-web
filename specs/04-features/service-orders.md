@@ -305,6 +305,23 @@ The create endpoint requires an `Idempotency-Key` request header containing a va
 
 
 
+### 7.14 Start Work command — idempotency
+
+The explicit Start Work command that transitions a ServiceOrder from `CREATED` to `IN_PROGRESS` requires an `Idempotency-Key` request header containing a valid UUID. The key is scoped to the authenticated Shop, the Start Work operation and the target ServiceOrder.
+
+- Every Start Work attempt requires a fresh employee code/password challenge. The backend resolves the employee and validates active status, Company membership and permission before processing the command. Do not cache or reuse employee authentication.
+- Repeating a committed command with the same key and identical normalized request payload returns the original result without repeating the status transition, event or append-only Note.
+- Reusing the same key with a different normalized payload, Shop, operation or ServiceOrder returns `409 Conflict` with a stable idempotency error code.
+- The idempotency record, status transition to `IN_PROGRESS`, immutable transition event and corresponding employee-attributed Note must commit in one database transaction. Any failure rolls back all effects.
+- A rolled-back attempt must not retain a committed idempotency record and may be retried with the same key.
+- Concurrent commands for the same ServiceOrder must be guarded so that only one Start Work transition commits. A duplicate replay with the same key returns the original result; a distinct command that loses the state/concurrency race receives `409 Conflict` and must refresh the ServiceOrder.
+- Exclude employee credentials from the normalized payload hash, stored request snapshot, response and logs. Each retry still performs fresh employee credential validation.
+- Retain a committed idempotency record for 24 hours from successful command completion. Do not expire a key while processing. After expiry, the record may be purged; the ServiceOrder state and audit history remain unchanged.
+
+This command applies only to `CREATED` → `IN_PROGRESS`. Resuming from `AWAITING_PARTS` is a separate explicit Resume command with its own authorization and idempotency contract; part receipt or reservation never starts work automatically.
+
+
+
 ### 7.1 Pickup HTTP contract — approved
 
 **Request**
