@@ -856,6 +856,17 @@ Pickup is the physical customer handover command and is allowed from either tech
 
 ### Automatic reservation on requirement registration — approved (2026-11-23)
 
+### Editing Product-part requirement quantities — approved (2026-11-23)
+
+An operator may increase or decrease a Product-part requirement quantity while the ServiceOrder is in `CREATED`, `IN_PROGRESS` or `AWAITING_PARTS`. Requirement quantities remain positive whole numbers greater than zero.
+
+- When the required quantity is increased, the system automatically attempts to reserve the additional quantity from currently available Shop stock, following the automatic reservation and concurrency rules above. Any uncovered remainder stays pending.
+- When the required quantity is decreased, release the excess active reservation quantity for that requirement so the active reservation never exceeds the updated requirement. Physical Product `qty` is not changed by releasing a reservation.
+- The requested requirement quantity, active reserved quantity and uncovered quantity remain distinct values; changing the requirement does not silently rewrite the original Product identity/name snapshot.
+- Every successful requirement quantity change and resulting reservation release/allocation must be recorded as an immutable, employee-attributed ServiceOrder event and append-only `Notes` entry in the same transaction. Failed operations must not leave partial requirement or reservation changes.
+- Requirement quantity editing is prohibited when the ServiceOrder is `FIXED`, `NOT_FIXED`, `PICKED` or `CANCELLED`. Existing status, payment and stock-settlement rules remain authoritative; editing a requirement never changes lifecycle status automatically.
+
+
 When a Product-part requirement is recorded or its required quantity is increased, the system automatically attempts to reserve available physical stock for that requirement:
 
 - Available-to-reserve quantity is the Product's physical `qty` minus quantities already covered by active reservations across the Shop. Active reservations must never cause the total reserved quantity to exceed physical stock.
