@@ -854,6 +854,20 @@ Pickup is the physical customer handover command and is allowed from either tech
 
 ## Product-part requirements during repair — approved (2026-11-23)
 
+### Automatic reservation on requirement registration — approved (2026-11-23)
+
+When a Product-part requirement is recorded or its required quantity is increased, the system automatically attempts to reserve available physical stock for that requirement:
+
+- Available-to-reserve quantity is the Product's physical `qty` minus quantities already covered by active reservations across the Shop. Active reservations must never cause the total reserved quantity to exceed physical stock.
+- If the full outstanding requirement can be covered, reserve it in full.
+- If only part can be covered, reserve the available quantity and leave the remainder uncovered/pending.
+- If no quantity is available, leave the requirement fully uncovered/pending.
+- The requirement's requested quantity remains unchanged; reservation quantities and uncovered quantities are tracked separately.
+- A reservation does not decrement or otherwise change physical stock `qty`. It only earmarks stock so it cannot be reserved by another operation.
+- Reservation allocation must be atomic and concurrency-safe across competing orders/requirements for the same Product in the Shop. A concurrent attempt must re-evaluate availability against committed active reservations before allocating.
+- Reservation creation or partial allocation does not automatically change the ServiceOrder lifecycle status or start/resume repair work. Existing lifecycle transition rules remain authoritative.
+
+
 A ServiceOrder may contain multiple Product-part requirements. Each requirement references an existing active Product catalogue item belonging to the same Company and records a required `qty` as a positive whole number greater than zero. Requirements may be added at different times during diagnosis and repair; adding a later requirement does not replace or overwrite previously recorded requirements.
 
 Each requirement preserves an immutable snapshot of the referenced Product identity and name at the time the requirement is recorded. Later catalogue renames or other Product master-data changes must not rewrite the historical requirement snapshot. Product eligibility is validated by the backend when the requirement is recorded; the client cannot override Company ownership or active status.
