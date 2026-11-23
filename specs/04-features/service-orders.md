@@ -473,6 +473,90 @@ Use the shared error envelope: `code`, `message` and optional field-level `error
 
 A rejected or rolled-back request must not persist a diagnosis event, Note or committed idempotency result. The command must not modify Fault references, ServiceOrder lines, Customer, Device, financial records, stock/reservations, lifecycle status or technical outcome.
 
+### 7.11 Create ServiceOrder — HTTP response contract — approved
+
+**Request**
+`POST /api/v1/service-orders`
+
+The request is executed within the authenticated active `ShopSession` and includes the fresh `employeeCode` and `employeePassword` challenge defined in section 7.10. The Shop and Company scope and acting employee are resolved by the server; the client cannot submit or override them.
+
+**Successful response — HTTP 201 Created**
+
+Return the complete canonical ServiceOrder resource as committed by the database. The response must be sufficient for the frontend to render the newly created order and navigate to its detail view without an immediate follow-up GET request.
+
+Include the `Location` header pointing to the newly created ServiceOrder detail resource.
+
+Response JSON shape:
+
+```json
+{
+  "id": "service-order-uuid",
+  "displayNumber": 125,
+  "status": "CREATED",
+  "technicalOutcome": null,
+  "createdAtUtc": "2026-11-23T10:30:00Z",
+  "customer": {
+    "id": "customer-uuid",
+    "name": "John Smith",
+    "phone": "+353..."
+  },
+  "device": {
+    "id": "device-uuid",
+    "brand": "Dell",
+    "model": "Inspiron 15",
+    "serialNumber": "ABC123"
+  },
+  "lines": [
+    {
+      "id": "service-order-line-uuid",
+      "itemType": "PRODUCT",
+      "catalogueItemId": "product-uuid",
+      "name": "SSD 500GB",
+      "description": null,
+      "quantity": 1,
+      "unitPrice": 50.00,
+      "lineTotal": 50.00
+    }
+  ],
+  "faults": [
+    {
+      "id": "fault-uuid",
+      "name": "Hard drive failure"
+    }
+  ],
+  "badSector": null,
+  "totalAmount": 50.00,
+  "balanceDue": 50.00,
+  "notes": [
+    {
+      "id": "note-uuid",
+      "content": "Service order created by John.",
+      "employeeName": "John",
+      "createdAtUtc": "2026-11-23T10:30:00Z"
+    }
+  ]
+}
+```
+
+The example values are illustrative. The response must follow these rules:
+
+- `id`, child identifiers, `displayNumber`, timestamps, status and technical outcome come from the committed server-side state. The globally unique internal ID and Shop-scoped display number are distinct.
+- `customer` and `device` contain the persisted records referenced by the new order, limited to the fields needed by the ServiceOrder detail/booking UI. Do not return or mutate Customer master data beyond this read.
+- `lines` contains every committed Product/Service line, including its persisted identifier, catalogue reference, item type, immutable creation-time name/description snapshots, quantity, unit price and calculated line total. Values must reflect the committed snapshots, not a fresh catalogue lookup.
+- `faults` contains every Fault linked to the committed order, with its identifier and display name.
+- `badSector` is the persisted whole-number value or `null`.
+- `totalAmount` is calculated by the server from the committed lines. `balanceDue` is the initial outstanding amount and therefore equals the order total at creation, because creation does not record or apply any payment or deposit.
+- `notes` contains the initial Note only when one was created under section 7.7/7.9. It is an empty array when no initial Note was supplied. The Note includes the server-resolved employee name snapshot and server timestamp.
+- The initial lifecycle status is `CREATED`; `technicalOutcome` is `null`.
+- The response represents only the committed ServiceOrder and its operational children. It must not include fabricated Payment, DepositReceipt, DepositApplication, refund or cash-drawer records.
+
+The response must never include `employeePassword`, raw credentials, credential hashes, internal authorization data, or server-side security details. Do not echo the request body. Employee identity is exposed only as the approved actor/name snapshot on the initial Note.
+
+The backend must send the response only after the entire creation transaction commits. If any part of creation fails, no partial resource is returned and the transaction must roll back the ServiceOrder, display-number allocation, event and initial Note.
+
+The response is the canonical result of creation. The frontend must use the returned resource as the newly created order state; it must not reconstruct server-generated values or assume that submitted values were persisted unchanged.
+
+
 
 ### 7.1 Pickup HTTP contract — approved
 
