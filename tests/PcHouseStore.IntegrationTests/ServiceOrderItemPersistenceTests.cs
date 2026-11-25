@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
 using PcHouseStore.Infrastructure.Persistence;
 using PcHouseStore.Infrastructure.Persistence.Entities;
 
@@ -23,9 +25,12 @@ public sealed class ServiceOrderItemPersistenceTests
         Assert.Equal("numeric(9,6)", item.FindProperty(nameof(ServiceOrderItemRecord.TaxRateSnapshot))!.GetColumnType());
         Assert.Equal("timestamp with time zone", item.FindProperty(nameof(ServiceOrderItemRecord.RemovedAt))!.GetColumnType());
 
-        Assert.Contains(item.GetCheckConstraints(), c => c.Name == "ck_service_order_item_type_quantity");
-        Assert.Contains(item.GetCheckConstraints(), c => c.Name == "ck_service_order_item_amounts");
-        Assert.Contains(item.GetCheckConstraints(), c => c.Name == "ck_service_order_item_tax_rate");
+        var designTimeItem = context.GetService<IDesignTimeModel>().Model
+            .FindEntityType(typeof(ServiceOrderItemRecord));
+        Assert.NotNull(designTimeItem);
+        Assert.Contains(designTimeItem!.GetCheckConstraints(), c => c.Name == "ck_service_order_item_type_quantity");
+        Assert.Contains(designTimeItem.GetCheckConstraints(), c => c.Name == "ck_service_order_item_amounts");
+        Assert.Contains(designTimeItem.GetCheckConstraints(), c => c.Name == "ck_service_order_item_tax_rate");
 
         Assert.Contains(item.GetForeignKeys(), fk =>
             fk.PrincipalEntityType.ClrType == typeof(ServiceOrderRecord) &&
