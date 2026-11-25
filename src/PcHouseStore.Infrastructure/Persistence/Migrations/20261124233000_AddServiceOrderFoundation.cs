@@ -47,6 +47,11 @@ public partial class AddServiceOrderFoundation : Migration
                 table.ForeignKey("FK_service_order_device_device_id_company_id", x => new { x.device_id, x.company_id }, "device", new[] { "id", "company_id" }, onDelete: ReferentialAction.Restrict);
                 table.ForeignKey("FK_service_order_employee_created_by_employee_id_company_id", x => new { x.created_by_employee_id, x.company_id }, "employee", new[] { "id", "company_id" }, onDelete: ReferentialAction.Restrict);
                 table.ForeignKey("FK_service_order_employee_responsible_employee_id_company_id", x => new { x.responsible_employee_id, x.company_id }, "employee", new[] { "id", "company_id" }, onDelete: ReferentialAction.Restrict);
+                table.CheckConstraint("ck_service_order_display_number", "display_number > 0");
+                table.CheckConstraint("ck_service_order_status", "status IN ('CREATED', 'IN_PROGRESS', 'AWAITING_PARTS', 'FIXED', 'NOT_FIXED', 'PICKED', 'CANCELLED')");
+                table.CheckConstraint("ck_service_order_technical_outcome", "technical_outcome IS NULL OR technical_outcome IN ('FIXED', 'NOT_FIXED')");
+                table.CheckConstraint("ck_service_order_amounts_non_negative", "subtotal >= 0 AND discount >= 0 AND tax_total >= 0 AND total >= 0 AND balance_due >= 0");
+                table.CheckConstraint("ck_service_order_bad_sector", "bad_sector IS NULL OR bad_sector >= 0");
             });
 
         migrationBuilder.CreateIndex("IX_service_order_company_id", "service_order", "company_id");
