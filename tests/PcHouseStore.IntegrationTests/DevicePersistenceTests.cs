@@ -64,7 +64,7 @@ public sealed class DevicePersistenceTests
         Assert.Contains(table.UniqueConstraints, constraint =>
             constraint.Name == "ak_device_id_company" &&
             constraint.Columns.SequenceEqual(new[] { "id", "company_id" }));
-        Assert.Contains(table.ForeignKeyConstraints, foreignKey =>
+        Assert.Contains(table.ForeignKeys, foreignKey =>
             foreignKey.Name == "FK_device_company_company_id" &&
             foreignKey.PrincipalTable == "company" &&
             foreignKey.OnDelete == ReferentialAction.Restrict);
