@@ -696,7 +696,7 @@ namespace PcHouseStore.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("CompanyId");
 
-                    b.ToTable("device", null);
+                    b.ToTable("device");
                 });
 
             modelBuilder.Entity("PcHouseStore.Infrastructure.Persistence.Entities.DeviceRecord", b =>
