@@ -6,9 +6,11 @@
     <Compile Include="Persistence/Configurations/CatalogueConfigurations.cs" />
     <Compile Include="Persistence/Configurations/DeviceConfigurations.cs" />
     <Compile Include="Persistence/Configurations/ServiceOrderConfigurations.cs" />
+    <Compile Include="Persistence/Configurations/ServiceOrderItemConfigurations.cs" />
     <Compile Include="Persistence/Entities/AuthenticationEntities.cs" />
     <Compile Include="Persistence/Entities/DeviceEntities.cs" />
     <Compile Include="Persistence/Entities/ServiceOrderEntities.cs" />
+    <Compile Include="Persistence/Entities/ServiceOrderItemEntities.cs" />
     <Compile Include="Persistence/Migrations/20261112005610_AuthenticationFoundationInitial.Designer.cs" />
     <Compile Include="Persistence/Migrations/20261112005610_AuthenticationFoundationInitial.cs" />
     <Compile Include="Persistence/Migrations/20261113004053_EmployeeAdministration.Designer.cs" />
