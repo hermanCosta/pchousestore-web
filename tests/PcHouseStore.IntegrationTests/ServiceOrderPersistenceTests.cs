@@ -24,6 +24,7 @@ public sealed class ServiceOrderPersistenceTests
         Assert.Equal("timestamp with time zone", entity.FindProperty(nameof(ServiceOrderRecord.CreatedAt))!.GetColumnType());
         Assert.Equal("CREATED", entity.FindProperty(nameof(ServiceOrderRecord.Status))!.GetDefaultValue());
         Assert.Equal("EUR", entity.FindProperty(nameof(ServiceOrderRecord.CurrencyCode))!.GetDefaultValue());
+        Assert.Null(entity.FindProperty("Discount"));
         Assert.Null(entity.FindProperty(nameof(ServiceOrderRecord.TechnicalOutcome))!.GetDefaultValue());
         Assert.Null(entity.FindProperty(nameof(ServiceOrderRecord.PickedAt))!.GetDefaultValue());
 
@@ -71,8 +72,14 @@ public sealed class ServiceOrderPersistenceTests
         Assert.NotNull(up);
         up!.Invoke(migration, [builder]);
 
-        var table = Assert.Single(builder.Operations.OfType<CreateTableOperation>());
-        Assert.Equal("service_order", table.Name);
+        var tables = builder.Operations.OfType<CreateTableOperation>().ToArray();
+        var table = Assert.Single(tables, item => item.Name == "service_order");
+        var itemTable = Assert.Single(tables, item => item.Name == "service_order_item");
+        Assert.DoesNotContain(table.Columns, c => c.Name == "discount");
+        Assert.Contains(itemTable.Columns, c => c.Name == "discount" && Equals(c.DefaultValue, 0m));
+        Assert.Contains(itemTable.CheckConstraints, c => c.Name == "ck_service_order_item_amounts");
+        Assert.Contains(itemTable.CheckConstraints, c => c.Name == "ck_service_order_item_type_quantity");
+        Assert.Equal(2, itemTable.ForeignKeys.Count);
         Assert.Contains(table.Columns, c => c.Name == "status" && Equals(c.DefaultValue, "CREATED"));
         Assert.Contains(table.Columns, c => c.Name == "technical_outcome" && c.IsNullable);
         Assert.Contains(table.Columns, c => c.Name == "picked_at" && c.IsNullable);
@@ -109,6 +116,8 @@ public sealed class ServiceOrderPersistenceTests
             "Down", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
         Assert.NotNull(down);
         down!.Invoke(migration, [downBuilder]);
+        Assert.Contains(downBuilder.Operations, operation =>
+            operation is DropTableOperation drop && drop.Name == "service_order_item");
         Assert.Contains(downBuilder.Operations, operation =>
             operation is DropTableOperation drop && drop.Name == "service_order");
     }
