@@ -36,6 +36,11 @@ public partial class AddDeviceFoundation : Migration
                     principalColumn: "id",
                     onDelete: ReferentialAction.Restrict);
             });
+
+        migrationBuilder.CreateIndex(
+            name: "IX_device_company_id",
+            table: "device",
+            column: "company_id");
     }
 
     protected override void Down(MigrationBuilder migrationBuilder)
