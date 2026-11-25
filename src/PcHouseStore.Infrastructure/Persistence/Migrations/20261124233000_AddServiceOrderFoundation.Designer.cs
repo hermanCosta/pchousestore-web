@@ -752,10 +752,6 @@ namespace PcHouseStore.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("device_id");
 
-                    b.Property<decimal>("Discount")
-                        .HasColumnType("numeric(19,2)")
-                        .HasColumnName("discount");
-
                     b.Property<long>("DisplayNumber")
                         .HasColumnType("bigint")
                         .HasColumnName("display_number");
@@ -834,8 +830,98 @@ namespace PcHouseStore.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_service_order_display_number", "display_number > 0");
                             t.HasCheckConstraint("ck_service_order_status", "status IN ('CREATED', 'IN_PROGRESS', 'AWAITING_PARTS', 'FIXED', 'NOT_FIXED', 'PICKED', 'CANCELLED')");
                             t.HasCheckConstraint("ck_service_order_technical_outcome", "technical_outcome IS NULL OR technical_outcome IN ('FIXED', 'NOT_FIXED')");
-                            t.HasCheckConstraint("ck_service_order_amounts_non_negative", "subtotal >= 0 AND discount >= 0 AND tax_total >= 0 AND total >= 0 AND balance_due >= 0");
+                            t.HasCheckConstraint("ck_service_order_amounts_non_negative", "subtotal >= 0 AND tax_total >= 0 AND total >= 0 AND balance_due >= 0");
                             t.HasCheckConstraint("ck_service_order_bad_sector", "bad_sector IS NULL OR bad_sector >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("PcHouseStore.Infrastructure.Persistence.Entities.ServiceOrderItemRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CatalogItemId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("catalog_item_id");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<string>("DescriptionSnapshot")
+                        .HasColumnType("text")
+                        .HasColumnName("description_snapshot");
+
+                    b.Property<decimal>("Discount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("numeric(19,2)")
+                        .HasDefaultValue(0m)
+                        .HasColumnName("discount");
+
+                    b.Property<string>("ItemType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("item_type");
+
+                    b.Property<decimal>("LineTotal")
+                        .HasColumnType("numeric(19,2)")
+                        .HasColumnName("line_total");
+
+                    b.Property<string>("NameSnapshot")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("name_snapshot");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("integer")
+                        .HasColumnName("quantity");
+
+                    b.Property<DateTime?>("RemovedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("removed_at");
+
+                    b.Property<long>("ServiceOrderId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("service_order_id");
+
+                    b.Property<decimal>("TaxAmount")
+                        .HasColumnType("numeric(19,2)")
+                        .HasColumnName("tax_amount");
+
+                    b.Property<string>("TaxCodeSnapshot")
+                        .HasColumnType("text")
+                        .HasColumnName("tax_code_snapshot");
+
+                    b.Property<decimal?>("TaxRateSnapshot")
+                        .HasColumnType("numeric(9,6)")
+                        .HasColumnName("tax_rate_snapshot");
+
+                    b.Property<decimal>("TaxableAmount")
+                        .HasColumnType("numeric(19,2)")
+                        .HasColumnName("taxable_amount");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasColumnType("numeric(19,2)")
+                        .HasColumnName("unit_price");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CatalogItemId", "CompanyId")
+                        .HasDatabaseName("ix_service_order_item_catalog_company");
+
+                    b.HasIndex("ServiceOrderId", "CompanyId")
+                        .HasDatabaseName("ix_service_order_item_order_company");
+
+                    b.ToTable("service_order_item", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_service_order_item_type_quantity", "(item_type = 'PRODUCT' AND quantity > 0) OR (item_type = 'SERVICE' AND quantity = 1)");
+                            t.HasCheckConstraint("ck_service_order_item_amounts", "unit_price >= 0 AND discount >= 0 AND discount <= quantity * unit_price AND taxable_amount >= 0 AND tax_amount >= 0 AND line_total >= 0 AND line_total = quantity * unit_price - discount");
+                            t.HasCheckConstraint("ck_service_order_item_tax_rate", "(tax_code_snapshot IS NULL AND tax_rate_snapshot IS NULL) OR (tax_code_snapshot IS NOT NULL AND tax_rate_snapshot IS NOT NULL AND tax_rate_snapshot >= 0)");
                         });
                 });
 
@@ -1602,6 +1688,23 @@ namespace PcHouseStore.Infrastructure.Persistence.Migrations
                         .HasForeignKey("ResponsibleEmployeeId", "CompanyId")
                         .HasPrincipalKey("Id", "CompanyId")
                         .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("PcHouseStore.Infrastructure.Persistence.Entities.ServiceOrderItemRecord", b =>
+                {
+                    b.HasOne("PcHouseStore.Infrastructure.Persistence.Entities.CatalogItemRecord", null)
+                        .WithMany()
+                        .HasForeignKey("CatalogItemId", "CompanyId")
+                        .HasPrincipalKey("Id", "CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("PcHouseStore.Infrastructure.Persistence.Entities.ServiceOrderRecord", null)
+                        .WithMany()
+                        .HasForeignKey("ServiceOrderId", "CompanyId")
+                        .HasPrincipalKey("Id", "CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("PcHouseStore.Infrastructure.Persistence.Entities.FaultRecord", b =>
