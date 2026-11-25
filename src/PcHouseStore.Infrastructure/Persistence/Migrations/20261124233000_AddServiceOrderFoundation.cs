@@ -40,13 +40,48 @@ public partial class AddServiceOrderFoundation : Migration
             {
                 table.PrimaryKey("PK_service_order", x => x.id);
                 table.UniqueConstraint("ak_service_order_id_company", x => new { x.id, x.company_id });
-                table.ForeignKey("FK_service_order_company_company_id", x => x.company_id, "company", "id", onDelete: ReferentialAction.Restrict);
-                table.ForeignKey("FK_service_order_shop_origin_shop_id_company_id", x => new { x.origin_shop_id, x.company_id }, "shop", new[] { "id", "company_id" }, onDelete: ReferentialAction.Restrict);
-                table.ForeignKey("FK_service_order_shop_shop_id_company_id", x => new { x.shop_id, x.company_id }, "shop", new[] { "id", "company_id" }, onDelete: ReferentialAction.Restrict);
-                table.ForeignKey("FK_service_order_customer_customer_id_company_id", x => new { x.customer_id, x.company_id }, "customer", new[] { "id", "company_id" }, onDelete: ReferentialAction.Restrict);
-                table.ForeignKey("FK_service_order_device_device_id_company_id", x => new { x.device_id, x.company_id }, "device", new[] { "id", "company_id" }, onDelete: ReferentialAction.Restrict);
-                table.ForeignKey("FK_service_order_employee_created_by_employee_id_company_id", x => new { x.created_by_employee_id, x.company_id }, "employee", new[] { "id", "company_id" }, onDelete: ReferentialAction.Restrict);
-                table.ForeignKey("FK_service_order_employee_responsible_employee_id_company_id", x => new { x.responsible_employee_id, x.company_id }, "employee", new[] { "id", "company_id" }, onDelete: ReferentialAction.Restrict);
+                table.ForeignKey(
+                    name: "FK_service_order_company_company_id",
+                    column: x => x.company_id,
+                    principalTable: "company",
+                    principalColumn: "id",
+                    onDelete: ReferentialAction.Restrict);
+                table.ForeignKey(
+                    name: "FK_service_order_shop_origin_shop_id_company_id",
+                    columns: x => new { x.origin_shop_id, x.company_id },
+                    principalTable: "shop",
+                    principalColumns: new[] { "id", "company_id" },
+                    onDelete: ReferentialAction.Restrict);
+                table.ForeignKey(
+                    name: "FK_service_order_shop_shop_id_company_id",
+                    columns: x => new { x.shop_id, x.company_id },
+                    principalTable: "shop",
+                    principalColumns: new[] { "id", "company_id" },
+                    onDelete: ReferentialAction.Restrict);
+                table.ForeignKey(
+                    name: "FK_service_order_customer_customer_id_company_id",
+                    columns: x => new { x.customer_id, x.company_id },
+                    principalTable: "customer",
+                    principalColumns: new[] { "id", "company_id" },
+                    onDelete: ReferentialAction.Restrict);
+                table.ForeignKey(
+                    name: "FK_service_order_device_device_id_company_id",
+                    columns: x => new { x.device_id, x.company_id },
+                    principalTable: "device",
+                    principalColumns: new[] { "id", "company_id" },
+                    onDelete: ReferentialAction.Restrict);
+                table.ForeignKey(
+                    name: "FK_service_order_employee_created_by_employee_id_company_id",
+                    columns: x => new { x.created_by_employee_id, x.company_id },
+                    principalTable: "employee",
+                    principalColumns: new[] { "id", "company_id" },
+                    onDelete: ReferentialAction.Restrict);
+                table.ForeignKey(
+                    name: "FK_service_order_employee_responsible_employee_id_company_id",
+                    columns: x => new { x.responsible_employee_id, x.company_id },
+                    principalTable: "employee",
+                    principalColumns: new[] { "id", "company_id" },
+                    onDelete: ReferentialAction.Restrict);
                 table.CheckConstraint("ck_service_order_display_number", "display_number > 0");
                 table.CheckConstraint("ck_service_order_status", "status IN ('CREATED', 'IN_PROGRESS', 'AWAITING_PARTS', 'FIXED', 'NOT_FIXED', 'PICKED', 'CANCELLED')");
                 table.CheckConstraint("ck_service_order_technical_outcome", "technical_outcome IS NULL OR technical_outcome IN ('FIXED', 'NOT_FIXED')");
