@@ -25,6 +25,7 @@ public sealed class ShopRecord
     public string? Phone { get; set; }
     public string TimeZone { get; set; } = "Europe/Dublin";
     public bool IsActive { get; set; }
+    public long NextServiceOrderDisplayNumber { get; set; } = 1;
 }
 
 public sealed class PersonRecord

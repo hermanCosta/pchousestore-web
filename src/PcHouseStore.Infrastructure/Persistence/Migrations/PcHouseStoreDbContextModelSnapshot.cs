@@ -634,6 +634,11 @@ namespace PcHouseStore.Infrastructure.Persistence.Migrations
                     b.HasAlternateKey("Id", "CompanyId")
                         .HasName("ak_employee_role_id_company");
 
+                    b.HasIndex("EmployeeId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_employee_one_active_profile")
+                        .HasFilter("is_active = TRUE");
+
                     b.HasIndex("AssignedByEmployeeId", "CompanyId");
 
                     b.HasIndex("EmployeeId", "CompanyId");
@@ -641,11 +646,6 @@ namespace PcHouseStore.Infrastructure.Persistence.Migrations
                     b.HasIndex("EmployeeId", "RoleCode")
                         .IsUnique()
                         .HasDatabaseName("uq_employee_role");
-
-                    b.HasIndex("EmployeeId")
-                        .IsUnique()
-                        .HasFilter("is_active = TRUE")
-                        .HasDatabaseName("uq_employee_one_active_profile");
 
                     b.ToTable("employee_role_assignment", null, t =>
                         {
@@ -979,6 +979,12 @@ namespace PcHouseStore.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("name");
 
+                    b.Property<long>("NextServiceOrderDisplayNumber")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(1L)
+                        .HasColumnName("next_service_order_display_number");
+
                     b.Property<string>("Phone")
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)")
@@ -1001,7 +1007,10 @@ namespace PcHouseStore.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("uq_shop_company_code");
 
-                    b.ToTable("shop", (string)null);
+                    b.ToTable("shop", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_shop_next_service_order_display_number", "next_service_order_display_number > 0");
+                        });
                 });
 
             modelBuilder.Entity("PcHouseStore.Infrastructure.Persistence.Entities.ShopSessionRecord", b =>

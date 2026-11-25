@@ -27,7 +27,9 @@ public sealed class ShopRecordConfiguration : IEntityTypeConfiguration<ShopRecor
 {
     public void Configure(EntityTypeBuilder<ShopRecord> builder)
     {
-        builder.ToTable("shop");
+        builder.ToTable("shop", table => table.HasCheckConstraint(
+            "ck_shop_next_service_order_display_number",
+            "next_service_order_display_number > 0"));
         builder.HasKey(x => x.Id);
         builder.HasAlternateKey(x => new { x.Id, x.CompanyId }).HasName("ak_shop_id_company");
         builder.Property(x => x.Id).HasColumnName("id").ValueGeneratedOnAdd();
@@ -38,6 +40,11 @@ public sealed class ShopRecordConfiguration : IEntityTypeConfiguration<ShopRecor
         builder.Property(x => x.Phone).HasColumnName("phone").HasMaxLength(40);
         builder.Property(x => x.TimeZone).HasColumnName("time_zone").HasMaxLength(80).HasDefaultValue("Europe/Dublin").IsRequired();
         builder.Property(x => x.IsActive).HasColumnName("is_active").IsRequired();
+        builder.Property(x => x.NextServiceOrderDisplayNumber)
+            .HasColumnName("next_service_order_display_number")
+            .HasColumnType("bigint")
+            .HasDefaultValue(1L)
+            .IsRequired();
         builder.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique().HasDatabaseName("uq_shop_company_code");
         builder.HasOne<CompanyRecord>().WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Restrict);
     }

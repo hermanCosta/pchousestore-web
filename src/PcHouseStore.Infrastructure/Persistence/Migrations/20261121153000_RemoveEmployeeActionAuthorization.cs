@@ -8,7 +8,6 @@ using PcHouseStore.Infrastructure.Persistence;
 
 namespace PcHouseStore.Infrastructure.Persistence.Migrations;
 
-[DbContext(typeof(PcHouseStoreDbContext))]
 [Migration("20261121153000_RemoveEmployeeActionAuthorization")]
 public partial class RemoveEmployeeActionAuthorization : Migration
 {
