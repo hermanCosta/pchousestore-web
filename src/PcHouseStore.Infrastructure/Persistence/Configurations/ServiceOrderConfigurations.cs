@@ -21,7 +21,7 @@ public sealed class ServiceOrderRecordConfiguration : IEntityTypeConfiguration<S
                 "technical_outcome IS NULL OR technical_outcome IN ('FIXED', 'NOT_FIXED')");
             table.HasCheckConstraint(
                 "ck_service_order_amounts_non_negative",
-                "subtotal >= 0 AND discount >= 0 AND tax_total >= 0 AND total >= 0 AND balance_due >= 0");
+                "subtotal >= 0 AND tax_total >= 0 AND total >= 0 AND balance_due >= 0");
             table.HasCheckConstraint(
                 "ck_service_order_bad_sector",
                 "bad_sector IS NULL OR bad_sector >= 0");
@@ -45,7 +45,6 @@ public sealed class ServiceOrderRecordConfiguration : IEntityTypeConfiguration<S
         builder.Property(x => x.TechnicalOutcome).HasColumnName("technical_outcome").HasMaxLength(16);
         builder.Property(x => x.CurrencyCode).HasColumnName("currency_code").HasColumnType("character(3)").HasDefaultValue("EUR").IsRequired();
         builder.Property(x => x.Subtotal).HasColumnName("subtotal").HasColumnType("numeric(19,2)").IsRequired();
-        builder.Property(x => x.Discount).HasColumnName("discount").HasColumnType("numeric(19,2)").IsRequired();
         builder.Property(x => x.TaxTotal).HasColumnName("tax_total").HasColumnType("numeric(19,2)").IsRequired();
         builder.Property(x => x.Total).HasColumnName("total").HasColumnType("numeric(19,2)").IsRequired();
         builder.Property(x => x.BalanceDue).HasColumnName("balance_due").HasColumnType("numeric(19,2)").IsRequired();
