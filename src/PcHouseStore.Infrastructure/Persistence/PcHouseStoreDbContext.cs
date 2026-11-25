@@ -11,6 +11,7 @@ public sealed class PcHouseStoreDbContext(DbContextOptions<PcHouseStoreDbContext
     public DbSet<PersonRecord> People => Set<PersonRecord>();
     public DbSet<CustomerRecord> Customers => Set<CustomerRecord>();
     public DbSet<DeviceRecord> Devices => Set<DeviceRecord>();
+    public DbSet<ServiceOrderRecord> ServiceOrders => Set<ServiceOrderRecord>();
     public DbSet<ProductCategoryRecord> ProductCategories => Set<ProductCategoryRecord>();
     public DbSet<CatalogItemRecord> CatalogItems => Set<CatalogItemRecord>();
     public DbSet<FaultRecord> Faults => Set<FaultRecord>();
