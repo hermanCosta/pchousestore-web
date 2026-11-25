@@ -706,6 +706,137 @@ namespace PcHouseStore.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("PcHouseStore.Infrastructure.Persistence.Entities.ServiceOrderRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<int?>("BadSector")
+                        .HasColumnType("integer")
+                        .HasColumnName("bad_sector");
+
+                    b.Property<decimal>("BalanceDue")
+                        .HasColumnType("numeric(19,2)")
+                        .HasColumnName("balance_due");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<long>("CreatedByEmployeeId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_employee_id");
+
+                    b.Property<string>("CurrencyCode")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("character(3)")
+                        .HasDefaultValue("EUR")
+                        .HasColumnName("currency_code");
+
+                    b.Property<long>("CustomerId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("customer_id");
+
+                    b.Property<long>("DeviceId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("device_id");
+
+                    b.Property<decimal>("Discount")
+                        .HasColumnType("numeric(19,2)")
+                        .HasColumnName("discount");
+
+                    b.Property<long>("DisplayNumber")
+                        .HasColumnType("bigint")
+                        .HasColumnName("display_number");
+
+                    b.Property<long>("OriginShopId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("origin_shop_id");
+
+                    b.Property<DateTime?>("PickedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("picked_at");
+
+                    b.Property<long?>("RefurbishedUnitWarrantyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("refurbished_unit_warranty_id");
+
+                    b.Property<long?>("ResponsibleEmployeeId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("responsible_employee_id");
+
+                    b.Property<long>("ShopId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("shop_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)")
+                        .HasDefaultValue("CREATED")
+                        .HasColumnName("status");
+
+                    b.Property<decimal>("Subtotal")
+                        .HasColumnType("numeric(19,2)")
+                        .HasColumnName("subtotal");
+
+                    b.Property<decimal>("TaxTotal")
+                        .HasColumnType("numeric(19,2)")
+                        .HasColumnName("tax_total");
+
+                    b.Property<string>("TechnicalOutcome")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("technical_outcome");
+
+                    b.Property<decimal>("Total")
+                        .HasColumnType("numeric(19,2)")
+                        .HasColumnName("total");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("Id", "CompanyId")
+                        .HasName("ak_service_order_id_company");
+
+                    b.HasIndex("CompanyId")
+                        .HasDatabaseName("IX_service_order_company_id");
+
+                    b.HasIndex("CreatedByEmployeeId", "CompanyId");
+
+                    b.HasIndex("CustomerId", "CompanyId");
+
+                    b.HasIndex("DeviceId", "CompanyId");
+
+                    b.HasIndex("OriginShopId", "CompanyId");
+
+                    b.HasIndex("ResponsibleEmployeeId", "CompanyId");
+
+                    b.HasIndex("ShopId", "CompanyId");
+
+                    b.HasIndex("ShopId", "DisplayNumber")
+                        .IsUnique()
+                        .HasDatabaseName("uq_service_order_shop_display_number");
+
+                    b.ToTable("service_order", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_service_order_display_number", "display_number > 0");
+                            t.HasCheckConstraint("ck_service_order_status", "status IN ('CREATED', 'IN_PROGRESS', 'AWAITING_PARTS', 'FIXED', 'NOT_FIXED', 'PICKED', 'CANCELLED')");
+                            t.HasCheckConstraint("ck_service_order_technical_outcome", "technical_outcome IS NULL OR technical_outcome IN ('FIXED', 'NOT_FIXED')");
+                            t.HasCheckConstraint("ck_service_order_amounts_non_negative", "subtotal >= 0 AND discount >= 0 AND tax_total >= 0 AND total >= 0 AND balance_due >= 0");
+                            t.HasCheckConstraint("ck_service_order_bad_sector", "bad_sector IS NULL OR bad_sector >= 0");
+                        });
+                });
+
             modelBuilder.Entity("PcHouseStore.Infrastructure.Persistence.Entities.FaultRecord", b =>
                 {
                     b.Property<long>("Id")
@@ -1419,6 +1550,56 @@ namespace PcHouseStore.Infrastructure.Persistence.Migrations
                         .HasPrincipalKey("Id", "CompanyId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("PcHouseStore.Infrastructure.Persistence.Entities.ServiceOrderRecord", b =>
+                {
+                    b.HasOne("PcHouseStore.Infrastructure.Persistence.Entities.CompanyRecord", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("PcHouseStore.Infrastructure.Persistence.Entities.ShopRecord", null)
+                        .WithMany()
+                        .HasForeignKey("OriginShopId", "CompanyId")
+                        .HasPrincipalKey("Id", "CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("PcHouseStore.Infrastructure.Persistence.Entities.ShopRecord", null)
+                        .WithMany()
+                        .HasForeignKey("ShopId", "CompanyId")
+                        .HasPrincipalKey("Id", "CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("PcHouseStore.Infrastructure.Persistence.Entities.CustomerRecord", null)
+                        .WithMany()
+                        .HasForeignKey("CustomerId", "CompanyId")
+                        .HasPrincipalKey("Id", "CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("PcHouseStore.Infrastructure.Persistence.Entities.DeviceRecord", null)
+                        .WithMany()
+                        .HasForeignKey("DeviceId", "CompanyId")
+                        .HasPrincipalKey("Id", "CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("PcHouseStore.Infrastructure.Persistence.Entities.EmployeeRecord", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedByEmployeeId", "CompanyId")
+                        .HasPrincipalKey("Id", "CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("PcHouseStore.Infrastructure.Persistence.Entities.EmployeeRecord", null)
+                        .WithMany()
+                        .HasForeignKey("ResponsibleEmployeeId", "CompanyId")
+                        .HasPrincipalKey("Id", "CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("PcHouseStore.Infrastructure.Persistence.Entities.FaultRecord", b =>
