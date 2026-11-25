@@ -1,5 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Migrations;
 using PcHouseStore.Infrastructure.Persistence;
 using PcHouseStore.Infrastructure.Persistence.Entities;
@@ -60,7 +59,7 @@ public sealed class DevicePersistenceTests
         var table = Assert.Single(builder.Operations.OfType<CreateTableOperation>());
         Assert.Equal("device", table.Name);
         Assert.Contains(table.Columns, column => column.Name == "is_active" && Equals(column.DefaultValue, true));
-        Assert.Contains(table.Constraints.OfType<AddUniqueConstraintOperation>(), constraint =>
+        Assert.Contains(table.UniqueConstraints, constraint =>
             constraint.Name == "ak_device_id_company" &&
             constraint.Columns.SequenceEqual(["id", "company_id"]));
         Assert.Contains(table.ForeignKeyConstraints, foreignKey =>
@@ -68,7 +67,7 @@ public sealed class DevicePersistenceTests
             foreignKey.PrincipalTable == "company" &&
             foreignKey.OnDelete == ReferentialAction.Restrict);
         Assert.DoesNotContain(table.Columns, column => column.Name == "customer_id");
-        Assert.DoesNotContain(table.Indexes, index =>
+        Assert.DoesNotContain(builder.Operations.OfType<CreateIndexOperation>(), index =>
             index.IsUnique && index.Columns.Contains("serial_number", StringComparer.Ordinal));
 
         var downBuilder = new MigrationBuilder("Npgsql.EntityFrameworkCore.PostgreSQL");
