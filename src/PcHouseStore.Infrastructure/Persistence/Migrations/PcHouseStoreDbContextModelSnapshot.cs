@@ -653,6 +653,59 @@ namespace PcHouseStore.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("PcHouseStore.Infrastructure.Persistence.Entities.DeviceRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Brand")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("brand");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("Model")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("model");
+
+                    b.Property<string>("SerialNumber")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("serial_number");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("Id", "CompanyId")
+                        .HasName("ak_device_id_company");
+
+                    b.HasIndex("CompanyId");
+
+                    b.ToTable("device", null);
+                });
+
+            modelBuilder.Entity("PcHouseStore.Infrastructure.Persistence.Entities.DeviceRecord", b =>
+                {
+                    b.HasOne("PcHouseStore.Infrastructure.Persistence.Entities.CompanyRecord", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("PcHouseStore.Infrastructure.Persistence.Entities.FaultRecord", b =>
                 {
                     b.Property<long>("Id")
