@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.EntityFrameworkCore.Metadata;
 using PcHouseStore.Infrastructure.Persistence;
 using PcHouseStore.Infrastructure.Persistence.Entities;
 using PcHouseStore.Infrastructure.Persistence.Migrations;
@@ -67,6 +68,10 @@ public sealed class DevicePersistenceTests
             foreignKey.PrincipalTable == "company" &&
             foreignKey.OnDelete == ReferentialAction.Restrict);
         Assert.DoesNotContain(table.Columns, column => column.Name == "customer_id");
+        Assert.Contains(builder.Operations.OfType<CreateIndexOperation>(), index =>
+            index.Name == "IX_device_company_id" &&
+            index.Columns.SequenceEqual(["company_id"]) &&
+            !index.IsUnique);
         Assert.DoesNotContain(builder.Operations.OfType<CreateIndexOperation>(), index =>
             index.IsUnique && index.Columns.Contains("serial_number", StringComparer.Ordinal));
 
