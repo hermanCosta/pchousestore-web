@@ -17,7 +17,6 @@ public sealed class ServiceOrderRecord
     public string? TechnicalOutcome { get; set; }
     public string CurrencyCode { get; set; } = "EUR";
     public decimal Subtotal { get; set; }
-    public decimal Discount { get; set; }
     public decimal TaxTotal { get; set; }
     public decimal Total { get; set; }
     public decimal BalanceDue { get; set; }
