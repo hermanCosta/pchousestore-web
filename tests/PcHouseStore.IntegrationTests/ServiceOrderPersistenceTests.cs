@@ -77,6 +77,10 @@ public sealed class ServiceOrderPersistenceTests
         Assert.Contains(table.Columns, c => c.Name == "technical_outcome" && c.IsNullable);
         Assert.Contains(table.Columns, c => c.Name == "picked_at" && c.IsNullable);
         Assert.Contains(table.Columns, c => c.Name == "bad_sector" && c.IsNullable);
+        Assert.Contains(table.CheckConstraints, c => c.Name == "ck_service_order_status");
+        Assert.Contains(table.CheckConstraints, c => c.Name == "ck_service_order_technical_outcome");
+        Assert.Contains(table.CheckConstraints, c => c.Name == "ck_service_order_amounts_non_negative");
+        Assert.Contains(table.CheckConstraints, c => c.Name == "ck_service_order_bad_sector");
         Assert.Contains(table.UniqueConstraints, c =>
             c.Name == "ak_service_order_id_company" &&
             c.Columns.SequenceEqual(new[] { "id", "company_id" }));
