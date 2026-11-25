@@ -31,12 +31,12 @@ public sealed class DevicePersistenceTests
 
         var alternateKey = Assert.Single(entity.GetKeys(), key =>
             key.Properties.Select(property => property.Name)
-                .SequenceEqual([nameof(DeviceRecord.Id), nameof(DeviceRecord.CompanyId)]));
+                .SequenceEqual(new[] { nameof(DeviceRecord.Id), nameof(DeviceRecord.CompanyId) }));
         Assert.Equal("ak_device_id_company", alternateKey.GetName());
 
         var companyForeignKey = Assert.Single(entity.GetForeignKeys(), foreignKey =>
             foreignKey.PrincipalEntityType.ClrType == typeof(CompanyRecord));
-        Assert.Equal([nameof(DeviceRecord.CompanyId)],
+        Assert.Equal(new[] { nameof(DeviceRecord.CompanyId) },
             companyForeignKey.Properties.Select(property => property.Name));
         Assert.Equal(DeleteBehavior.Restrict, companyForeignKey.DeleteBehavior);
 
@@ -62,7 +62,7 @@ public sealed class DevicePersistenceTests
         Assert.Contains(table.Columns, column => column.Name == "is_active" && Equals(column.DefaultValue, true));
         Assert.Contains(table.UniqueConstraints, constraint =>
             constraint.Name == "ak_device_id_company" &&
-            constraint.Columns.SequenceEqual(["id", "company_id"]));
+            constraint.Columns.SequenceEqual(new[] { "id", "company_id" }));
         Assert.Contains(table.ForeignKeyConstraints, foreignKey =>
             foreignKey.Name == "FK_device_company_company_id" &&
             foreignKey.PrincipalTable == "company" &&
@@ -70,7 +70,7 @@ public sealed class DevicePersistenceTests
         Assert.DoesNotContain(table.Columns, column => column.Name == "customer_id");
         Assert.Contains(builder.Operations.OfType<CreateIndexOperation>(), index =>
             index.Name == "IX_device_company_id" &&
-            index.Columns.SequenceEqual(["company_id"]) &&
+            index.Columns.SequenceEqual(new[] { "company_id" }) &&
             !index.IsUnique);
         Assert.DoesNotContain(builder.Operations.OfType<CreateIndexOperation>(), index =>
             index.IsUnique && index.Columns.Contains("serial_number", StringComparer.Ordinal));
