@@ -21,6 +21,7 @@
     <Compile Include="Persistence/Migrations/20261121153000_RemoveEmployeeActionAuthorization.cs" />
     <Compile Include="Persistence/Migrations/20261124212526_AddShopServiceOrderDisplayCounter.Designer.cs" />
     <Compile Include="Persistence/Migrations/20261124212526_AddShopServiceOrderDisplayCounter.cs" />
+    <Compile Include="Persistence/Migrations/20261124223000_AddDeviceFoundation.Designer.cs" />
     <Compile Include="Persistence/Migrations/20261124223000_AddDeviceFoundation.cs" />
     <Compile Include="Persistence/Migrations/PcHouseStoreDbContextModelSnapshot.cs" />
     <Compile Include="Persistence/PcHouseStoreDbContext.cs" />
