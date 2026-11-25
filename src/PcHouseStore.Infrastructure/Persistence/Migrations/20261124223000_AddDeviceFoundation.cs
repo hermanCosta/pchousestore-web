@@ -1,14 +1,10 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
-using PcHouseStore.Infrastructure.Persistence;
 
 #nullable disable
 
 namespace PcHouseStore.Infrastructure.Persistence.Migrations;
 
-[DbContext(typeof(PcHouseStoreDbContext))]
-[Migration("20261124223000_AddDeviceFoundation")]
 public partial class AddDeviceFoundation : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)
