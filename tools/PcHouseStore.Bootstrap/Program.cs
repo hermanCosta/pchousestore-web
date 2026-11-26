@@ -23,7 +23,7 @@ var initialPassword = operation == "ProvisionShopCredential"
 if (operation == "BootstrapDevelopment")
 {
     var allowDevelopmentBootstrap = configuration.GetValue<bool>("DevelopmentBootstrap:Allow");
-    var databaseConnection = new Npgsql.NpgsqlConnectionStringBuilder(connectionString);
+    var databaseConnection = new Npgsql.NpgsqlConnectionStringBuilder(connectionString ?? string.Empty);
     var companyName = configuration["DevelopmentBootstrap:CompanyName"]?.Trim();
     var companyAddress = configuration["DevelopmentBootstrap:CompanyAddress"]?.Trim();
     var companyContact = configuration["DevelopmentBootstrap:CompanyContact"]?.Trim();
