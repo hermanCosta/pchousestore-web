@@ -114,14 +114,142 @@ select:focus-visible {
 .app-header {
   position: relative;
   z-index: 10;
+  display: grid;
+  background: #244c78;
+  color: #fff;
+}
+
+.app-header-main {
   display: flex;
-  align-items: stretch;
-  justify-content: space-between;
-  background: var(--app-navigation-bg);
+  min-height: 6.25rem;
+  align-items: center;
+  gap: clamp(1rem, 3vw, 3rem);
+  padding: 0.7rem clamp(1rem, 4vw, 3.5rem);
 }
 
 .app-header .auth-brand {
+  flex: 0 0 auto;
+  min-height: 4.5rem;
+  padding: 0.5rem 0;
+  background: transparent;
+  font-size: clamp(1rem, 1.7vw, 1.45rem);
+  white-space: nowrap;
+}
+
+.global-search {
+  position: relative;
+  display: flex;
   flex: 1;
+  max-width: 54rem;
+  min-width: 8rem;
+  margin: 0 auto;
+}
+
+.global-search input {
+  width: 100%;
+  min-height: 3.25rem;
+  padding: 0.7rem 4rem 0.7rem 1.25rem;
+  border: 0;
+  border-radius: 2rem;
+  background: #fff;
+  color: #244c78;
+  font-size: 1rem;
+}
+
+.global-search input:disabled {
+  cursor: not-allowed;
+  opacity: 1;
+}
+
+.global-search input::placeholder { color: #527aa7; }
+
+.global-search > span:last-child {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: grid;
+  width: 3.5rem;
+  height: 3.25rem;
+  place-items: center;
+  border-radius: 0 2rem 2rem 0;
+  background: #3978b8;
+  color: white;
+  font-size: 1.75rem;
+}
+
+.account-action {
+  display: inline-flex;
+  min-height: 2.8rem;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.35rem 0.65rem;
+  border: 1px solid rgb(255 255 255 / 38%);
+  border-radius: 2rem;
+  background: transparent;
+  color: white;
+  white-space: nowrap;
+}
+
+.account-action:hover { background: rgb(255 255 255 / 12%); }
+
+.account-avatar {
+  display: grid;
+  width: 1.8rem;
+  height: 1.8rem;
+  place-items: center;
+  border-radius: 50%;
+  background: white;
+  color: #244c78;
+  font-size: 1.2rem;
+}
+
+.primary-nav {
+  display: flex;
+  min-height: 3.2rem;
+  align-items: stretch;
+  justify-content: center;
+  gap: clamp(0.25rem, 2.3vw, 2.4rem);
+  overflow-x: auto;
+  padding: 0 clamp(0.5rem, 3vw, 2rem);
+  border-top: 1px solid rgb(255 255 255 / 10%);
+  background: #244c78;
+  scrollbar-width: thin;
+}
+
+.primary-nav-item {
+  position: relative;
+  min-height: 3.2rem;
+  flex: 0 0 auto;
+  padding: 0.55rem 0.5rem;
+  border-radius: 0;
+  background: transparent;
+  color: rgb(255 255 255 / 88%);
+  font-size: 0.95rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+.primary-nav-item:hover,
+.primary-nav-item.active { background: transparent; color: white; }
+
+.primary-nav-item.active::after {
+  position: absolute;
+  right: 0.5rem;
+  bottom: 0;
+  left: 0.5rem;
+  height: 3px;
+  background: #54b7ec;
+  content: "";
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
 }
 .admin-menu {
   position: relative;
@@ -731,6 +859,14 @@ button:disabled {
 }
 .dialog-actions .secondary:hover {
   background: var(--pc-surface-50);
+}
+
+@media (max-width: 720px) {
+  .app-header-main { flex-wrap: wrap; gap: 0.6rem 1rem; padding: 0.65rem 1rem; }
+  .app-header .auth-brand { flex: 1 1 auto; }
+  .global-search { order: 3; flex: 1 1 100%; max-width: none; }
+  .account-action { padding: 0.3rem 0.45rem; font-size: 0.82rem; }
+  .primary-nav { justify-content: flex-start; }
 }
 
 @media (max-width: 480px) {
