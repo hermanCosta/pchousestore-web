@@ -323,92 +323,117 @@ export default function App() {
           <div className="app-header-main">
             <Brand />
             {shop && (
-              <>
-                <span className="header-shop-name" title={shop.shopName}>
-                  {shop.shopName}
-                </span>
-                <div className="admin-menu">
-                  <button
-                    className="admin-menu-trigger"
-                    aria-label="Open administration menu"
-                    aria-expanded={menuOpen}
-                    onClick={() => setMenuOpen((value) => !value)}
-                  >
-                    <span />
-                    <span />
-                    <span />
-                  </button>
-                  {menuOpen && (
-                    <nav className="admin-menu-panel" aria-label="Administration">
-                      <p>SHOP</p>
-                      <button
-                        className="admin-menu-item"
-                        aria-current={activePage === "shop-profile" ? "page" : undefined}
-                        onClick={() => navigateAdmin("shop-profile")}
-                      >
-                        Shop profile
-                      </button>
-                      <button
-                        className="admin-menu-item"
-                        aria-current={activePage === "shop-access-credential" ? "page" : undefined}
-                        onClick={() => navigateAdmin("shop-access-credential")}
-                      >
-                        Shop access credential
-                      </button>
-                      <p>EMPLOYEE SETTINGS</p>
-                      <button
-                        className="admin-menu-item"
-                        aria-current={activePage === "employee-password-change" ? "page" : undefined}
-                        onClick={() => navigateAdmin("employee-password-change")}
-                      >
-                        Change my password
-                      </button>
-                      <button
-                        className="admin-menu-item"
-                        aria-current={activePage === "employee-directory-search" ? "page" : undefined}
-                        onClick={() => navigateAdmin("employee-directory-search")}
-                      >
-                        Load employees
-                      </button>
-                      <button
-                        className="admin-menu-item"
-                        aria-current={activePage === "create-employee" ? "page" : undefined}
-                        onClick={() => navigateAdmin("create-employee")}
-                      >
-                        Create employee
-                      </button>
-                      <button
-                        className="admin-menu-item"
-                        aria-current={activePage === "employee-directory" ? "page" : undefined}
-                        onClick={() => navigateAdmin("employee-directory")}
-                      >
-                        Employee directory
-                      </button>
-                      <p>SESSION</p>
-                      <button
-                        className="admin-menu-item"
-                        disabled={signingOut}
-                        onClick={() => {
-                          setMenuOpen(false);
-                          void handleSignOut();
-                        }}
-                      >
-                        {signingOut ? "Signing out…" : "Sign out"}
-                      </button>
-                    </nav>
-                  )}
-                </div>
-              </>
+              <span className="header-shop-name" title={shop.shopName}>
+                {shop.shopName}
+              </span>
+            )}
+            {shop && (
+              <div className="admin-menu">
+                <button
+                  className="admin-menu-trigger"
+                  aria-label="Open administration menu"
+                  aria-expanded={menuOpen}
+                  onClick={() => setMenuOpen((value) => !value)}
+                >
+                  <span />
+                  <span />
+                  <span />
+                </button>
+                {menuOpen && (
+                  <nav className="admin-menu-panel" aria-label="Administration">
+                    <p>SHOP</p>
+                    <button
+                      className="admin-menu-item"
+                      aria-current={activePage === "shop-profile" ? "page" : undefined}
+                      onClick={() => navigateAdmin("shop-profile")}
+                    >
+                      Shop profile
+                    </button>
+                    <button
+                      className="admin-menu-item"
+                      aria-current={activePage === "shop-access-credential" ? "page" : undefined}
+                      onClick={() => navigateAdmin("shop-access-credential")}
+                    >
+                      Shop access credential
+                    </button>
+                    <p>EMPLOYEE SETTINGS</p>
+                    <button
+                      className="admin-menu-item"
+                      aria-current={activePage === "employee-password-change" ? "page" : undefined}
+                      onClick={() => navigateAdmin("employee-password-change")}
+                    >
+                      Change my password
+                    </button>
+                    <button
+                      className="admin-menu-item"
+                      aria-current={activePage === "employee-directory-search" ? "page" : undefined}
+                      onClick={() => navigateAdmin("employee-directory-search")}
+                    >
+                      Load employees
+                    </button>
+                    <button
+                      className="admin-menu-item"
+                      aria-current={activePage === "create-employee" ? "page" : undefined}
+                      onClick={() => navigateAdmin("create-employee")}
+                    >
+                      Create employee
+                    </button>
+                    <button
+                      className="admin-menu-item"
+                      aria-current={activePage === "employee-directory" ? "page" : undefined}
+                      onClick={() => navigateAdmin("employee-directory")}
+                    >
+                      Employee directory
+                    </button>
+                    <p>SESSION</p>
+                    <button
+                      className="admin-menu-item"
+                      disabled={signingOut}
+                      onClick={() => {
+                        setMenuOpen(false);
+                        void handleSignOut();
+                      }}
+                    >
+                      {signingOut ? "Signing out…" : "Sign out"}
+                    </button>
+                  </nav>
+                )}
+              </div>
             )}
           </div>
           {shop && (
             <nav className="primary-nav" aria-label="Main navigation">
-            <button className={activePage === "customer-directory" ? "primary-nav-item active" : "primary-nav-item"} aria-current={activePage === "customer-directory" ? "page" : undefined} onClick={() => navigateAdmin("customer-directory")}>Customers</button>
-            <button className={activePage === "catalog-items" ? "primary-nav-item active" : "primary-nav-item"} aria-current={activePage === "catalog-items" ? "page" : undefined} onClick={() => navigateAdmin("catalog-items")}>Products &amp; Services</button>
-            <button className={activePage === "product-categories" ? "primary-nav-item active" : "primary-nav-item"} aria-current={activePage === "product-categories" ? "page" : undefined} onClick={() => navigateAdmin("product-categories")}>Categories</button>
-            <button className={activePage === "fault-catalogue" ? "primary-nav-item active" : "primary-nav-item"} aria-current={activePage === "fault-catalogue" ? "page" : undefined} onClick={() => navigateAdmin("fault-catalogue")}>Fault catalogue</button>
-          </nav>
-        )}
+              <button
+                className={activePage === "customer-directory" ? "primary-nav-item active" : "primary-nav-item"}
+                aria-current={activePage === "customer-directory" ? "page" : undefined}
+                onClick={() => navigateAdmin("customer-directory")}
+              >
+                Customers
+              </button>
+              <button
+                className={activePage === "catalog-items" ? "primary-nav-item active" : "primary-nav-item"}
+                aria-current={activePage === "catalog-items" ? "page" : undefined}
+                onClick={() => navigateAdmin("catalog-items")}
+              >
+                Products &amp; Services
+              </button>
+              <button
+                className={activePage === "product-categories" ? "primary-nav-item active" : "primary-nav-item"}
+                aria-current={activePage === "product-categories" ? "page" : undefined}
+                onClick={() => navigateAdmin("product-categories")}
+              >
+                Categories
+              </button>
+              <button
+                className={activePage === "fault-catalogue" ? "primary-nav-item active" : "primary-nav-item"}
+                aria-current={activePage === "fault-catalogue" ? "page" : undefined}
+                onClick={() => navigateAdmin("fault-catalogue")}
+              >
+                Fault catalogue
+              </button>
+            </nav>
+          )}
+        </div>
         <div className="auth-content">
           <h1>{shop ? adminPageTitles[activePage] : "Shop access"}</h1>
           <p className="auth-description">
