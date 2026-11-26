@@ -285,14 +285,6 @@ export default function App() {
       <main className="auth-shell">
         <section className="auth-card" aria-live="polite">
           <Brand />
-          {shop && (
-          <nav className="primary-nav" aria-label="Main navigation">
-            <button className={activePage === "customer-directory" ? "primary-nav-item active" : "primary-nav-item"} aria-current={activePage === "customer-directory" ? "page" : undefined} onClick={() => navigateAdmin("customer-directory")}>Customers</button>
-            <button className={activePage === "catalog-items" ? "primary-nav-item active" : "primary-nav-item"} aria-current={activePage === "catalog-items" ? "page" : undefined} onClick={() => navigateAdmin("catalog-items")}>Products &amp; Services</button>
-            <button className={activePage === "product-categories" ? "primary-nav-item active" : "primary-nav-item"} aria-current={activePage === "product-categories" ? "page" : undefined} onClick={() => navigateAdmin("product-categories")}>Categories</button>
-            <button className={activePage === "fault-catalogue" ? "primary-nav-item active" : "primary-nav-item"} aria-current={activePage === "fault-catalogue" ? "page" : undefined} onClick={() => navigateAdmin("fault-catalogue")}>Fault catalogue</button>
-          </nav>
-        )}
         <div className="auth-content">
             <h1>
               {isSilentCallback
@@ -421,11 +413,18 @@ export default function App() {
                     Employee directory
                   </button>
                 </nav>
-                </nav>
               )}
             </div>
           )}
         </div>
+        {shop && (
+          <nav className="primary-nav" aria-label="Main navigation">
+            <button className={activePage === "customer-directory" ? "primary-nav-item active" : "primary-nav-item"} aria-current={activePage === "customer-directory" ? "page" : undefined} onClick={() => navigateAdmin("customer-directory")}>Customers</button>
+            <button className={activePage === "catalog-items" ? "primary-nav-item active" : "primary-nav-item"} aria-current={activePage === "catalog-items" ? "page" : undefined} onClick={() => navigateAdmin("catalog-items")}>Products &amp; Services</button>
+            <button className={activePage === "product-categories" ? "primary-nav-item active" : "primary-nav-item"} aria-current={activePage === "product-categories" ? "page" : undefined} onClick={() => navigateAdmin("product-categories")}>Categories</button>
+            <button className={activePage === "fault-catalogue" ? "primary-nav-item active" : "primary-nav-item"} aria-current={activePage === "fault-catalogue" ? "page" : undefined} onClick={() => navigateAdmin("fault-catalogue")}>Fault catalogue</button>
+          </nav>
+        )}
         <div className="auth-content">
           <h1>{shop ? adminPageTitles[activePage] : "Shop access"}</h1>
           <p className="auth-description">
