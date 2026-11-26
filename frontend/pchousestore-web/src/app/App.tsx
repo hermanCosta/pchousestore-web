@@ -327,11 +327,6 @@ export default function App() {
                 <span className="header-shop-name" title={shop.shopName}>
                   {shop.shopName}
                 </span>
-                <label className="global-search">
-                  <span className="visually-hidden">Search modules</span>
-                  <input type="search" placeholder="Search..." disabled />
-                  <span aria-hidden="true">⌕</span>
-                </label>
                 <div className="admin-menu">
               <button
                 className="admin-menu-trigger"
