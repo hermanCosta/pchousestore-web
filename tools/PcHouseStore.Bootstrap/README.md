@@ -17,11 +17,12 @@ Run from the repository root. These values exist only in the current terminal se
 ```bash
 export ConnectionStrings__PcHouseStore="Host=localhost;Port=5432;Database=pchousestore_dev;Username=YOUR_POSTGRES_USER"
 
+export EmployeeBootstrap__Operation="BootstrapDevelopment"
 export DevelopmentBootstrap__Allow=true
 export DevelopmentBootstrap__CompanyName="PcHouseStore"
 export DevelopmentBootstrap__CompanyAddress="Company address"
 export DevelopmentBootstrap__CompanyContact="Company phone"
-export DevelopmentBootstrap__CompanyCountryCode="IE"
+export DevelopmentBootstrap__CountryCode="IE"
 export DevelopmentBootstrap__CurrencyCode="EUR"
 export DevelopmentBootstrap__TimeZone="Europe/Dublin"
 
@@ -61,6 +62,7 @@ The ADMIN employee is created with `MustChangePasswordAtNextUse = true`. Sign in
 After a successful run, remove the bootstrap values from the shell session:
 
 ```bash
+unset EmployeeBootstrap__Operation
 unset DevelopmentBootstrap__Allow DevelopmentBootstrap__CompanyName DevelopmentBootstrap__CompanyAddress DevelopmentBootstrap__CompanyContact DevelopmentBootstrap__CompanyCountryCode DevelopmentBootstrap__CurrencyCode DevelopmentBootstrap__TimeZone
 unset ShopCredentialProvisioning__Code ShopCredentialProvisioning__Name ShopCredentialProvisioning__Address ShopCredentialProvisioning__Phone ShopCredentialProvisioning__InitialPassword
 unset EmployeeBootstrap__EmployeeCode EmployeeBootstrap__FirstName EmployeeBootstrap__LastName EmployeeBootstrap__Phone EmployeeBootstrap__Email EmployeeBootstrap__InitialPassword
