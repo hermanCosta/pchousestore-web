@@ -324,20 +324,15 @@ export default function App() {
             <Brand />
             {shop && (
               <>
+                <span className="header-shop-name" title={shop.shopName}>
+                  {shop.shopName}
+                </span>
                 <label className="global-search">
                   <span className="visually-hidden">Search modules</span>
-                  <input type="search" placeholder="Search modules..." disabled />
+                  <input type="search" placeholder="Search..." disabled />
                   <span aria-hidden="true">⌕</span>
                 </label>
-                <button className="account-action" onClick={() => void handleSignOut()} disabled={signingOut} aria-label="Sign out" title="Sign out">
-                  <span className="account-avatar" aria-hidden="true">●</span>
-                  <span>{signingOut ? "Signing out…" : "Sign out"}</span>
-                </button>
-              </>
-            )}
-          </div>
-          {shop && (
-            <div className="admin-menu">
+                <div className="admin-menu">
               <button
                 className="admin-menu-trigger"
                 aria-label="Open administration menu"
@@ -412,11 +407,23 @@ export default function App() {
                   >
                     Employee directory
                   </button>
+                  <p>SESSION</p>
+                  <button
+                    className="admin-menu-item"
+                    disabled={signingOut}
+                    onClick={() => {
+                      setMenuOpen(false);
+                      void handleSignOut();
+                    }}
+                  >
+                    {signingOut ? "Signing out…" : "Sign out"}
+                  </button>
                 </nav>
               )}
             </div>
-          )}
-        </div>
+              </>
+            )}
+          </div>
         {shop && (
           <nav className="primary-nav" aria-label="Main navigation">
             <button className={activePage === "customer-directory" ? "primary-nav-item active" : "primary-nav-item"} aria-current={activePage === "customer-directory" ? "page" : undefined} onClick={() => navigateAdmin("customer-directory")}>Customers</button>
