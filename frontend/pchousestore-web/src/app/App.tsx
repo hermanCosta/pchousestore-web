@@ -400,6 +400,8 @@ export default function App() {
                 </div>
               </>
             )}
+
+        </div>
           </div>
           {shop && (
             <nav className="primary-nav" aria-label="Main navigation">
