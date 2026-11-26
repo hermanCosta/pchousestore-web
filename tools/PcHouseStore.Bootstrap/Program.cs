@@ -19,6 +19,178 @@ var phone = configuration[$"{prefix}:Phone"]?.Trim();
 var initialPassword = operation == "ProvisionShopCredential"
     ? configuration[$"{shopPrefix}:InitialPassword"]
     : configuration[$"{prefix}:InitialPassword"];
+
+if (operation == "BootstrapDevelopment")
+{
+    var allowDevelopmentBootstrap = configuration.GetValue<bool>("DevelopmentBootstrap:Allow");
+    var databaseConnection = new Npgsql.NpgsqlConnectionStringBuilder(connectionString);
+    var companyName = configuration["DevelopmentBootstrap:CompanyName"]?.Trim();
+    var companyAddress = configuration["DevelopmentBootstrap:CompanyAddress"]?.Trim();
+    var companyContact = configuration["DevelopmentBootstrap:CompanyContact"]?.Trim();
+    var companyEmail = configuration["DevelopmentBootstrap:CompanyEmail"]?.Trim();
+    var countryCode = (configuration["DevelopmentBootstrap:CountryCode"] ?? "IE").Trim().ToUpperInvariant();
+    var currencyCode = (configuration["DevelopmentBootstrap:CurrencyCode"] ?? "EUR").Trim().ToUpperInvariant();
+    var companyTimeZone = configuration["DevelopmentBootstrap:TimeZone"] ?? "Europe/Dublin";
+    var shopName = configuration["ShopCredentialProvisioning:Name"]?.Trim();
+    var shopAddress = configuration["ShopCredentialProvisioning:Address"]?.Trim();
+    var shopPhone = configuration["ShopCredentialProvisioning:Phone"]?.Trim();
+    var shopPassword = configuration["ShopCredentialProvisioning:InitialPassword"];
+    var adminFirstName = firstName;
+    var adminLastName = lastName;
+    var adminPhone = phone;
+    var adminEmail = configuration["EmployeeBootstrap:Email"]?.Trim();
+
+    if (!allowDevelopmentBootstrap ||
+        databaseConnection.Database != "pchousestore_dev" ||
+        !(databaseConnection.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase) ||
+          databaseConnection.Host.Equals("127.0.0.1", StringComparison.OrdinalIgnoreCase) ||
+          databaseConnection.Host.Equals("::1", StringComparison.OrdinalIgnoreCase) ||
+          databaseConnection.Host == "/tmp"))
+    {
+        Console.Error.WriteLine("Development bootstrap is restricted to the local pchousestore_dev database. Set DevelopmentBootstrap:Allow=true explicitly.");
+        return 2;
+    }
+
+    if (string.IsNullOrWhiteSpace(companyName) || companyName.Length > 200 ||
+        string.IsNullOrWhiteSpace(companyAddress) || string.IsNullOrWhiteSpace(companyContact) ||
+        countryCode.Length != 2 || currencyCode.Length != 3 ||
+        string.IsNullOrWhiteSpace(newShopCode) || newShopCode.Length > 40 ||
+        string.IsNullOrWhiteSpace(shopName) || shopName.Length > 200 ||
+        string.IsNullOrWhiteSpace(employeeCode) || employeeCode.Length > 40 ||
+        string.IsNullOrWhiteSpace(adminFirstName) || string.IsNullOrWhiteSpace(adminLastName) ||
+        string.IsNullOrWhiteSpace(adminPhone) || string.IsNullOrWhiteSpace(initialPassword) ||
+        initialPassword.Length is < 6 or > 128 ||
+        string.IsNullOrEmpty(shopPassword) || shopPassword.Length is < 12 or > 128)
+    {
+        Console.Error.WriteLine("Development bootstrap configuration is incomplete or contains values outside supported limits.");
+        return 2;
+    }
+
+    var developmentOptions = new DbContextOptionsBuilder<PcHouseStoreDbContext>()
+        .UseNpgsql(connectionString)
+        .UseOpenIddict()
+        .Options;
+
+    await using var developmentDb = new PcHouseStoreDbContext(developmentOptions);
+    if (!await developmentDb.Database.CanConnectAsync())
+    {
+        Console.Error.WriteLine("The configured development database is unavailable.");
+        return 3;
+    }
+
+    var pendingMigrations = await developmentDb.Database.GetPendingMigrationsAsync();
+    if (pendingMigrations.Any())
+    {
+        Console.Error.WriteLine("Apply all database migrations before running the development bootstrap.");
+        return 3;
+    }
+
+    await using var developmentTransaction = await developmentDb.Database.BeginTransactionAsync();
+    if (await developmentDb.Companies.AnyAsync() ||
+        await developmentDb.Shops.AnyAsync() ||
+        await developmentDb.Employees.AnyAsync())
+    {
+        Console.Error.WriteLine("Development bootstrap refused: the database already contains Company, Shop or Employee records. No data was changed.");
+        return 4;
+    }
+
+    var createdAt = DateTime.UtcNow;
+    var companyRecord = new CompanyRecord
+    {
+        Name = companyName,
+        Address = companyAddress,
+        ContactOne = companyContact,
+        Email = string.IsNullOrWhiteSpace(companyEmail) ? null : companyEmail,
+        CountryCode = countryCode,
+        DefaultCurrencyCode = currencyCode,
+        TimeZone = companyTimeZone,
+        IsActive = true
+    };
+    developmentDb.Companies.Add(companyRecord);
+    await developmentDb.SaveChangesAsync();
+
+    var shopRecord = new ShopRecord
+    {
+        CompanyId = companyRecord.Id,
+        Code = newShopCode,
+        Name = shopName,
+        Address = string.IsNullOrWhiteSpace(shopAddress) ? null : shopAddress,
+        Phone = string.IsNullOrWhiteSpace(shopPhone) ? null : shopPhone,
+        TimeZone = companyTimeZone,
+        IsActive = true,
+        NextServiceOrderDisplayNumber = 1
+    };
+    developmentDb.Shops.Add(shopRecord);
+    await developmentDb.SaveChangesAsync();
+
+    var personRecord = new PersonRecord
+    {
+        CompanyId = companyRecord.Id,
+        FirstName = adminFirstName!,
+        LastName = adminLastName!,
+        ContactNo = adminPhone!,
+        Email = string.IsNullOrWhiteSpace(adminEmail) ? null : adminEmail
+    };
+    developmentDb.People.Add(personRecord);
+    await developmentDb.SaveChangesAsync();
+
+    var adminRecord = new EmployeeRecord
+    {
+        CompanyId = companyRecord.Id,
+        PersonId = personRecord.Id,
+        EmployeeCode = employeeCode!,
+        IsActive = true,
+        MustChangePasswordAtNextUse = true,
+        CredentialVersion = 1,
+        CreatedAt = createdAt,
+        UpdatedAt = createdAt
+    };
+    adminRecord.PasswordHash = new PasswordHasher<EmployeeRecord>().HashPassword(adminRecord, initialPassword);
+    developmentDb.Employees.Add(adminRecord);
+    await developmentDb.SaveChangesAsync();
+
+    developmentDb.EmployeeRoleAssignments.Add(new EmployeeRoleAssignmentRecord
+    {
+        CompanyId = companyRecord.Id,
+        EmployeeId = adminRecord.Id,
+        RoleCode = "ADMIN",
+        IsActive = true,
+        AssignedAt = createdAt
+    });
+
+    var shopCredential = new ShopAccessCredentialRecord
+    {
+        ShopId = shopRecord.Id,
+        CompanyId = companyRecord.Id,
+        CredentialVersion = 1,
+        IsActive = true,
+        CreatedAt = createdAt,
+        UpdatedAt = createdAt
+    };
+    shopCredential.PasswordHash = new PasswordHasher<ShopAccessCredentialRecord>()
+        .HashPassword(shopCredential, shopPassword);
+    developmentDb.ShopAccessCredentials.Add(shopCredential);
+    developmentDb.ShopAccessCredentialEvents.Add(new ShopAccessCredentialEventRecord
+    {
+        ShopId = shopRecord.Id,
+        CompanyId = companyRecord.Id,
+        EventType = "PROVISIONED",
+        CredentialVersion = 1,
+        OccurredAt = createdAt,
+        ActorType = "DEPLOYMENT_OPERATOR",
+        Reason = "Initial local development credentials provisioned by the deployment operator."
+    });
+
+    await developmentDb.SaveChangesAsync();
+    await developmentTransaction.CommitAsync();
+
+    Console.WriteLine("Local development Company, Shop, Shop credential and ADMIN employee were provisioned.");
+    Console.WriteLine($"Shop login code: {shopRecord.Code}");
+    Console.WriteLine($"Initial ADMIN employee code: {adminRecord.EmployeeCode}");
+    Console.WriteLine("The ADMIN employee must change the initial password before performing protected actions.");
+    return 0;
+}
+
 var needsEmployeeCode = operation is "BootstrapAdmin" or "BootstrapManager" or "ResetEmployeeCredential";
 
 if (string.IsNullOrWhiteSpace(connectionString) || companyId is null or <= 0 ||
