@@ -285,7 +285,15 @@ export default function App() {
       <main className="auth-shell">
         <section className="auth-card" aria-live="polite">
           <Brand />
-          <div className="auth-content">
+          {shop && (
+          <nav className="primary-nav" aria-label="Main navigation">
+            <button className={activePage === "customer-directory" ? "primary-nav-item active" : "primary-nav-item"} aria-current={activePage === "customer-directory" ? "page" : undefined} onClick={() => navigateAdmin("customer-directory")}>Customers</button>
+            <button className={activePage === "catalog-items" ? "primary-nav-item active" : "primary-nav-item"} aria-current={activePage === "catalog-items" ? "page" : undefined} onClick={() => navigateAdmin("catalog-items")}>Products &amp; Services</button>
+            <button className={activePage === "product-categories" ? "primary-nav-item active" : "primary-nav-item"} aria-current={activePage === "product-categories" ? "page" : undefined} onClick={() => navigateAdmin("product-categories")}>Categories</button>
+            <button className={activePage === "fault-catalogue" ? "primary-nav-item active" : "primary-nav-item"} aria-current={activePage === "fault-catalogue" ? "page" : undefined} onClick={() => navigateAdmin("fault-catalogue")}>Fault catalogue</button>
+          </nav>
+        )}
+        <div className="auth-content">
             <h1>
               {isSilentCallback
                 ? "Renewing Shop session"
@@ -320,7 +328,22 @@ export default function App() {
     <main className={shop ? "auth-shell auth-shell-full" : "auth-shell"}>
       <section className={shop ? "auth-card auth-card-wide" : "auth-card"}>
         <div className="app-header">
-          <Brand />
+          <div className="app-header-main">
+            <Brand />
+            {shop && (
+              <>
+                <label className="global-search">
+                  <span className="visually-hidden">Search modules</span>
+                  <input type="search" placeholder="Search modules..." disabled />
+                  <span aria-hidden="true">⌕</span>
+                </label>
+                <button className="account-action" onClick={() => void handleSignOut()} disabled={signingOut} aria-label="Sign out" title="Sign out">
+                  <span className="account-avatar" aria-hidden="true">●</span>
+                  <span>{signingOut ? "Signing out…" : "Sign out"}</span>
+                </button>
+              </>
+            )}
+          </div>
           {shop && (
             <div className="admin-menu">
               <button
@@ -356,7 +379,7 @@ export default function App() {
                   >
                     Shop access credential
                   </button>
-                  <p>EMPLOYEES</p>
+                  <p>EMPLOYEE SETTINGS</p>
                   <button
                     className="admin-menu-item"
                     aria-current={
@@ -397,54 +420,7 @@ export default function App() {
                   >
                     Employee directory
                   </button>
-                  <p>CATALOGUE</p>
-                  <button
-                    className="admin-menu-item"
-                    aria-current={
-                      activePage === "customer-directory" ? "page" : undefined
-                    }
-                    onClick={() => navigateAdmin("customer-directory")}
-                  >
-                    Customers
-                  </button>
-                  <button
-                    className="admin-menu-item"
-                    aria-current={
-                      activePage === "catalog-items" ? "page" : undefined
-                    }
-                    onClick={() => navigateAdmin("catalog-items")}
-                  >
-                    Products and Services
-                  </button>
-                  <button
-                    className="admin-menu-item"
-                    aria-current={
-                      activePage === "product-categories" ? "page" : undefined
-                    }
-                    onClick={() => navigateAdmin("product-categories")}
-                  >
-                    Product categories
-                  </button>
-                  <button
-                    className="admin-menu-item"
-                    aria-current={
-                      activePage === "fault-catalogue" ? "page" : undefined
-                    }
-                    onClick={() => navigateAdmin("fault-catalogue")}
-                  >
-                    Fault catalogue
-                  </button>
-                  <p>SESSION</p>
-                  <button
-                    className="admin-menu-item"
-                    disabled={signingOut}
-                    onClick={() => {
-                      setMenuOpen(false);
-                      void handleSignOut();
-                    }}
-                  >
-                    {signingOut ? "Signing out…" : "Sign out"}
-                  </button>
+                </nav>
                 </nav>
               )}
             </div>
