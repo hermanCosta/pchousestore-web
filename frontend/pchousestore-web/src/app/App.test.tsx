@@ -86,6 +86,12 @@ describe("Application shell navigation", () => {
     await renderAuthenticatedApp();
 
     expect(screen.getByText("Dublin Central")).toBeInTheDocument();
+    expect(screen.getByText("12 Main Street, Dublin")).toBeInTheDocument();
+    expect(
+      screen.getByRole("img", {
+        name: "PC HOUSE — SELLS AND REPAIRS LAPTOPS",
+      }),
+    ).toHaveAttribute("src", "/assets/pc-house-wordmark.webp");
     expect(
       screen.getByRole("navigation", { name: "Main navigation" }),
     ).toBeInTheDocument();
