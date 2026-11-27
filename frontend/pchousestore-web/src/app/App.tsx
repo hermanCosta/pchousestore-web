@@ -364,7 +364,9 @@ export default function App() {
                     <button
                       className="admin-menu-item"
                       aria-current={
-                        activePage === "shop-access-credential" ? "page" : undefined
+                        activePage === "shop-access-credential"
+                          ? "page"
+                          : undefined
                       }
                       onClick={() => navigateAdmin("shop-access-credential")}
                     >
@@ -374,7 +376,9 @@ export default function App() {
                     <button
                       className="admin-menu-item"
                       aria-current={
-                        activePage === "employee-password-change" ? "page" : undefined
+                        activePage === "employee-password-change"
+                          ? "page"
+                          : undefined
                       }
                       onClick={() => navigateAdmin("employee-password-change")}
                     >
@@ -383,7 +387,9 @@ export default function App() {
                     <button
                       className="admin-menu-item"
                       aria-current={
-                        activePage === "employee-directory-search" ? "page" : undefined
+                        activePage === "employee-directory-search"
+                          ? "page"
+                          : undefined
                       }
                       onClick={() => navigateAdmin("employee-directory-search")}
                     >

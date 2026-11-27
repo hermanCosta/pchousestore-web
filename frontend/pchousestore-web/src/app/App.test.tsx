@@ -129,9 +129,7 @@ describe("Application shell navigation", () => {
       "Employee directory",
       "Sign out",
     ]) {
-      expect(
-        screen.getByRole("button", { name: label }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: label })).toBeInTheDocument();
     }
   });
 
@@ -148,12 +146,13 @@ describe("Application shell navigation", () => {
 
       await user.click(screen.getByRole("button", { name: label }));
 
-      expect(
-        screen.getByRole("button", { name: label }),
-      ).toHaveAttribute("aria-current", "page");
-      expect(
-        screen.getByTestId("catalogue-administration"),
-      ).toHaveTextContent(page);
+      expect(screen.getByRole("button", { name: label })).toHaveAttribute(
+        "aria-current",
+        "page",
+      );
+      expect(screen.getByTestId("catalogue-administration")).toHaveTextContent(
+        page,
+      );
     },
   );
 
