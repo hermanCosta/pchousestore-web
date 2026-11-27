@@ -285,7 +285,7 @@ export default function App() {
       <main className="auth-shell">
         <section className="auth-card" aria-live="polite">
           <Brand />
-        <div className="auth-content">
+          <div className="auth-content">
             <h1>
               {isSilentCallback
                 ? "Renewing Shop session"
