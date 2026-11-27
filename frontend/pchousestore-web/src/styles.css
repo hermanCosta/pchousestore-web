@@ -205,7 +205,9 @@ select:focus-visible {
   opacity: 1;
 }
 
-.global-search input::placeholder { color: #527aa7; }
+.global-search input::placeholder {
+  color: #527aa7;
+}
 
 .global-search > span:last-child {
   position: absolute;
@@ -249,7 +251,10 @@ select:focus-visible {
 }
 
 .primary-nav-item:hover,
-.primary-nav-item.active { background: transparent; color: white; }
+.primary-nav-item.active {
+  background: transparent;
+  color: white;
+}
 
 .primary-nav-item.active::after {
   position: absolute;
@@ -882,15 +887,35 @@ button:disabled {
 }
 
 @media (max-width: 720px) {
-  .app-header-main { flex-wrap: wrap; gap: 0.6rem 0.8rem; padding: 0.65rem 1rem; }
-  .app-header .auth-brand { flex: 0 1 auto; }
-  .app-header .auth-brand-wordmark { width: min(15rem, 34vw); }
-  .header-shop-identity { max-width: 12rem; }
+  .app-header-main {
+    flex-wrap: wrap;
+    gap: 0.6rem 0.8rem;
+    padding: 0.65rem 1rem;
+  }
+  .app-header .auth-brand {
+    flex: 0 1 auto;
+  }
+  .app-header .auth-brand-wordmark {
+    width: min(15rem, 34vw);
+  }
+  .header-shop-identity {
+    max-width: 12rem;
+  }
   .header-shop-name,
-  .header-shop-address { max-width: 100%; }
-  .global-search { order: 3; flex: 1 1 100%; max-width: none; }
-  .app-header-main > .admin-menu { margin-left: 0; }
-  .primary-nav { justify-content: flex-start; }
+  .header-shop-address {
+    max-width: 100%;
+  }
+  .global-search {
+    order: 3;
+    flex: 1 1 100%;
+    max-width: none;
+  }
+  .app-header-main > .admin-menu {
+    margin-left: 0;
+  }
+  .primary-nav {
+    justify-content: flex-start;
+  }
 }
 
 @media (max-width: 480px) {
@@ -914,11 +939,22 @@ button:disabled {
   .admin-menu {
     padding: 0 0.8rem;
   }
-  .app-header-main { gap: 0.5rem; }
-  .app-header .auth-brand { gap: 0.4rem; }
-  .app-header .auth-brand-mark { width: 2rem; height: 2.25rem; }
-  .app-header .auth-brand-wordmark { width: min(10rem, 42vw); }
-  .header-shop-identity { max-width: 8rem; }
+  .app-header-main {
+    gap: 0.5rem;
+  }
+  .app-header .auth-brand {
+    gap: 0.4rem;
+  }
+  .app-header .auth-brand-mark {
+    width: 2rem;
+    height: 2.25rem;
+  }
+  .app-header .auth-brand-wordmark {
+    width: min(10rem, 42vw);
+  }
+  .header-shop-identity {
+    max-width: 8rem;
+  }
   .dialog-actions > button {
     flex: 1;
   }
