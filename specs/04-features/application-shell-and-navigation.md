@@ -33,7 +33,7 @@ The Shop name is sourced from the authenticated session response (`ShopSession.s
 ### 3.1 First header row
 
 1. Render the PC House logo mark at the left of the header.
-2. Render the brand name **PC HOUSE** and tagline **SELLS AND REPAIRS LAPTOPS** immediately to the right of the logo mark, as one brand lockup. Preserve the wording and visual hierarchy shown in the owner-provided reference image.
+2. Place the owner-provided PC HOUSE wordmark artwork image immediately to the right of the primary logo mark. The artwork already contains the wording “PC HOUSE” and “SELLS AND REPAIRS LAPTOPS”; use the image itself as supplied. Do not recreate, retype, overlay or render those words as HTML text. Preserve the artwork's proportions and avoid cropping or distortion.
 3. When a Shop session is active, display the active Shop name and Shop address together in the same Shop identity block on the right side of the header. Do not separate the address into another header region or place it in the brand lockup.
 4. Keep the hamburger trigger at the far right of the first row, after the Shop identity block.
 5. The hamburger is the entry point for Shop settings, Employee settings and session actions.
@@ -91,7 +91,7 @@ The shell must not change OIDC, token handling, ShopSession identity, API author
 ## 5. Visual and responsive requirements
 
 - Retain the established PC House visual identity and existing logo asset.
-- In the first row, place the logo mark on the left and the **PC HOUSE** wordmark with **SELLS AND REPAIRS LAPTOPS** tagline immediately to its right.
+- In the first row, place the primary logo mark on the left and the owner-provided PC HOUSE wordmark artwork image immediately to its right. Use the artwork as an image asset; do not recreate its embedded wording with HTML text.
 - Keep the active Shop name and address together in one identity block on the right side of the first row; place the hamburger at the far right, after that block.
 - Use two distinct horizontal rows: brand/Shop/menu first, operational navigation second.
 - Do not restore the removed search bar.
@@ -135,7 +135,7 @@ The tests and CI change have been committed but have not yet been executed or ob
 
 Remaining validation:
 
-- Render the authenticated shell and verify the logo mark with the PC HOUSE wordmark/tagline to its right, the active Shop name and address grouped together, and the right-aligned hamburger.
+- Render the authenticated shell and verify the primary logo mark with the supplied PC HOUSE wordmark artwork image to its right, the active Shop name and address grouped together, and the right-aligned hamburger.
 - Select each remaining settings item and verify the correct existing screen opens and the menu closes.
 - Verify the Shop identity/address grouping and brand lockup after their implementation is aligned with the approved reference.
 - Verify the global search field is absent.
