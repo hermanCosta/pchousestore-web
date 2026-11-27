@@ -137,14 +137,14 @@ describe("Application shell navigation", () => {
   ])(
     "navigates to %s and marks it as the current page",
     async (label, page) => {
-    const user = userEvent.setup();
-    await renderAuthenticatedApp();
+      const user = userEvent.setup();
+      await renderAuthenticatedApp();
 
-    await user.click(screen.getByRole("button", { name: label }));
+      await user.click(screen.getByRole("button", { name: label }));
 
-    expect(
-      screen.getByRole("button", { name: label }),
-    ).toHaveAttribute("aria-current", "page");
+      expect(
+        screen.getByRole("button", { name: label }),
+      ).toHaveAttribute("aria-current", "page");
       expect(
         screen.getByTestId("catalogue-administration"),
       ).toHaveTextContent(page);
