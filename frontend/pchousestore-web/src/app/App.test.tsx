@@ -174,9 +174,9 @@ describe("Application shell navigation", () => {
     ).not.toBeInTheDocument();
     const credentialForm = document.getElementById("shop-access-credential");
     expect(credentialForm).toBeInTheDocument();
-    expect(
-      credentialForm?.querySelector("h2"),
-    ).toHaveTextContent("Shop access credential");
+    expect(credentialForm?.querySelector("h2")).toHaveTextContent(
+      "Shop access credential",
+    );
   });
 
   it("closes menu and initiates OIDC sign-out", async () => {
