@@ -1,154 +1,146 @@
 # Feature: Application shell and primary navigation
 
-**Status:** DONE — implemented and owner-validated 2026-11-18  
-**Type:** REDESIGN — new back-office navigation experience, not an inherited Java Swing workflow.  
-**Depends on:** Existing ShopSession response, approved brand assets, customer/catalogue screens and employee/shop settings screens.
+**Status:** IMPLEMENTED — owner-confirmed 2026-11-26; automated and responsive accessibility validation remains pending.  
+**Type:** REDESIGN — back-office shell inspired by the public PC House website; not an inherited Java Swing workflow.  
+**Depends on:** Existing ShopSession response, approved brand asset, catalogue screens and Shop/Employee settings screens.
 
 ## 1. Objective
 
-Replace the current single brand header plus administration hamburger layout with a PC House back-office shell inspired by the public website's horizontal header and category navigation.
+Provide a consistent PC House back-office shell with:
+- the PC House brand and active Shop identity in the first header row;
+- a Settings hamburger on the right of that row;
+- operational navigation in a separate second row;
+- no global search field.
 
-The shell must make primary working areas accessible from a horizontal navigation row, keep Shop/application configuration in the hamburger menu, and make the active Shop's address visible in the header.
+The shell must retain the existing Shop-session authentication boundary. It must not introduce a persistent signed-in Employee identity.
 
-## 2. Reference and current implementation
+## 2. Current implementation baseline
 
-### Public visual reference
+The product owner confirmed the implemented header reorganisation and successful frontend build on 2026-11-26. The current implementation is in:
 
-- Official website: https://www.pchouse.ie/
-- The website uses a dark blue header area with a brand region and a search field, followed by a horizontal navigation row (Home and product categories).
-- The back-office adopts the two-level visual hierarchy, but replaces the search field with the active Shop address and uses operational navigation rather than storefront product categories.
-- Website category links are visual inspiration only; they are not automatically target back-office modules.
-
-### Current frontend evidence
-
-| File | Existing behavior |
+| File | Responsibility |
 |---|---|
-| frontend/pchousestore-web/src/app/App.tsx | Brand renders the logo and text PC HOUSE STORE; the hamburger contains Shop, Employee and Catalogue groups; default active page is shop-profile. |
-| frontend/pchousestore-web/src/app/App.tsx | ShopSession already includes shopName, shopAddress and shopPhone. |
-| frontend/pchousestore-web/src/app/App.tsx | Existing catalogue destinations are customer-directory, catalog-items, product-categories and fault-catalogue. |
-| frontend/pchousestore-web/src/styles.css | Existing .app-header, .admin-menu and .admin-menu-panel styles are the starting point for the shell update. |
-| specs/03-design/brand-identity.md | The provisional primary logo is the owner-supplied transparent mark; the adjacent wordmark must be rendered as UI text PC House. |
+| `frontend/pchousestore-web/src/app/App.tsx` | Shop session loading, brand/header composition, Settings menu, primary navigation and existing screen selection. |
+| `frontend/pchousestore-web/src/styles.css` | Header, menu and primary-navigation presentation. |
+| `frontend/pchousestore-web/src/auth/oidc.ts` | Shop OIDC client and access-token retrieval. |
 
-## 3. Approved layout requirements
+The first row contains the existing PC House logo/wordmark, the active Shop name when authenticated, and the hamburger trigger aligned to the right. The second row contains the operational navigation. The previous search bar is not part of this shell.
 
-### 3.1 Brand and active-Shop context row
+The Shop name is sourced from the authenticated session response (`ShopSession.shopName`); do not hard-code it or substitute Company or Employee data.
 
-1. Use a deep-navy horizontal top row.
-2. Render the existing owner-supplied primary logo asset on the left.
-3. Render the exact adjacent brand text **PC House**. Replace the current PC HOUSE STORE text.
-4. Replace the reference website's search-field position with a location display containing a location-pin icon and the active Shop address.
-5. Read the address only from ShopSession.shopAddress, returned by the authenticated session endpoint. Never hard-code the address or substitute Company or Employee address values.
-6. If shopAddress is null, empty or whitespace, display **Shop address not configured**.
-7. Keep the hamburger trigger at the right of this row.
-8. Do not display a persistent Employee name, employee code or employee role. The persistent shell context remains the authenticated Shop.
-9. Do not introduce a global search control as part of this header change.
+## 3. Approved layout and navigation
 
-### 3.2 Primary navigation row
+### 3.1 First header row
 
-The primary navigation is a separate horizontal row immediately below the brand/context row.
+1. Render the existing PC House logo and current brand wordmark.
+2. When a Shop session is active, display the active Shop name in the header.
+3. Keep the hamburger trigger aligned to the right of this row.
+4. The hamburger is the entry point for Shop settings, Employee settings and session actions.
+5. Do not add a global search field.
+6. Do not display a persistent Employee name, code or role. The persistent authenticated context is the Shop.
 
-| Item | Behavior |
-|---|---|
-| Home | Direct navigation to the default signed-in workspace. It becomes the initial destination after successful Shop sign-in. |
-| Catalogue | Opens a dropdown with the current catalogue screens listed below. |
+### 3.2 Settings hamburger
 
-Catalogue dropdown entries:
-
-- Customers → customer-directory
-- Products and Services → catalog-items
-- Product Categories → product-categories
-- Fault Catalogue → fault-catalogue
-
-When a destination is selected:
-- Navigate to the existing corresponding screen without changing its business behavior.
-- Close the dropdown.
-- Mark the selected destination as active.
-- Preserve the selected screen when the user interacts with its forms and dialogs.
-
-Catalogue entries are removed from the Settings hamburger to avoid duplicate navigation.
-
-The Home link is part of this shell change. Dashboard cards, KPIs, sales figures, operational queues and other Home content are not defined here; do not fabricate those elements. A separate Home/dashboard SPEC is required before adding operational widgets.
-
-### 3.3 Settings hamburger
-
-The hamburger remains the entry point for Shop/application settings and secondary administration.
+The menu contains the following groups and entries:
 
 | Group | Entries |
 |---|---|
-| SETTINGS | Shop profile; Shop access credential |
-| EMPLOYEES | Change my password; Load employees; Create employee; Employee directory |
+| SHOP | Shop profile; Shop access credential |
+| EMPLOYEE SETTINGS | Change my password; Load employees; Create employee; Employee directory |
 | SESSION | Sign out |
 
 Rules:
+- Shop profile displays the active Shop's available details.
+- Shop access credential retains its existing workflow and authorization behavior.
+- Employee administration retains its existing screens and authorization behavior.
+- Sign out retains the existing OIDC sign-out behavior.
+- Operational catalogue destinations must not be duplicated in this menu.
+- Selecting a menu item closes the menu and selects the corresponding existing screen.
 
-- Shop profile remains available under SETTINGS and displays the full active Shop profile (Shop name, address, phone and Company email where available).
-- Shop access credential retains the current Manager credential challenge and existing rotate/enable/disable workflows.
-- Employee administration and sign-out retain their existing behavior and authorization.
-- Customers, Products and Services, Product Categories and Fault Catalogue must not appear in this hamburger.
+### 3.3 Second-row operational navigation
+
+The second row is a separate navigation landmark labelled **Main navigation** and contains:
+
+| Label | Existing destination |
+|---|---|
+| Customers | `customer-directory` |
+| Products & Services | `catalog-items` |
+| Categories | `product-categories` |
+| Fault catalogue | `fault-catalogue` |
+
+Rules:
+- Each item opens its existing screen without changing its business behavior.
+- The selected destination is visibly marked active and exposes `aria-current="page"`.
+- Navigation does not reset the active Shop session.
+- Do not add unimplemented modules (Sales, Service Orders, Stock, Finance or Reports) until their feature specifications authorize them.
+- Do not add a Dashboard/Home destination or fabricate dashboard content as part of this shell.
 
 ## 4. Data and API contracts
 
-No backend/API change is required for this layout.
+No backend/API change is required for the shell layout.
 
-The shell must use the existing session response fields:
-- shopName — available for the Shop profile/settings view.
-- shopAddress — displayed in the top header in place of search.
-- shopPhone and companyEmail — remain available on the Shop profile/settings view.
+The shell uses the existing authenticated Shop session:
+- `shopName` — active Shop name displayed in the header.
+- `shopAddress`, `shopPhone` and `companyEmail` — remain available to the Shop profile screen.
 
-No store address may be sourced from static frontend configuration, the public website, Company defaults or employee profile data.
+Do not source Shop details from static frontend configuration, the public website, Company defaults or Employee profile data.
+
+The shell must not change OIDC, token handling, ShopSession identity, API authorization or employee-attribution rules.
 
 ## 5. Visual and responsive requirements
 
-- Deep navy/blue header and navigation treatment consistent with PC House Brand Identity and Design System.
-- Use the existing owner-supplied primary logo asset; preserve its aspect ratio and transparency.
-- Use PC House as the wordmark. Do not use the third-party ILAC directory logo as the application logo.
-- Location-pin icon precedes the address. Long addresses may truncate visually on wide layouts but the complete value must remain available via accessible text/title.
-- On narrow screens, keep the brand and settings trigger reachable; the address may wrap to a compact second line.
-- Primary navigation may horizontally scroll or use a separate primary-navigation disclosure on small screens. Do not merge Settings and Catalogue navigation.
-- Both dropdowns must support keyboard and touch interaction, visible focus, Escape-to-close, correct aria-expanded and semantic navigation landmarks.
-- The active primary destination must be identifiable without relying on colour alone.
+- Retain the established PC House visual identity and existing logo asset.
+- Use two distinct horizontal rows: brand/Shop/menu first, operational navigation second.
+- Keep the hamburger at the right of the first row.
+- Do not restore the removed search bar.
+- Keep the Shop identity and menu reachable at narrow viewport widths.
+- Keep the operational navigation usable at desktop, tablet and mobile widths; responsive behavior must be verified rather than assumed.
+- Provide visible keyboard focus and semantic navigation/menu controls.
+- The active operational destination must be identifiable without relying on colour alone.
+- Support keyboard and touch interaction, including a predictable way to close the menu.
 
 ## 6. Out of scope
 
 - New customer/catalogue business rules or API endpoints.
-- Dashboard KPIs or operational widgets on Home.
-- New search functionality.
-- Changes to ShopSession identity, OIDC, authorization or EmployeeActionAuthorization.
-- Changes to the contents or authorization of Shop profile, Shop credential and Employee administration screens.
-- Adding unimplemented modules (sales, service orders, stock, finance or reports) as active menu items.
+- Dashboard KPIs, sales figures, operational queues or Home content.
+- Global search.
+- Changes to ShopSession identity, OIDC, authorization or employee credential validation.
+- Changes to Shop profile, Shop credential or Employee administration business behavior.
+- Adding unimplemented business modules as active navigation destinations.
 
-## 7. Acceptance criteria
+## 7. Acceptance criteria and validation status
 
-- [ ] AC-01: After Shop sign-in, the application shows a two-level horizontal shell.
-- [ ] AC-02: The brand area shows the existing primary logo beside the exact text PC House.
-- [ ] AC-03: The old PC HOUSE STORE wordmark is no longer displayed in the shell.
-- [ ] AC-04: The header displays the address for the authenticated Shop from shopAddress instead of a search field.
-- [ ] AC-05: Switching to another Shop session displays that Shop's own address; no address is carried over from the previous session.
-- [ ] AC-06: An absent Shop address displays Shop address not configured and does not use another address as fallback.
-- [ ] AC-07: Home is the default signed-in destination and can be reached from the primary navigation.
-- [ ] AC-08: Catalogue opens a dropdown containing Customers, Products and Services, Product Categories and Fault Catalogue.
-- [ ] AC-09: Selecting each Catalogue entry opens its existing screen, closes the dropdown and marks the entry active.
-- [ ] AC-10: Catalogue entries no longer appear in the Settings hamburger.
-- [ ] AC-11: The Settings hamburger contains Shop profile and Shop access credential under SETTINGS.
-- [ ] AC-12: Employee administration actions and Sign out remain available and retain their current behavior.
-- [ ] AC-13: The shell remains usable at desktop, tablet and mobile widths without hiding the Shop address entirely or merging Settings and Catalogue navigation.
-- [ ] AC-14: The shell exposes no persistent Employee identity.
+The owner confirmed the reorganised header and successful frontend build on 2026-11-26. That confirmation does not imply that every automated, responsive or accessibility test below has run.
 
-## 8. Test scenarios
+- [x] AC-01: The application uses a two-row header/navigation structure.
+- [x] AC-02: The first row displays the existing PC House logo/wordmark and active Shop name.
+- [x] AC-03: The hamburger is positioned at the right of the first row.
+- [x] AC-04: Shop and Employee settings plus Sign out are available from the hamburger.
+- [x] AC-05: Operational navigation is displayed in the separate second row.
+- [x] AC-06: The global search bar is absent.
+- [x] AC-07: The frontend build was reported successful by the owner on 2026-11-26.
+- [ ] AC-08: Automated tests cover menu contents, menu selection and sign-out initiation.
+- [ ] AC-09: Automated tests cover each operational navigation destination and active state.
+- [ ] AC-10: Keyboard interaction, focus visibility and menu dismissal are verified.
+- [ ] AC-11: Desktop, tablet and mobile layouts are verified.
+- [ ] AC-12: Navigation preserves the active Shop session and does not expose persistent Employee identity.
 
-- Render the brand image and wordmark; verify the exact accessible label.
-- Render a valid ShopSession and assert the exact address appears in the header.
-- Render a ShopSession with null/blank address and assert the neutral fallback.
-- Change the active Shop session and verify the address updates to the new Shop.
-- Navigate Home → Catalogue dropdown → each of its four destinations.
-- Verify the dropdown closes after selection and on Escape.
-- Verify current page/active state is available semantically.
-- Verify Shop profile and Shop access credential are present in Settings and Catalogue entries are absent there.
-- Verify employee menu actions and Sign out remain reachable.
-- Verify responsive layout and keyboard operation.
+## 8. Remaining test scenarios
+
+- Render the authenticated shell and verify the logo/wordmark, active Shop name and right-aligned hamburger.
+- Verify the hamburger contains the three approved groups and all specified entries.
+- Select each settings item and verify the correct existing screen opens and the menu closes.
+- Verify Sign out starts the existing OIDC sign-out flow.
+- Select each of the four operational destinations and verify its screen and active state.
+- Verify the global search field is absent.
+- Verify navigation does not clear or replace the active Shop session.
+- Verify keyboard and touch operation, focus visibility and menu dismissal.
+- Verify the layout at desktop, tablet and mobile viewport widths.
 
 ## 9. Approval
 
-- Product-owner layout direction: APPROVED — 2026-11-18.
-- Implementation validation: COMPLETE — owner validated the implemented shell 2026-11-18.
-- API/data-model impact: NONE — existing ShopSession DTO already supplies the required Shop address.
+- Product-owner layout direction: APPROVED.
+- Implementation: OWNER-CONFIRMED — 2026-11-26.
+- Frontend build: REPORTED SUCCESSFUL BY OWNER — 2026-11-26; not independently rerun during this documentation update.
+- Automated, responsive and accessibility validation: PENDING.
+- API/data-model impact: NONE.
