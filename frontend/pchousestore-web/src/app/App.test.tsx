@@ -85,7 +85,11 @@ describe("Application shell navigation", () => {
   it("renders Shop shell and operational destinations", async () => {
     await renderAuthenticatedApp();
 
-    expect(screen.getByText("Dublin Central")).toBeInTheDocument();
+    expect(
+      screen
+        .getAllByText("Dublin Central")
+        .some((element) => element.closest(".header-shop-identity")),
+    ).toBe(true);
     expect(screen.getByText("12 Main Street, Dublin")).toBeInTheDocument();
     expect(
       screen.getByRole("img", {
@@ -168,9 +172,11 @@ describe("Application shell navigation", () => {
     expect(
       screen.queryByRole("navigation", { name: "Administration" }),
     ).not.toBeInTheDocument();
+    const credentialForm = document.getElementById("shop-access-credential");
+    expect(credentialForm).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { name: "Shop access credential" }),
-    ).toBeInTheDocument();
+      credentialForm?.querySelector("h2"),
+    ).toHaveTextContent("Shop access credential");
   });
 
   it("closes menu and initiates OIDC sign-out", async () => {
