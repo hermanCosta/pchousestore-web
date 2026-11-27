@@ -323,9 +323,16 @@ export default function App() {
           <div className="app-header-main">
             <Brand />
             {shop && (
-              <span className="header-shop-name" title={shop.shopName}>
-                {shop.shopName}
-              </span>
+              <div className="header-shop-identity">
+                <span className="header-shop-name" title={shop.shopName}>
+                  {shop.shopName}
+                </span>
+                {shop.shopAddress && (
+                  <span className="header-shop-address" title={shop.shopAddress}>
+                    {shop.shopAddress}
+                  </span>
+                )}
+              </div>
             )}
             {shop && (
               <div className="admin-menu">
@@ -613,8 +620,16 @@ async function apiError(response: Response): Promise<Error> {
 function Brand() {
   return (
     <div className="auth-brand">
-      <img src={`${apiBaseUrl}/assets/pc-house-logo.png`} alt="PC House logo" />
-      <span>PC HOUSE STORE</span>
+      <img
+        className="auth-brand-mark"
+        src={`${apiBaseUrl}/assets/pc-house-logo.png`}
+        alt="PC House logo"
+      />
+      <img
+        className="auth-brand-wordmark"
+        src="/assets/pc-house-wordmark.webp"
+        alt="PC HOUSE — SELLS AND REPAIRS LAPTOPS"
+      />
     </div>
   );
 }
