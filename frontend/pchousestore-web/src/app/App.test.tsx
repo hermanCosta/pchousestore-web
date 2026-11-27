@@ -195,4 +195,113 @@ describe("Application shell navigation", () => {
       screen.queryByRole("navigation", { name: "Administration" }),
     ).not.toBeInTheDocument();
   });
+
+  it("shows the sign-in state and starts OIDC sign-in", async () => {
+    const user = userEvent.setup();
+    getShopAccessToken.mockResolvedValue(null);
+    render(<App />);
+
+    expect(await screen.findByText("No Shop is signed in")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Sign in" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("navigation", { name: "Main navigation" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Open administration menu" }),
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+    const { userManager } = await import("../auth/oidc");
+    expect(userManager.signinRedirect).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    [401, "The API rejected the access token (HTTP 401). Please sign in again."],
+    [403, "The access token is missing the required Shop API scope (HTTP 403)."],
+    [500, "Session verification failed (HTTP 500)."],
+  ])("reports session verification failure for HTTP %s", async (status, message) => {
+    getShopAccessToken.mockResolvedValue("shop-access-token");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: false, status }),
+    );
+
+    render(<App />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(message);
+    expect(
+      screen.queryByRole("navigation", { name: "Main navigation" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("uses fallback values for optional Shop profile fields", async () => {
+    getShopAccessToken.mockResolvedValue("shop-access-token");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          ...shopSession,
+          shopAddress: null,
+          shopPhone: null,
+          companyEmail: null,
+        }),
+      }),
+    );
+
+    render(<App />);
+
+    expect(
+      await screen.findByRole("navigation", { name: "Main navigation" }),
+    ).toBeInTheDocument();
+    const profile = screen.getByRole("definition list", {
+      name: "Active Shop profile",
+    });
+    expect(profile).toHaveTextContent("Not set");
+  });
+
+  it.each([
+    ["Change my password", "employee-password-change"],
+    ["Load employees", "employee-directory-search"],
+    ["Create employee", "create-employee"],
+    ["Employee directory", "employee-directory"],
+  ])("navigates to employee destination %s", async (label, page) => {
+    const user = userEvent.setup();
+    await renderAuthenticatedApp();
+    await openAdministrationMenu(user);
+
+    await user.click(screen.getByRole("button", { name: label }));
+
+    expect(
+      screen.queryByRole("navigation", { name: "Administration" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId("employee-administration")).toHaveTextContent(
+      page,
+    );
+  });
+
+  it("updates the hamburger expanded state when the menu is toggled", async () => {
+    const user = userEvent.setup();
+    await renderAuthenticatedApp();
+
+    const trigger = screen.getByRole("button", {
+      name: "Open administration menu",
+    });
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+
+    await user.click(trigger);
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+    expect(
+      screen.getByRole("navigation", { name: "Administration" }),
+    ).toBeInTheDocument();
+
+    await user.click(trigger);
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(
+      screen.queryByRole("navigation", { name: "Administration" }),
+    ).not.toBeInTheDocument();
+  });
 });
