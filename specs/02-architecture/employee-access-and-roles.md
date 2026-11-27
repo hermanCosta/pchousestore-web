@@ -1,18 +1,23 @@
+> **SUPERSEDED FOR EMPLOYEE IDENTITY AND ROLE BASELINE (2026-11-20):** The active role model is now defined in [Employee Management](../04-features/employee-management.md): `EMPLOYEE`, `MANAGER`, `ADMIN`; all profiles are Company-wide across all Shops; there is no dual-role assignment; and employee authorization is a fresh direct credential validation per protected operation, with no `EmployeeActionAuthorization` token. The legacy `TECHNICIAN` matrix below is historical discovery/previous-decision material and is not an authoritative target permission matrix. Re-approve or map each business operation in its feature SPEC before implementation.
+
 # Employee Access and Roles — pcHouseStore Web
 
-**Status:** DRAFT v15 — MANAGER full access is confirmed. The TECHNICIAN matrix below is the recommended first-release interpretation of partial access; it is ready for owner review before fine-grained policy freeze. All operations remain scoped to the active Shop and individually attributed.
+**Status:** PRODUCT-APPROVED v1 baseline (updated 2026-11-19) — MANAGER full access and the TECHNICIAN matrix below are approved. The 2026-11-13 product-owner updates supersede earlier Technician restrictions for customer, catalogue, Product, Fault and ServiceOrder work. On 2026-11-19, the owner additionally approved equal MANAGER/TECHNICIAN permission to mark a ServiceOrder `NOT_FIXED` and to record handover of a `NOT_FIXED` order. Payment, cancellation, deposit forfeiture and refunds remain Manager-only. An employee may hold both roles; effective permissions are the union of assigned roles, so MANAGER grants the full capability set. All operations remain scoped to the active Shop and individually attributed.
 
 ## 1. Identity and cross-Shop access
 
 - One Company-wide `Employee` identity and password per person. The same employee account works in every Shop belonging to the Company.
 - The Shop is authenticated at application entry. `ShopSession` contains only the active Shop and never stores an employee identity.
-- Before every protected committed operation, the actor supplies an employee identifier (employee code) and password. The password alone must not be used to identify a person because different people may choose the same password.
-- The server verifies the employee password, active status, Company membership and role permission for the requested action. It issues a short-lived, action-scoped, single-use `EmployeeActionAuthorization`.
-- The authorization is consumed atomically with the command. A later operation requires another employee challenge; the previous employee is never reused implicitly.
+- For operations that the approved feature SPEC marks employee-protected, the actor supplies an employee identifier (employee code) and password. The password alone must not be used to identify a person because different people may choose the same password.
+- The server verifies the employee password, active status, Company membership and role permission for that action. It issues a short-lived, action-scoped, single-use `EmployeeActionAuthorization`.
+- The authorization is consumed atomically with the command. A later employee-protected operation requires another employee challenge; the previous employee is never reused implicitly.
+- Customer and shared-catalogue CRUD is Shop-session protected but does not require an individual employee challenge, as approved in CAT-01. Its audit actor is the active `ShopSession`.
 
-## 2. Roles and proposed first-release permission matrix
+## 2. Approved v1 permission matrix
 
-Roles are Company-wide and work across all Shops. MANAGER full access is a confirmed requirement. The TECHNICIAN scope is a recommended first-release baseline derived from the service/technical workflows. Permission checks are server-side. The React client may hide unavailable actions for usability, but API authorization is authoritative.
+Roles are Company-wide and work across all Shops. MANAGER full access is a confirmed requirement. The TECHNICIAN scope is the approved first-release baseline derived from the service/technical workflows. Permission checks are server-side. The React client may hide unavailable actions for usability, but API authorization is authoritative.
+
+The Product Owner approved the initial action matrix on 2026-11-10 and updated Technician permissions on 2026-11-13. An employee may hold both `MANAGER` and `TECHNICIAN`; effective permissions are the union of assigned roles. Since MANAGER grants full access, it takes precedence wherever the TECHNICIAN column says No. There is no deny-overrides rule.
 
 | Capability | `MANAGER` | `TECHNICIAN` |
 |---|---:|---:|
@@ -20,16 +25,23 @@ Roles are Company-wide and work across all Shops. MANAGER full access is a confi
 | View company/Shop dashboards and financial reports | Yes | No |
 | Manage employees, passwords, roles and Shop credentials | Yes | No |
 | Manage Company, Shop and application settings, including VAT configuration | Yes | No |
-| Manage catalogue, products, services, categories and sale prices | Yes | No |
+| Create and edit customer records | Yes | Yes |
+| Create and edit Products | Yes | Yes |
+| Create and edit Fault catalogue entries | Yes | Yes |
+| Manage catalogue, Products, Services, categories and sale prices | Yes | Yes |
 | Create and edit sales | Yes | No |
 | Apply discounts/price overrides | Yes | No |
 | Register payments, deposits and instalments | Yes | No |
 | Open/close cash day, cash-in/out, safe drops and closing corrections | Yes | No |
-| Create, edit and cancel service orders | Yes | Create/update service work; cancellation is Manager-only |
-| Read customer contact details required by a service assigned/available to the technician | Yes | Yes, service-context only |
+| Create, edit and cancel service orders | Yes | Create and edit service orders; cancellation is Manager-only |
+| Read Company customer directory and customer contact details | Yes | Yes, Company scope |
 | Register diagnosis, faults, technical notes and test results | Yes | Yes |
 | Move service between `CREATED`, `IN_PROGRESS`, `AWAITING_PARTS` and `FIXED` | Yes | Yes |
-| Mark customer handover `PICKED`, cancel or financially refund service | Yes | No |
+| Mark a ServiceOrder `NOT_FIXED` | Yes | Yes |
+| Record customer handover for a `NOT_FIXED` ServiceOrder (not permitted from `FIXED`) | Yes | Yes |
+| Cancel a ServiceOrder | Yes | No |
+| Register ServiceOrder payment/deposit transactions | Yes | No |
+| Execute a financial ServiceOrder refund | Yes | No |
 | View product availability in the active Shop | Yes | Yes |
 | Reserve/release parts for a service order | Yes | Yes |
 | Create/manage service-part procurement requests and upload reference images | Yes | Yes |
@@ -38,10 +50,11 @@ Roles are Company-wide and work across all Shops. MANAGER full access is a confi
 | Adjust stock balances, perform write-offs or inter-Shop transfers | Yes | No |
 | Inspect refurbished units, record test results/condition and upload photos | Yes | Yes |
 | Open a product complaint and perform technical inspection | Yes | Yes |
-| Approve complaint remedy, refund, replacement or price reduction | Yes | No |
+| Execute refunds, including refunds related to sales, service deposits or complaint remedies | Yes | No |
+| Approve non-refund complaint remedy, replacement or price reduction | Yes | No |
 | Close/reopen complaint cases | Yes | Add technical findings; cannot close the case |
 
-`MANAGER` is the full-access role across all Shops. The v1 proposed `TECHNICIAN` profile is intentionally a technical/operational role: the technician may diagnose and repair, reserve or request parts, capture purchase/receipt details for service parts, and inspect equipment, but cannot perform financial, commercial-pricing, staff-administration or company-configuration actions.
+`MANAGER` is the full-access role across all Shops. `TECHNICIAN` may create/edit customer records, Products, Services, categories, sale prices and Fault catalogue entries, and create/edit service orders, in addition to the technical/operational work listed above. The product owner specifically permits both roles to mark a ServiceOrder `NOT_FIXED` and to record handover of a `NOT_FIXED` order; neither action is permitted to hand over an order while its status is `FIXED`. Payment, cancellation, deposit forfeiture and refunds remain Manager-only.
 
 ### No second purchase approval
 
@@ -49,16 +62,19 @@ Creating, linking, updating or receiving a supplier purchase for service parts d
 
 ### Financial operation rule
 
-- Only `MANAGER` can register or execute full/partial refunds, refund service deposits, apply a forfeiture to a deposit, or approve financial complaint remedies.
+- Only `MANAGER` can register or execute full/partial refunds, refund service deposits, apply a forfeiture to a deposit, or approve financial complaint remedies. This remains true after the 2026-11-13 Technician permission update.
 - Every such action requires the Manager's own fresh employee password challenge and one-use authorization. There is no amount threshold and no second Manager approval in v1.
 - `TECHNICIAN` can record technical findings and request manager review but cannot commit a refund, cash operation or deposit forfeiture.
 
-## 3. Employee password challenge
+## 3. Employee password challenge and credential operations
 
 - UI collects `employee_code` + password. Employee code is unique within the Company.
 - Store only a vetted password hash (Argon2id, bcrypt or the established ASP.NET Core Identity hasher); never plaintext or reversible encryption.
 - Transmit the password only over TLS. Do not retain it in browser storage, logs, analytics or audit payloads.
-- Rate-limit failed challenges and apply account-level lockout/protection without invalidating the shared ShopSession for all employees.
+- Do not lock, disable or suspend a Shop or Employee credential because of failed password attempts. Apply request-rate limits at authentication endpoints by source/network and endpoint, with generic authentication errors. Credential-specific failures may be recorded for security monitoring but must not cause a credential-specific waiting period, rejection window or disabled state. Throttling must not persist an account lock state or invalidate a shared ShopSession.
+- A Manager may provision, disable and reset a Shop credential, and may provision, disable and reset an Employee credential. Employee reset requires the Manager's fresh action authorization and forces a password change on next use. An employee may change their own password after providing the current password.
+- The initial Shop credential and recovery when no Manager can authenticate use a deployment-controlled, identity-verified Company-owner/operator bootstrap procedure outside the public Shop sign-in endpoint. Record and audit each bootstrap/recovery, then require credential rotation before normal use.
+- Use a minimum password length of 6 characters, accept at least 128 characters, allow password managers/paste, and do not require arbitrary periodic changes. Rotate promptly after suspected compromise or an authorized reset. Hash using ASP.NET Core Identity's established hasher (or an approved equivalent) and support rehash-on-success when parameters are upgraded.
 - The authorization binds `ShopSessionId`, `ShopId`, `EmployeeId`, action code, operation-context hash, authentication time, expiry and consumed time.
 - Use a one-use compare-and-set/transaction to prevent replay and concurrent double-consumption.
 
@@ -67,9 +83,10 @@ Creating, linking, updating or receiving a supplier purchase for service parts d
 1. The same employee code/password works in any Shop belonging to the Company.
 2. A `ShopSession` never contains `EmployeeId` or an employee role.
 3. Each protected operation records the person who entered the credential for that exact action.
-4. Under the proposed first-release matrix, a technician can perform permitted service/technical/procurement actions but is denied payments, refunds, deposit forfeitures, cash operations, sales, price edits, staff administration, settings, stock adjustments and Shop transfers.
+4. Under the approved first-release matrix, a technician can perform permitted service/technical/procurement and catalogue actions, including price edits, but is denied payments, refunds, deposit forfeitures, cash operations, sales, staff administration, settings, stock adjustments and Shop transfers unless that employee also has MANAGER, in which case MANAGER permissions apply.
 5. A manager can perform all application actions in every Shop.
 6. A previous employee authorization cannot be reused for another action or operation context.
 7. A supplier purchase or receipt does not wait for a second manager approval, but still checks the acting role and employee authorization.
+8. Repeated failed attempts do not lock or disable a credential; authentication endpoints apply request throttling without account lock state.
 
 See [the consolidated decision register](product-owner-decisions.md).

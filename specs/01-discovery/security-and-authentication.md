@@ -50,7 +50,7 @@ The employee challenge mechanism is a password. The same Company-wide employee a
 5. Verify active Company-wide Employee role assignment and action permission on every employee challenge; no per-Shop employee assignment is required.
 6. Enforce one-time consumption and short expiry of `EmployeeActionAuthorization` server-side, under concurrency.
 7. Record employee actor, Shop, action, timestamp and target on every protected operation. Do not infer actor from workstation or session history.
-8. Rate-limit Shop login and employee challenges. Apply employee-specific lockout/protection without terminating the shared Shop session for all other employees.
+8. **Target policy updated 2026-11-10:** limit authentication request rates by source/network and endpoint. Failed attempts must not lock/disable credentials or create credential-specific rejection windows. The earlier lockout suggestion is superseded by the product-owner decision in `product-owner-decisions.md`.
 9. Use OAuth 2.0/OIDC Authorization Code + PKCE, API JWT Bearer validation, strict redirect/CORS policy, ShopSession revocation and least-privilege database accounts. Protect cookie-based authorization-server state with Secure/HttpOnly/SameSite settings and CSRF controls where applicable.
 10. Audit security-relevant events including Shop sign-in/out, employee challenge success/failure, authorization consumption and privileged actions.
 
@@ -59,7 +59,7 @@ The employee challenge mechanism is a password. The same Company-wide employee a
 - Employee password recovery/reset workflow and password policy.
 - The detailed action-by-action permission matrix for `MANAGER` and `TECHNICIAN`; these roles are Company-wide and work in all Shops.
 - Whether the same employee may hold both roles (allowed by the current data model).
-- Shop access credential provisioning, rotation, recovery, and whether the login identifier is a branch code, username or other value.
-- Shared workstation lifecycle, idle timeout and whether a ShopSession may be active on several devices simultaneously.
-- Initial access-token lifetime is 10 minutes; final ShopSession idle/absolute timeout values and whether v1 needs refresh tokens remain open.
+- Shop access credential provisioning, rotation and recovery remain open. Shop sign-in identifier is the stable Shop code (product-owner confirmation 2026-11-07).
+- Shared workstation lifecycle, idle/absolute timeout values and whether a ShopSession may be active on several devices simultaneously must be decided before production; keep timeout values configurable (product-owner confirmation 2026-11-07).
+- Initial access-token lifetime is 10 minutes. Final ShopSession idle/absolute timeout values remain open. Refresh tokens are disabled for the v1 SPA by ADR-034; reconsideration requires a later ADR with rotation and reuse detection.
 - Final signing key/certificate storage, rotation and backup/recovery procedure remain deployment tasks.

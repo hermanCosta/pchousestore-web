@@ -1,6 +1,6 @@
 # Stock, Reservations, Transfers and Refurbished Equipment
 
-**Status:** DRAFT — owner decisions recorded 2026-11-05 and reconfirmed in v12. See ADR-003, ADR-006 through ADR-008 and ADR-018.
+**Status:** DRAFT — owner decisions recorded 2026-11-05, reconfirmed in v12, physical return disposition and product-transfer discrepancy handling approved 2026-11-08, and discrepancy permissions approved 2026-11-21. Cross-Shop service-order transfer is a separate requirement with a separate SPEC pending. See ADR-003, ADR-006 through ADR-008 and ADR-018.
 
 ## 1. Quantity policy
 
@@ -47,24 +47,27 @@ A reservation is tied to exactly one Sale or ServiceOrder and to the specific so
 
 ## 5. Service-order stock timing
 
-1. When a `ServicePartRequirement` is created, the Shop reserves currently available whole units immediately, when reservation is requested. If only part is available, reserve that portion and procure the remaining shortage; a blocking shortage moves the ServiceOrder to `AWAITING_PARTS`.
+1. Creating a `ServicePartRequirement` does not reserve stock. Stock replenishment increases on-hand and available quantity only. An employee must explicitly select the ServiceOrder requirement and requested quantity in a separate reservation action. The backend reserves no more than the currently available quantity; if less than requested is available, it creates a partial reservation for the available amount and reports the actual reserved and remaining quantities. A blocking requirement that remains short keeps the ServiceOrder in `AWAITING_PARTS`.
 2. A service deposit received at booking (for example, to secure a battery/keyboard order or as a guarantee) is recorded as a financial deposit. Receiving it does not itself consume stock.
 3. The ServiceOrder cannot transition to `FIXED` while any blocking part requirement remains short. Once all blocking requirements are reserved, an employee-authorized command resumes the order to `IN_PROGRESS`; after repair, transition to `FIXED` keeps the reservations while the repaired equipment awaits payment/pickup.
-4. When settled payments and explicitly applied deposits reduce the ServiceOrder balance to zero, the service payment command consumes reserved product parts atomically. This is the defined meaning of payment completion for stock posting; partial settlement does not deduct stock. Deduction is not delayed until the later physical `PICKED`/collection event.
-5. Non-blocking product entries follow the same full-settlement deduction rule. If a quantity-tracked balance becomes negative because of the payment posting, the signed deficit is retained and reported.
-6. If the order is cancelled before consumption, active reservations are released; no return movement is posted.
+4. For a ServiceOrder whose technical outcome is `FIXED`, settled payments and explicitly applied deposits reducing the balance to zero consume reserved Product parts atomically. Partial settlement does not deduct stock. The consumption is not delayed until physical `PICKED`/collection.
+5. For a ServiceOrder whose technical outcome is `NOT_FIXED`, reaching a zero balance does not consume or release stock. Reservations remain active until the customer handover action. At handover, the employee must explicitly record the quantity actually used from each reserved Product requirement. The command consumes only those recorded used quantities and releases every unused reserved quantity, atomically with the handover. If no part was used, all reservations are released. This applies whether the order is fully paid or still has an outstanding balance; handover itself does not settle the financial balance. Only quantities covered by active reservations can be recorded as used through this action.
+6. The `NOT_FIXED` handover usage record is a separate stock/ServiceOrder event, attributed to the employee and committed with the inventory movements and ServiceOrder `Notes`. A failed or rolled-back handover creates no usage, movement, release or Note.
+7. Non-blocking Product entries follow the same consumption timing as the ServiceOrder's technical outcome: full settlement for `FIXED`, explicit actual-usage recording at handover for `NOT_FIXED`. If a quantity-tracked balance becomes negative because of a permitted settlement posting, the signed deficit is retained and reported.
+8. If the order is cancelled before stock consumption, all active ServiceOrder reservations are released atomically with cancellation; reserved and available counters are updated, on-hand is unchanged, and no inbound/return movement is posted. If any parts were already consumed, cancellation does not reverse that consumption or automatically restock the parts. Any physically returned parts must use the separate selected StockReturn and inspection/disposition workflow.
 
-## 5A. Service-part procurement and receipt
+## 5A. Service-part replenishment and reservation
 
-The detailed workflow is specified in [Service Parts Procurement Workflow](service-parts-procurement.md). The inventory rules are:
+The former supplier-procurement workflow is retired. Parts to Buy is only a visibility list; purchases happen outside the application. Inventory replenishment is recorded through the normal Stock module and is not linked to an external purchase or a ServiceOrder allocation.
 
-1. Every part needed for a service job must exist as a product `ServiceOrderItem` and a `ServicePartRequirement`. A requirement has a positive integer quantity and may be marked `blocks_work` (default true).
-2. When a requirement is created, the Shop may reserve currently available units. If a blocking requirement is not fully reserved, the ServiceOrder moves to `AWAITING_PARTS`. A partially available requirement may be fulfilled by existing stock plus one or more supplier purchases.
-3. A Shop can create a `SupplierPurchase` with a supplier/source, order reference, purchase link, product listing link, order date, expected delivery date, tracking link/reference and notes. One purchase can contain several purchase lines and allocations to procurement request lines from multiple service orders in the same Shop; the request lines link back to durable service-part requirements.
-4. When goods arrive, an employee enters the actual accepted quantity, including partial deliveries. This posts `PURCHASE_RECEIPT_IN` only for the actual quantity received. Allocated quantities are reserved against the linked service requirements in the same transaction; unallocated over-order quantity stays available as normal Shop stock.
-5. Every order-status, ETA, tracking and receipt change is recorded in an append-only procurement event timeline. An overdue indicator is derived when the ETA passes while the purchase remains open.
-6. When every blocking requirement is fully reserved, an employee-authorized command resumes the ServiceOrder to `IN_PROGRESS`. Receipt is not an automatic repair-start event.
-7. Supplier purchasing is operational traceability plus inventory receipt. Supplier accounts payable, settlement, supplier returns and marketplace API integrations are out of the initial scope.
+1. Every part needed for a service job must exist as a Product `ServiceOrderItem` and a `ServicePartRequirement`. A requirement has a positive integer quantity and may be marked `blocks_work` (default true).
+2. Creating a requirement does not reserve stock. A stock receipt increases on-hand and available quantity only; it never automatically reserves or allocates received units to an order.
+3. `EMPLOYEE`, `MANAGER` or `ADMIN` may explicitly reserve available stock for a ServiceOrder requirement. Each reservation action requires a fresh employee code/password challenge; the backend resolves the employee, validates active status, Company membership and permission, and derives the Shop from ShopSession.
+4. The operator selects the target ServiceOrder requirement and requested whole-unit quantity. The backend checks current availability and creates the reservation atomically. It must never reserve more than the currently available quantity. If availability is lower than requested, reserve the available quantity as a partial reservation and return the actual reserved and remaining quantities to the UI. If no quantity is available, create no reservation and report the shortage.
+5. Each successful reservation/release records the server-resolved employee and timestamp in the relevant immutable inventory/ServiceOrder event and ServiceOrder `Notes`, atomically with the stock update. A failed or rolled-back action creates no event or Note.
+6. A blocking requirement that remains short keeps the ServiceOrder in `AWAITING_PARTS`. When every blocking requirement is fully reserved, an explicit employee-authorized resume command is still required to return the order to `IN_PROGRESS`; reservation itself never resumes work.
+7. Releasing a reservation is a separate explicit, employee-authorized action, except when a defined lifecycle operation (such as eligible cancellation) releases reservations atomically as part of that operation. Release restores availability only and does not change on-hand stock.
+8. No supplier, purchase-order, purchase allocation, ETA, tracking, supplier receipt or procurement event is recorded in this workflow.
 
 ## 6. Refund/cancellation and selected stock return
 
@@ -74,7 +77,16 @@ The detailed workflow is specified in [Service Parts Procurement Workflow](servi
 - A quantity return cannot exceed `consumed_quantity - already_returned_quantity` for the source line.
 - An unpaid cancellation only releases reservations; it must not create a positive `RETURN_IN` movement because no stock was previously deducted.
 - For serialized refurbished units, the exact original unit must be selected; a different device with similar model/specification is not interchangeable in the stock ledger.
-- Returned item inspection/condition disposition is still open. The model reserves fields for condition/disposition metadata but does not finalize a damaged-vs-resellable policy.
+
+### Approved return inspection and disposition
+
+- Physical receipt creates a selected `StockReturnLine` in `PENDING_INSPECTION`; this records custody but does not increase sellable stock.
+- An authorized inspection assigns one disposition: `RESTOCK`, `QUARANTINE` or `DISPOSE`. Only `RESTOCK` creates a positive `RETURN_IN` movement and increases `ShopInventory`.
+- A serialized refurbished return must be the exact unit from the original sale. On receipt it becomes `QUARANTINED`; it can return to `AVAILABLE` only after a passing inspection and explicit `RESTOCK` disposition.
+- For quantity-tracked products, split a return line when only part of its quantity can be restocked. Quantities pending inspection or quarantined are excluded from sellable on-hand/available balances; keep the return record as their custody/audit record.
+- Refund settlement and `REFUNDED`/`CANCELLED` status never trigger physical receipt, inspection or restocking. Unpaid cancellation still releases reservations only.
+
+This decision determines stock availability and audit mechanics only. It does not decide refund entitlement, consumer-law remedies, employee role permissions or any customer-facing assessment standard.
 
 ## 7. Inter-shop transfer
 
@@ -89,6 +101,28 @@ A transfer has source Shop, destination Shop, one or more product lines and a li
 - `CANCELLED`: allowed only before dispatch. A dispatched transfer requires a reverse/corrective transfer rather than status-only cancellation.
 
 Dispatch is an employee-authorized action in the source Shop session. Receipt is a separate employee-authorized action in the destination Shop session. Both Shops must belong to the same Company and must be different. At dispatch, only unreserved available quantities may leave the source. At receipt, record actual count, not merely requested count.
+
+### Approved transfer discrepancy handling
+
+- Post inbound inventory only for quantities physically counted and accepted by the destination Shop; accepted quantity cannot exceed dispatched quantity.
+- A short or damaged quantity is not accepted into destination sellable stock. Keep it outstanding on the transfer and record the discrepancy, reason, observed quantity and employee authorization. The transfer remains `PARTIALLY_RECEIVED` until every dispatched quantity is received or corrected by a separately documented transfer.
+- Do not automatically write off lost or damaged in-transit units. If the goods cannot be received or corrected, the transfer remains open; any future loss-adjustment workflow requires a separate decision and authorization.
+- If more units arrive than were dispatched, do not post the excess to inventory or alter the dispatch record. Record the overage and handle the extra units through a separately authorized transfer/document.
+- For serialized units, reconcile the exact dispatched unit IDs. A damaged unit stays unavailable until the receiving Shop records its disposition; an unaccounted unit keeps the transfer open.
+
+Every discrepancy action requires fresh direct employee credential validation, including active status and Company membership. The backend resolves the acting employee and enforces the following approved permissions:
+
+| Discrepancy action | EMPLOYEE | MANAGER | ADMIN |
+|---|---:|---:|---:|
+| Register a discrepancy | Yes | Yes | Yes |
+| Add reason, notes and evidence | Yes | Yes | Yes |
+| Record a later physical receipt against the outstanding quantity | Yes | Yes | Yes |
+| Authorize an administrative resolution | No | Yes | Yes |
+| Authorize an exceptional administrative closure | No | Yes | Yes |
+
+Registration records the observed facts; it does not authorize a write-off, alter dispatched quantities or close the transfer. A later physical receipt is processed through the normal receipt command and can accept only verified, acceptable quantities within the dispatched outstanding quantity. A corrective transfer remains a separately documented transfer and follows its own dispatch/receipt authorization.
+
+Only MANAGER or ADMIN may authorize an administrative resolution or exceptional closure. This permission does not create an automatic loss write-off or permit changing the original dispatch/receipt evidence. The resolution must retain its reason, employee attribution and link to the discrepancy; any stock adjustment requires a separately approved stock-adjustment workflow. Every protected action requires its own fresh employee code/password challenge.
 
 Serialized refurbished devices transfer by unit ID with quantity exactly one. A serialized unit in transit is unavailable in both Shops.
 
@@ -110,7 +144,7 @@ Recommended unit fields:
 
 - Internal `asset_code` (required and unique), QR/barcode value if used.
 - Manufacturer `serial_number` (capture whenever the manufacturer provides one; optional only when no manufacturer serial exists).
-- `brand`, `model`, condition grade, free-text description/notes. `asset_code` is mandatory and unique within the Company; populated normalized manufacturer serial is also unique within the Company.
+- `brand`, `model`, condition grade, free-text description/notes. `asset_code` is mandatory and unique within the Company; the normalized manufacturer + serial pair is also unique within the Company when populated.
 - Acquisition date/cost and asking price if the purchase/resale process needs them.
 - `current_shop_id` and status (`AVAILABLE`, `RESERVED`, `IN_TRANSIT`, `SOLD`, `QUARANTINED`, `DISPOSED`).
 
@@ -134,10 +168,11 @@ Every refurbished unit sold by the Company carries a 12-month commercial guarant
 
 ## 9. Required validation and idempotency
 
-- Lock the relevant ShopInventory row while reserving, releasing, consuming, transferring or returning quantity-tracked stock, or use an optimistic concurrency token with retry-safe commands.
+- For stock commands linked to a ServiceOrder, first lock the parent `service_order` row (`SELECT ... FOR UPDATE`) before locking reservation rows and then `shop_inventory` rows. This shared parent lock serializes reservation changes with payment settlement, deposit application, Pickup and cross-Shop ServiceOrder transfer. Lock multiple reservation and ShopInventory rows in ascending ID order. For standalone stock commands without a ServiceOrder, lock the relevant ShopInventory row while reserving, releasing, consuming, transferring or returning quantity-tracked stock, or use an optimistic concurrency token with retry-safe commands.
 - Verify availability after acquiring the lock; pre-read UI values are not authoritative.
+- ServiceOrder-linked stock commands use PostgreSQL `READ COMMITTED` with the canonical lock order documented in [Relational Database Model](database-model.md), section 4: ServiceOrder first, then transfer/deposit/payment rows when relevant, reservation rows, and ShopInventory. Re-read reservation and availability state after acquiring locks; do not rely on pre-lock UI values. A command must participate in the caller's transaction when invoked by payment settlement, Pickup or transfer acceptance.
 - Use a unique command/idempotency key for payment settlement, transfer dispatch/receipt and stock returns.
-- Every movement records Shop, Product, employee, action authorization, time, reason and source document/line.
+- Every movement records Shop, Product, the server-resolved employee actor, time, reason and source document/line. Protected stock commands validate the employee's fresh code/password directly; do not persist or reference an EmployeeActionAuthorization or authorization ID.
 - Never mutate `quantity_on_hand` without inserting the matching InventoryMovement in the same database transaction.
 - Reconcile the materialized reserved counter against active reservation lines periodically and provide an administrative repair/audit path.
 - For serialized refurbished units, enforce transitions with concurrency checks and prevent the same unit from being reserved/sold/transferred twice.
@@ -146,6 +181,21 @@ Every refurbished unit sold by the Company carries a 12-month commercial guarant
 
 1. Serial policy is specified: internal asset code is mandatory/Company-unique; manufacturer serial is captured when present and is Company-unique when populated. Exact acquisition/source fields can be refined during DDL review.
 2. The 12-month commercial guarantee duration is confirmed. Proposed coverage/exclusions and remedy terms are in [Refurbished Condition Grades and Customer Complaint Workflow](refurbished-condition-and-complaints.md), but must be reviewed before customer-facing publication.
-3. Initial stock design is one stock pool per Shop. Reservation-expiry automation and multiple internal stock locations are intentionally out of scope. Reservations remain active until explicitly released or consumed. Partial reservation/sourcing is supported for service-part requirements.
-4. Returned products are credited only through selected `StockReturnLine` quantities. The operational inspection/disposition policy for damaged or incomplete returns remains a future refinement; no automatic restock should occur merely because money was refunded.
+3. Initial stock design is one stock pool per Shop. Reservation-expiry automation and multiple internal stock locations are intentionally out of scope. Reservations remain active until explicitly released or consumed. Partial reservations are supported for service-part requirements; purchases and sourcing happen outside the application.
+4. Returned goods enter pending inspection outside sellable stock; only an explicit RESTOCK disposition credits inventory. Serialized units remain quarantined until inspection passes and restock is approved.
 5. `CREDIT_SALE` handover-before-full-payment remains disabled pending Irish legal/regulatory review; the initial enabled mode is `LAYAWAY`.
+
+
+## 11. Legacy evidence reconciliation
+
+See [Legacy Stock and ServiceOrder Reconciliation](legacy-stock-service-order-reconciliation.md) for the source-level comparison with `hermanCosta/pchousestoremvn`. The legacy application stores a manually editable product quantity and provides a low-stock listing, but the reviewed source does not establish a stock ledger, reservation lifecycle or automatic ServiceOrder/Sale stock deduction. The target has no minimum-stock field or reorder threshold: `qty` represents physical on-hand stock (`quantity_on_hand`), while reservations are tracked separately. The target stock ledger, explicit reservations, settlement consumption and independent pickup/refund/cancellation flows are approved redesign behavior, not legacy parity. Import legacy physical quantities only after a separate data-validation decision.
+
+
+## ServiceOrder Pickup stock rules (2026-11-20)
+
+- Pickup is allowed from both `FIXED` and `NOT_FIXED`; lifecycle becomes `PICKED` while technical outcome remains independently stored.
+- `FIXED`: Pickup performs no inventory movement and does not consume, release or mutate reservations. Reserved parts are consumed only by the existing full-financial-settlement rule.
+- `NOT_FIXED`: present all active reservations with reserved, used and calculated released quantities. Used quantity is an integer from zero through the active reserved quantity. Consume only used reserved quantity and release the unused remainder atomically with Pickup. Zero use releases all active reservations. If no active reservations exist, skip stock disposition. Unreserved products/quantities cannot be added to this command.
+- Financial balance is irrelevant to Pickup eligibility and stock disposition. Pickup does not settle, waive or refund any amount.
+- The stock disposition, movements, reservation updates, ServiceOrder state, immutable event and Note share one transaction. A rollback leaves no partial effects.
+- Require fresh employee code/password authorization, explicit confirmation, an idempotency key and concurrency protection. A repeated committed key returns its original result; a concurrent distinct command loses with a conflict. No direct undo/cancel is offered; corrections require a separate auditable stock operation.

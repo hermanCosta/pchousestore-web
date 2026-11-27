@@ -102,6 +102,8 @@ The flow supports customer matching by contact, brand/model/serial autocomplete,
 
 `ServiceOrderController` exposes create, update, status update and transfer operations. Creation receives the order plus fault rows, product/service rows, payment rows, an optional deposit and an optional note.
 
+**Transfer evidence:** `controllers/ServiceOrderController.java#transferServiceOrderController` delegates to `dao/ServiceOrderDAO.java#transferServiceOrderDAO`. The DAO changes the existing order's `Company` reference to the selected target and persists an `OrderNote`; `views/modals/TransferingOrderModal.java` prompts for an employee credential and target Company. The owner confirms that the target web workflow must support sending a service order/work to another Shop as well as transferring Product stock. The destination Shop assumes operational and financial responsibility; transactions from transfer onward use the destination. Already-settled transactions remain attributed to the source; outstanding balance and held/unapplied deposit liability transfer to the destination through an audited internal event without a cash receipt. Device custody, product-part inventory attribution, transfer authorization and exact event fields remain OPEN. The legacy uses Company as the transfer target; target-web behavior must map this to Shop because the target model is one Company with multiple Shops.
+
 `FixedServiceOrderView.payServiceOrder` asks for operator authorization, opens the payment modal for the order's due amount, persists the resulting payment rows and creates an order note. `ServiceOrderPaymentDAO.addOrderPaymentDAO` persists payment rows and then sets the order status to `PICKED` and its picked timestamp.
 
 `PickedOrderView` exposes a refund action. A refunded service order is represented with `OrderStatus.REFUNDED` and a refund record.
@@ -118,7 +120,7 @@ In `CreatedServiceOrderView.updateOrderStatus`, the order status update and the 
 - Whether serial numbers are globally unique, unique per company, or simply searchable.
 - Rules for deposits, payment installments, additional service items and recalculated balances.
 - Meaning of `FINISHED` versus `FIXED` and which user action produces each state.
-- Transfer destination, ownership and audit requirements.
+- Device custody, product-part inventory attribution, transfer authorization and exact transfer-event fields. The legacy has a Company reassignment plus OrderNote path; it does not settle these redesigned Shop semantics.
 
 ## 6. Refurbished-equipment workflow — confirmed observations
 

@@ -4,7 +4,7 @@
 
 - Target .NET 10 and current supported C# language version.
 - ASP.NET Core Web API.
-- EF Core with MySQL provider selected after compatibility verification.
+- EF Core with Npgsql provider for PostgreSQL; validate generated migrations and concurrency behavior before production use.
 - Use dependency injection and options pattern.
 - Keep controllers/endpoints thin.
 - Put orchestration in Application and invariants in Domain.
@@ -13,7 +13,9 @@
 - Use CancellationToken on asynchronous I/O.
 - Use transactions for multi-aggregate workflows where atomicity is required.
 - Use optimistic concurrency where concurrent updates are possible.
-- Centralize exception handling and return Problem Details.
+- Centralize exception handling and return the application's standard HTTP error envelope: `code`, `message`, and optional field-level `errors`. Keep this envelope consistent across all HTTP feature contracts. It may be implemented using RFC 9457 Problem Details internally or through compatible extensions, but clients must receive the documented stable fields and semantics.
+- Use the standard status semantics: `400` for malformed/invalid request shape; `401` for missing/invalid authentication or credential challenge; `403` for an authenticated/valid actor lacking permission or scope; `404` for a resource not found within the caller's authorized scope; `409` for idempotency/state/concurrency conflicts; `422` for structurally valid requests rejected by business rules; and `500` for unexpected server failures with a generic public message. A feature contract may define a justified, explicitly documented exception.
+- Error codes are stable machine-readable identifiers. Messages are concise and safe for users. Field errors identify the affected field and may include a stable field-level code. Never expose secrets, credential-validation details useful for guessing, stack traces, internal exception text, database/provider details or cross-tenant resource existence.
 - Validate input at API boundary and enforce domain invariants independently.
 - Use structured logging with sensitive-data redaction.
 - Add unit tests for domain/application behavior and integration tests for persistence/API.
@@ -28,13 +30,12 @@
 - Shared master data (customers, employees, catalogue, products/services, devices and faults) is company-level by default.
 - Do not trust a `shop_id`, `employee_id`, total or balance supplied by the browser as authoritative.
 
-## Shop session and employee action authorization
+## Shop session and direct employee credential validation
 
 - The persistent authentication principal represents the Shop and contains no active Employee identity or employee role.
-- Before each protected committed business operation, validate the executing employee's password, active status, Company ownership relative to the active Shop and permission for the action. Employee accounts and MANAGER/TECHNICIAN roles are Company-wide; no ShopEmployee assignment is required.
-- Create a short-lived, one-time EmployeeActionAuthorization scoped to ShopSession, Shop and action code (and, where practical, a canonical operation/request fingerprint). Roles are Company-wide `MANAGER`/`TECHNICIAN`; the same Employee password works in all Shops owned by the Company.
-- Consume the authorization exactly once in the same database transaction as the business write. Reject expired, consumed, wrong-Shop, wrong-action and replayed authorizations.
-- Persist the employee actor from the server-validated authorization, not from a client-supplied employee ID.
+- Before each protected operation, validate the submitted employee code/password directly against the Company-wide employee credential. Verify active status, Company membership and the feature-specific permission in the active Shop context. Active profiles are EMPLOYEE, MANAGER and ADMIN; no ShopEmployee assignment is required.
+- Do not create, issue, persist, consume or accept an EmployeeActionAuthorization token, entity or endpoint. A fresh employee credential challenge is part of each protected request and is revalidated on retries and idempotent replays.
+- Resolve and persist the employee actor from the server-side credential validation, never from a client-supplied employee ID.
 - Log successful/failed challenges without logging credentials, hashes or PINs.
 
 ## OAuth 2.0 / OpenID Connect and API protection
@@ -47,7 +48,7 @@
 - Require `shop.api` scope and policy authorization for API endpoints. Use 401 for invalid/missing tokens and 403 for valid tokens lacking permission.
 - Keep access tokens in React memory only; no localStorage/sessionStorage/IndexedDB. Refresh tokens are optional; if enabled for the public client, rotate them and detect reuse.
 - Do not use Implicit or Resource Owner Password Credentials grants. Do not use ASP.NET Core Identity's proprietary bearer tokens as a substitute for OAuth/OIDC. Do not implement a custom JWT issuer.
-- Employee code/password remains a separate one-operation challenge, consumed atomically through EmployeeActionAuthorization. OAuth authenticates the Shop context; it does not replace employee attribution.
+- Employee code/password is submitted as a fresh challenge for each protected operation and validated directly by the backend. Never store raw credentials, include them in request hashes or snapshots, or write them to logs. OAuth authenticates the Shop context; it does not replace employee attribution.
 - Use HTTPS, exact redirect URI registration, strict CORS allowlists, rate limits, secure asymmetric signing keys, secret redaction and an OpenAPI OAuth2 security definition.
 
 ## Inventory and finance

@@ -1,3 +1,5 @@
+> **SUPERSEDING PRODUCT DECISION (2026-11-20):** The employee authorization design in this document is superseded by [Employee Management](../04-features/employee-management.md). Do not use `TECHNICIAN` as an active role and do not create/use `EmployeeActionAuthorization` tokens, entities or endpoints. For every feature-defined protected operation, validate the acting employee's own credential directly in the backend, freshly for that operation, and enforce active status, Company membership and feature-specific role permission. Keep employee identity and roles out of the Shop OIDC token and ShopSession. All Shop OIDC/OAuth protocol, JWT validation and Shop-session rules in this document remain in force unless explicitly contradicted by the employee-management SPEC. The legacy employee authorization endpoint, token header, EF entity and table mapping have been removed from the current code; migration `20261121153000_RemoveEmployeeActionAuthorization` is pending application. Any remaining references to `EmployeeActionAuthorization` or its endpoint/DTO are historical only.
+
 # API Authentication and Token Security — OAuth 2.0 / OpenID Connect
 
 **Status:** TARGET DECISION RECORDED — v19. Implementation and deployment review remain pending.
@@ -15,7 +17,7 @@ The authorization principal is the **Shop access context**, not an employee. Thi
 - JWT access tokens in the `Authorization: Bearer <access_token>` header for `/api/v1/**` endpoints.
 - A public React SPA client; no client secret is shipped to the browser.
 - A self-hosted authorization server implemented with OpenIddict in the ASP.NET Core solution is the default implementation choice. Keep the protocol standards-based so a compatible external OIDC provider can replace it later without changing business rules.
-- OpenIddict token/authorization persistence uses its EF Core integration and the same MySQL deployment, subject to provider/migration compatibility tests.
+- OpenIddict token/authorization persistence uses its EF Core integration and the same PostgreSQL deployment, subject to provider/migration compatibility tests.
 
 Do not treat ASP.NET Core Identity API's proprietary bearer tokens as OAuth/OIDC access tokens. Use an actual OAuth/OIDC authorization server and standard JWT Bearer validation in the API.
 
@@ -31,20 +33,19 @@ The token/session must never include:
 
 - `employee_id`;
 - employee code, name, or password;
-- `MANAGER` or `TECHNICIAN` as the logged-in Shop principal's role;
+- any employee role or permission as the logged-in Shop principal's role;
 - an employee identity inherited from a previous operation.
 
 ### Employee actor
 
-Employee authentication remains a separate, action-level business authorization mechanism:
+Employee identity is resolved only for operations whose feature specification requires employee authorization:
 
 1. The bearer token authenticates the current Shop context.
-2. For each protected write, React prompts for `employee_code` and password.
-3. The API validates the employee hash, active status, Company ownership and role permission for the requested action.
-4. It creates a short-lived `EmployeeActionAuthorization` bound to `ShopSession`, `Shop`, action code and operation-context hash.
-5. It consumes that authorization exactly once in the same database transaction as the business command.
+2. For each protected operation, the client collects the acting employee's code and password.
+3. The API validates the employee password hash, active status, Company membership and feature-specific permission on the server.
+4. The backend resolves the employee actor and executes the authorized business operation. The credential validation and business operation must be protected against replay and must not rely on a reusable or one-use authorization token.
 
-No employee access token is issued and the employee password challenge does not become an OAuth grant. A fresh employee challenge is required for the next protected action.
+No employee access token is issued, and the employee password challenge is not an OAuth grant. A fresh credential validation is required for each protected operation. Raw employee credentials must never be stored in logs, request hashes, idempotency snapshots or audit payloads. The active role baseline is `EMPLOYEE`, `MANAGER` and `ADMIN`; `ADMIN` inherits `MANAGER` permissions unless a feature-specific exception is explicitly defined.
 
 ## 3. Authorization Code + PKCE flow
 
@@ -55,7 +56,7 @@ No employee access token is issued and the employee password challenge does not 
 5. React redeems the code at the token endpoint using the matching PKCE `code_verifier`.
 6. The authorization server issues an OIDC ID token for the Shop principal and an OAuth access token for the API. The ID token is for the client sign-in result; **only the access token is sent to the API**.
 7. React calls the API with `Authorization: Bearer <access_token>`.
-8. When the access token expires, the client uses a refresh token only if enabled; refresh tokens must be rotated with reuse detection. Alternatively, it can re-run authorization against the still-active Shop OIDC session.
+8. Before the access token expires, the client silently re-runs Authorization Code + PKCE with `prompt=none` against the active Shop OIDC session in a hidden iframe. The client keeps the new access token in memory; refresh tokens remain disabled. If the OIDC cookie or ShopSession has expired/revoked, silent renewal fails and the client requires interactive sign-in. This does not extend ShopSession lifetime.
 9. Shop sign-out revokes the `ShopSession`, authorization/refresh-token family and server-side OIDC session. API calls associated with a revoked session are rejected.
 
 The Shop password is entered only at the authorization endpoint's interactive login UI. Do not implement the OAuth Resource Owner Password Credentials grant (`grant_type=password`) or a custom username/password token endpoint.
@@ -75,12 +76,12 @@ Required standard claims/validation inputs:
 - `scope` — includes `shop.api`;
 - `company_id`, `shop_id`, `shop_session_id` — server-issued Shop context claims.
 
-No employee claim or employee role is allowed in this token. `MANAGER`/`TECHNICIAN` permissions are evaluated only by the employee action challenge and authorization policy.
+No employee claim or employee role is allowed in this token. Feature-specific employee permissions are evaluated by the backend after fresh credential validation; the active roles are `EMPLOYEE`, `MANAGER` and `ADMIN`, with `ADMIN` inheriting `MANAGER` permissions unless a feature-specific exception is explicitly defined.
 
 Initial token policy proposal:
 
 - Access token lifetime: 10 minutes (configurable, keep short).
-- Refresh token: optional for v1; if enabled for the public client, use rotation, family tracking, replay/reuse detection and revocation. Never store a raw refresh token in MySQL application tables or logs.
+- Refresh token: optional for v1; if enabled for the public client, use rotation, family tracking, replay/reuse detection and revocation. Never store a raw refresh token in PostgreSQL application tables or logs.
 - Shop session idle/absolute lifetime: configurable and remains a separate operational policy; do not silently derive it from JWT expiry.
 - Validate ShopSession active/revoked status at API authorization time (directly or through a short-lived server-side cache) so a logged-out/revoked Shop cannot continue using otherwise unexpired tokens.
 
@@ -93,7 +94,7 @@ The final expiry/idle values require a security/operations acceptance test; the 
 - Apply a default authorization policy to all `/api/v1/**` endpoints. Public exceptions are limited to health/readiness and OIDC protocol endpoints as required.
 - Require the `shop.api` scope for application API calls, then apply action-specific authorization policies.
 - Derive `CompanyId` and `ShopId` from the verified token and active ShopSession record. Reject or ignore client-supplied Shop identifiers as authorization context.
-- Apply rate limits to authorization, token and employee challenge endpoints; use account-level lockout without terminating the Shop session for other employees.
+- Apply request-rate limits to authorization, token and employee credential-validation endpoints by source/network and endpoint. Failed employee credential attempts must not lock or disable employee credentials, create credential-specific rejection windows or invalidate the shared ShopSession.
 - Use HTTPS only, exact registered redirect URIs, strict allowed CORS origins, secure token signing-key storage, short token lifetimes, security headers/CSP and redacted logs.
 - React keeps access tokens in memory only; never write access/refresh/ID tokens to `localStorage`, `sessionStorage`, IndexedDB, analytics or browser logs. Never send ID tokens to the API.
 - Since API calls use an explicit Authorization header, do not add cookie-based authentication as an implicit fallback for `/api/v1/**`. The authorization server's own HttpOnly cookie is only for its Shop sign-in session.
@@ -114,7 +115,7 @@ The final expiry/idle values require a security/operations acceptance test; the 
 - Authorization server: OpenIddict Server + ASP.NET Core integration; EF Core token/application/authorization persistence.
 - Credentials: `ShopAccessCredential` with a vetted password hasher; keep it logically separate from `Employee.password_hash`.
 - API resource server: `Microsoft.AspNetCore.Authentication.JwtBearer` plus ASP.NET Core policy-based authorization.
-- Employee operation authorization: existing `EmployeeActionAuthorization` application/domain service; it is not replaced by OAuth.
+- Employee operation authorization: backend validation of fresh employee credentials for each feature-protected operation, including active status, Company membership and feature-specific permission. Do not create or use `EmployeeActionAuthorization`.
 - React: OIDC authorization-code client integration configured as a public SPA client with PKCE `S256` and memory-only token handling.
 
 OpenIddict's ASP.NET Core integration documents support for ASP.NET Core/.NET 10. Package versions must be pinned and tested together during implementation; do not copy an old package version from a sample without compatibility review.

@@ -1,5 +1,7 @@
 # Service Parts Purchase Queue — Screen Specification
 
+> **SUPERSEDED — DO NOT IMPLEMENT.** On 2026-11-20 the Product Owner replaced this purchasing queue with the simplified **Parts to Buy** list. This file is retained only as historical discovery context. Do not implement the procurement route, purchasing queue, buyer workflow, supplier purchases, request rounds, photos, ETA/tracking, allocations or receipt handling. Follow [SO-01 Service Orders](../04-features/service-orders.md) and [Product Owner Decisions](product-owner-decisions.md) for the approved scope.
+
 **Status:** DRAFT — product-owner requirement recorded 2026-11-05.  
 **Module:** Supplier Procurement / Service Operations  
 **Route proposal:** `/procurement/service-parts`  
@@ -99,18 +101,18 @@ The detail view contains:
 - Allow capture from a mobile device camera as well as file selection from desktop/mobile storage.
 - Allow multiple images per request line. Suggested roles: `PART_OVERVIEW`, `MODEL_OR_SERIAL_LABEL`, `CONNECTOR`, `DAMAGE`, `OTHER`.
 - Images should help identify compatibility: the removed/old part, printed part number, model label, connectors, dimensions and visible damage are common useful references.
-- Store image bytes in the same MySQL database using the shared `stored_image.content MEDIUMBLOB` table and a bounded `thumbnail_content BLOB`. No object storage, filesystem or external file service is used.
+- Store image bytes in the same PostgreSQL database using the shared `stored_image.content BYTEA` and `thumbnail_content BYTEA` columns. No object storage, filesystem or external file service is used.
 - Validate content by file signature/MIME, enforce the 10 MiB limit and image-count limits, re-encode accepted images, strip EXIF/GPS and store a SHA-256 digest.
-- Do not expose public URLs or storage keys. The client requests an opaque image ID through an authorization-checked ASP.NET Core endpoint. The endpoint verifies the attachment parent and active Shop before streaming thumbnail/full BLOB bytes.
+- Do not expose public URLs or storage keys. The client requests an opaque image ID through an authorization-checked ASP.NET Core endpoint. The endpoint verifies the attachment parent and active Shop before streaming thumbnail/full binary content.
 - Deleting an image is a soft-delete/audited action recorded in `ServiceProcurementRequestEvent`; preserve history where the image was previously used for a purchase decision. A replacement image can be added without erasing the old one.
 
-Initial limits are 10 MiB per image, 10 images and 100 MiB aggregate per target. The image bytes are stored in MySQL; soft-delete is audited and no automatic physical purge runs in v1. Exact GDPR retention schedule remains pending.
+Initial limits are 10 MiB per image, 10 images and 100 MiB aggregate per target. The image bytes are stored in PostgreSQL; soft-delete is audited and no automatic physical purge runs in v1. Exact GDPR retention schedule remains pending.
 
 ## 7. Actions and employee authentication
 
 Supplier purchase creation, linking, updates and receipt do not require a second manager approval. This does not bypass the executing employee's role permission or per-operation password challenge. The persistent session identifies only the Shop. Every write action requires fresh employee authentication and a single-use action authorization, including create/edit/cancel request, upload/delete image, assignment, purchase linkage and receipt. The employee who created a request is not assumed to be the buyer or the employee who later receives the part.
 
-Action codes use the proposed v1 matrix in `employee-access-and-roles.md`: `PROCUREMENT_REQUEST_CREATE`, `PROCUREMENT_REQUEST_UPDATE`, `PROCUREMENT_REQUEST_CANCEL`, `PROCUREMENT_IMAGE_UPLOAD`, `PROCUREMENT_IMAGE_DELETE`, `PROCUREMENT_ASSIGN`, `SUPPLIER_PURCHASE_LINK`, `SUPPLIER_PURCHASE_RECEIVE`.
+Action codes use the approved v1 matrix in `employee-access-and-roles.md`: `PROCUREMENT_REQUEST_CREATE`, `PROCUREMENT_REQUEST_UPDATE`, `PROCUREMENT_REQUEST_CANCEL`, `PROCUREMENT_IMAGE_UPLOAD`, `PROCUREMENT_IMAGE_DELETE`, `PROCUREMENT_ASSIGN`, `SUPPLIER_PURCHASE_LINK`, `SUPPLIER_PURCHASE_RECEIVE`.
 
 ## 8. Status behavior
 

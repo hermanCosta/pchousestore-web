@@ -1,27 +1,64 @@
 # Financial Model — Ireland deployment
 
-**Status:** DRAFT · v15 incorporates CASH/CARD-only tender, Manager-only refunds, deposit terms, MySQL image storage policy and deferred processor integration. This is an operational data model, not legal, tax or accounting advice.
+**Status:** Approved operational v1 financial rules, reconciled with employee authorization and refund decisions as of 2026-11-21. Customer-facing deposit wording, legal terms, tax and accounting mappings remain subject to external review. This is an operational data model, not legal, tax or accounting advice.
 
 ## 1. Scope and decisions
 
-The model supports one Company with multiple Shops, a persistent Shop session and employee authentication per protected operation. Every payment, deposit, refund, cash movement and close is scoped to the active Shop and attributed to the employee authorization that performed it.
+The model supports one Company with multiple Shops, a persistent Shop session and employee authentication per protected operation. Every payment, deposit, refund, cash movement and close is scoped to the active Shop and attributed to the employee whose fresh code/password challenge is directly validated by the backend for that operation.
 
 | Requirement | Target rule | Status |
 |---|---|---|
 | Tender methods | `CASH` and `CARD` only in v1; enabled per Shop | DECIDED |
 | Service deposits | Receive at service booking; track purpose and disposition | DECIDED |
 | Weekly refurbished instalments | Plan plus dated schedule and receipts | DECIDED; fulfillment/legal mode pending |
-| Refunds | Partial and total; Manager-only; original tender by default | DECIDED v1 baseline |
+| Refunds | Partial and total; `MANAGER` and `ADMIN`; original tender only | DECIDED v1 baseline |
 | Currency | EUR | DECIDED baseline |
 | Cash rounding | Optional per Shop, Ireland €0.05 cash-only rounding | DECIDED baseline |
-| Approval policy | Every refund and deposit forfeiture requires a fresh Manager authorization; no second Manager approver; procurement has no second approval | DECIDED v1 baseline |
+| Approval policy | Every refund requires a fresh `MANAGER` or `ADMIN` code/password challenge; deposit forfeiture requires `MANAGER`; no second approver | DECIDED v1 baseline |
 | VAT feature | Company-level `vat_enabled` flag; initial behavior is OFF (no VAT amount is added by the application) | NO-CHARGE SOFTWARE SETTING DECIDED; legal status/reason still OPEN |
 | Reconciliation formula | Ledger-derived per Shop/day; external accounting reconciliation deferred | Operational close defined; accountant mapping deferred |
+
+### Approved financial reconciliation controls (technical review 3 — decision 5)
+
+The Product Owner approved on 2026-11-22 a read-only reconciliation capability, executable on demand and on a scheduled daily basis.
+
+**Required reconciliation checks**
+
+1. **ServiceOrder balance:** compare materialized `balance_due` with the canonical formula: order total less settled `PAYMENT` credits and committed `DepositApplication` credits. Exclude unapplied deposit receipts, refunds, deposit refunds and internal transfer events.
+2. **Deposit liability:** calculate `available_held` independently for every deposit from settled receipts, committed applications, settled deposit refunds and valid authorized forfeitures. Verify event-to-source references, currency and materialized held-balance projection; `RELEASED` has no effect.
+3. **Payment integrity:** compare each PaymentTransaction amount with its PaymentAllocations; verify allocation sums, tender/change/rounding values, original-transaction links, settlement status and cumulative refund caps. Check that only SETTLED transactions contribute to balances and drawer totals.
+4. **Cash and closing:** compare settled cash tender, change, cash-rounding adjustment, cash refunds/deposit refunds and cash movements against the DailyClosing expected-cash calculation. Do not duplicate PaymentTransactions as CashMovements.
+5. **Shop transfer:** compare each accepted transfer's immutable financial event header and component lines with the canonical order balance and each per-deposit liability snapshot at acceptance. Verify one event per accepted transfer, exact source references, currency, line/header totals and no duplicate or omitted liability.
+6. **Cross-ledger consistency:** verify each financial effect is represented once across transaction, allocation, deposit event/application, ServiceOrder balance projection, cash closing and transfer event. A source reference validates a ledger event; it must not cause the same amount to be summed twice.
+
+**Execution and evidence**
+
+- Run on demand by an authorized Manager/Admin and automatically once per business day after the Shop's DailyClosing window. The scheduled run is read-only and must not delay or mutate a closed DailyClosing.
+- A run records its scope (Company/Shop/business date and applicable aggregate IDs), start/completion timestamps, trigger (manual/scheduled), initiating actor or system identity, check set/version, outcome, counts by severity and a durable reference to detailed findings.
+- Preserve run history and findings append-only. A rerun creates a new run; it never overwrites an earlier result. Do not persist secrets or raw credential material in findings.
+- Outcomes distinguish `PASSED`, `FAILED` and `INCOMPLETE` (for example, a technical failure preventing a complete scan). Findings identify affected records, expected and observed amounts, currency, check code and source references without modifying the source ledger.
+- A mismatch blocks only the affected financial aggregate/operation and any transfer that depends on it. Unrelated Shops and aggregates continue operating. A technical `INCOMPLETE` run does not certify the scope as reconciled; sensitive operations in an unverified affected scope must fail closed until a complete check or explicit safe validation is available.
+- Reconciliation never auto-corrects balances, inserts compensating events, changes transaction status, rewrites transfer events or deletes history. Resolution must use a separately authorized business operation or controlled data-correction procedure with its own audit trail. Re-run reconciliation afterward.
+- This is internal operational reconciliation. External accounting, bank/acquirer settlement and Irish tax/accounting mapping remain separate integrations/reviews and are not claimed by a PASSED result.
+
 
 ## 2. Ireland localization and monetary precision
 
 - Company defaults: `country_code = 'IE'`, `default_currency_code = 'EUR'`, `time_zone = 'Europe/Dublin'`.
-- Use C# `decimal` and MySQL `DECIMAL(19,2)` for transaction amounts in EUR. Never use binary floating point for amounts.
+- Use C# `decimal` and PostgreSQL `NUMERIC(19,2)` for transaction amounts in EUR. Never use binary floating point for amounts.
+
+### Approved monetary precision and rounding policy (technical review 3 — decision 4)
+
+The Product Owner approved on 2026-11-22:
+
+- All persisted monetary amounts denominated in EUR use exactly two fractional decimal places and PostgreSQL `NUMERIC(19,2)`; application code uses C# `decimal`. Never use `float`, `double` or binary floating point for monetary values.
+- Intermediate calculations (for example percentage/tax calculations, prorations and aggregate calculations) retain higher decimal precision. Do not round at each arithmetic step or at each intermediate subtotal. Convert to the two-decimal persisted amount only at the defined monetary posting boundary for the relevant operation, using the rounding rule explicitly specified for that operation.
+- The unrounded calculation inputs/results needed to explain a posted amount must remain reproducible from immutable price, quantity, discount, tax-code/rate and transaction snapshots. Do not silently recompute historical documents using current configuration.
+- The standard persisted transaction amount and customer balance use two decimals. The optional Irish cash-rounding adjustment is a separate signed amount, also persisted to two decimals; it does not mutate the order total, line prices, taxable base, tax calculation or canonical ServiceOrder balance formula.
+- Cash rounding remains optional per Shop and applies only to an eligible bill paid entirely in CASH, rounding the final bill to the nearest €0.05 using the Irish cent-ending pattern already specified below. Mixed CASH/CARD tender is not rounded in v1. CARD and other electronic tenders are never rounded. Exact-change handling remains available.
+- Keep distinct values reconcilable: unrounded document total, posted amount applied to the customer balance, cash tendered, change returned and signed cash-rounding adjustment. The cash drawer amount must be derived consistently from cash tender/change and the adjustment; never fold the adjustment into a line discount or tax base.
+- The specific tax rounding boundary/method and accounting presentation must be confirmed with the Irish accountant before VAT-enabled production documents are finalized. This decision does not choose a tax rounding method or legal/accounting treatment.
+
 - Store `currency_code` on sales, service orders, deposits, payment transactions, refunds and instalment plans so historical documents remain self-describing. Multi-currency settlement is out of the initial scope.
 - Initial product-owner instruction: no VAT is to be added/charged by the application while the Company-level `CompanyTaxConfiguration.vat_enabled` flag is `false`. The configuration defaults to `false` and `setup_status = NOT_REVIEWED`. This describes current software behavior only; it does not establish that the business is legally outside VAT or exempt. Before production tax documents are finalized, an Irish accountant must confirm the Company's position and either document the lawful disabled state or configure and enable the applicable VAT setup.
 - Before production tax-document finalization is enabled, the Company tax setup must be reviewed and marked READY by an authorized administrator based on Irish accountant advice. If VAT is enabled, tax codes, effective-dated rates, registration details and price display mode must be populated. If VAT is disabled, the reason/legal basis must be recorded after review.
@@ -42,6 +79,30 @@ Target application behavior:
 5. Allow exact-change handling when requested; do not round card, bank transfer or other electronic allocations.
 6. Keep cash received/change and amount applied to the customer balance separately reconcilable. A rounding adjustment is not a line discount and is not a change to VAT base.
 
+### Approved cash-rounding refund cap (technical review 4 — decision 1)
+
+The Product Owner approved on 2026-11-22 that refunds are capped by the amount actually received/settled through each original tender allocation, not solely by the amount credited to the order.
+
+```text
+physical_cash_received = amount_applied + cash_rounding_adjustment
+                       = amount_tendered - change_amount
+
+cash_refundable_remaining =
+    physical_cash_received
+    - sum(PENDING and SETTLED cash refund allocations linked to this original allocation)
+```
+
+- The signed adjustment is the rounded cash amount minus the unrounded amount applied to the customer balance. Example: €10.02 applied, -€0.02 cash-rounding adjustment, €10.00 physically received.
+- In that example, the maximum cumulative cash refund is €10.00, not €10.02. The €0.02 rounding concession is not money received and cannot be refunded.
+- For CARD, the refundable cap is the amount actually approved/settled on the original card allocation, less PENDING and SETTLED refund allocations linked to that allocation. CARD has no cash-rounding adjustment.
+- For a transaction split across CASH and CARD, enforce each tender's remaining refundable amount independently; no refund may exceed the original allocation's actual received/settled amount. Mixed-tender cash rounding remains disabled in v1.
+- Apply the same original-tender cap to `REFUND` and `DEPOSIT_REFUND`. A refund must reference the original transaction and allocation; alternative tender is not allowed in v1.
+- Calculate the cap under the ServiceOrder-first lock order (when ServiceOrder-linked), then lock original transaction/allocation rows in stable ID order. Concurrent refunds must not over-refund any tender allocation.
+- The original `amount_applied`, order total, tax base and deposit/order ledger credits are not rewritten by a refund. Refunds remain separate outgoing-funds transactions.
+
+This rule governs the maximum refundable cash/card received. Consumer-law or contractual entitlement may require a different business resolution; the application must not pay more through the original tender than was actually received.
+
+`refundable_remaining(original, allocation) = original_allocation_received_amount - sum(PENDING and SETTLED refund allocations referencing that original allocation)`; the original transaction's overall cap is the sum of its per-allocation remaining caps.
 ## 3. Configurable tender methods
 
 `PaymentMethod` is a catalogue seeded with exactly two active methods in v1: `CASH` and `CARD`. `ShopPaymentMethod` enables/disables these methods per branch. Other tenders (bank transfer, store credit, cheque, online payment) are out of initial scope.
@@ -54,7 +115,7 @@ Only a transaction in `SETTLED` state contributes to the paid balance or till. F
 
 ## 4. Service deposits at booking
 
-A `ServiceDeposit` is created against a `ServiceOrder`. The receipt is captured at booking through a `PaymentTransaction` of kind `DEPOSIT_RECEIPT`, with its tender allocations. Supported purpose values:
+A `ServiceDeposit` is created against a `ServiceOrder`. Its incoming receipt is captured at booking through a `PaymentTransaction` of kind `DEPOSIT_RECEIPT`, with its tender allocations. `DEPOSIT_RECEIPT` and `DEPOSIT_REFUND` transactions target the `ServiceDeposit`; ordinary `PAYMENT` and `REFUND` transactions target exactly one `Sale` or `ServiceOrder`. A `DEPOSIT_REFUND` references the original settled `DEPOSIT_RECEIPT`; a `REFUND` references the original settled `PAYMENT`. Supported purpose values:
 
 - `PARTS_PREORDER`: customer provides funds toward an expected part such as a battery or keyboard.
 - `BOOKING_ADVANCE`: advance intended to be credited to the service price later.
@@ -65,23 +126,101 @@ The deposit record contains the agreed target amount, currency, purpose, terms s
 
 ### Deposit lifecycle
 
-`OPEN -> PARTIALLY_FUNDED -> HELD -> PARTIALLY_APPLIED -> APPLIED`
-
-Alternative terminal outcomes include `REFUNDED` and `FORFEITED`; a partially refunded deposit may remain open for its residual held amount. `valid_until` is null by default; no automatic expiry applies.
+The deposit status is a derived projection, not a manually advanced state machine. Its values are `OPEN`, `PARTIALLY_FUNDED`, `HELD`, `PARTIALLY_DISPOSED` and `CLOSED`. Applications, refunds and forfeitures are immutable ledger facts and may coexist; they are not mutually exclusive status values. The canonical per-deposit liability formula remains authoritative. `valid_until` is null by default; no automatic expiry applies.
 
 - A deposit received at booking is a cash/bank/card movement and appears in the correct Shop cash/financial report.
 - It is not automatically applied to `ServiceOrder.balance_due`.
-- `DepositApplication` is an explicit, non-cash operation that credits the service order, optionally against a specific `ServiceOrderItem`. It must be employee-authorized and cannot exceed the deposit's available held balance.
-- `DEPOSIT_REFUND` is a real outgoing payment linked to the original deposit receipt. Refund tender allocations identify how money was returned.
+- `DepositApplication` is an explicit, non-cash operation that credits the service order, optionally against a specific `ServiceOrderItem`. It requires fresh direct employee credential validation and feature-specific permission, and cannot exceed the deposit's available held balance.
+- `DEPOSIT_REFUND` is a real outgoing payment linked to the original settled deposit receipt and must not exceed the deposit's available refundable held balance. Refund tender allocations return funds through the original tender only. It is distinct from `REFUND`, which applies only to an original settled `PAYMENT`; deposit refunds follow deposit lifecycle and available-held-balance rules.
 - No expiry/forfeiture runs automatically. If no customer response has been recorded for 90 days, set an operational `REVIEW_REQUIRED` flag and prompt the Shop to contact the customer; this is not a legal expiry date.
 - Before receipt, snapshot the service/part purpose, expected fulfilment date, refund/cancellation terms and customer acknowledgement.
 - If the Company cannot supply the agreed service/item, or misses the agreed date and no replacement date is agreed, the unconsumed balance is refundable, subject to applicable consumer rights.
 - If the customer changes their mind, apply the terms disclosed and accepted before payment. Any retention/non-refundable portion must be clearly disclosed, fair and legally valid. For a special-order part, only a documented and genuinely non-recoverable supplier cost may be considered where the customer accepted that term in advance. Never automatically forfeit the whole deposit.
 - A `SECURITY` deposit is returned when its stated purpose ends, less only documented deductions accepted in the terms and permitted by law.
-- `FORFEITED` requires a fresh Manager authorization, reason, terms snapshot and documented evidence/cost. No second Manager approval is required; TECHNICIAN cannot forfeit.
+- `FORFEITED` requires a fresh `MANAGER` code/password challenge, reason, terms snapshot and documented evidence/cost. This is an explicit feature-specific restriction; `ADMIN` cannot forfeit deposits. No second approver is required.
 - Deposit amount reconciliation: `available_held = settled_receipts - applied - settled_refunds - approved_forfeitures`.
 
-The system must not conflate a parts pre-order deposit with supplier procurement. Operational supplier purchase tracking (supplier/source, order link, ETA, tracking and receipt of actual inventory) is specified in [Service Parts Procurement Workflow](service-parts-procurement.md). Supplier invoice settlement, accounts payable, supplier returns and procurement tax postings remain outside this initial scope.
+
+
+### Derived deposit status and operational review flag (lifecycle review approved 2026-11-22)
+
+Derive the status from committed, valid financial sources for that specific deposit, in this precedence order:
+
+1. `OPEN`: no settled `DEPOSIT_RECEIPT` exists.
+2. `CLOSED`: at least one settled receipt exists and canonical `available_held = 0`; all received value has been applied, refunded or validly forfeited.
+3. `PARTIALLY_DISPOSED`: `available_held > 0` and at least one positive committed application, settled deposit refund or valid forfeiture exists.
+4. `PARTIALLY_FUNDED`: no disposition exists and settled receipts are greater than zero but below `target_amount`.
+5. `HELD`: no disposition exists and settled receipts meet or exceed `target_amount`.
+
+`available_held` is always calculated as settled receipts minus committed applications, settled deposit refunds and valid authorized forfeitures. The status is only a projection/cache and cannot authorize or execute a financial command. It may be recomputed when a valid source record is committed; a later receipt can therefore change the derived classification without rewriting any earlier event. Do not create exclusive `APPLIED`, `REFUNDED` or `FORFEITED` statuses.
+
+Pending deposit-refund reservations reduce command-time spendable capacity but do not alter the posted liability formula or derived status. `RELEASED` is an administrative event with zero financial effect and does not change the status.
+
+The operational `REVIEW_REQUIRED` flag is independent of the derived status. It can coexist with any status, including `CLOSED`, and has no effect on liability, application/refund capacity or Shop transfer. Clearing it is an operational acknowledgement only. The existing 90-day no-customer-response rule may raise the flag; it must never trigger automatic expiry, refund or forfeiture.
+
+### Canonical ServiceDeposit liability reconciliation (technical review 3 — decision 3 approved)
+
+The Product Owner approved on 2026-11-22 the following formula, calculated independently for each deposit:
+
+```text
+available_held = settled_receipts
+               - applied
+               - settled_refunds
+               - approved_forfeitures
+```
+
+- `settled_receipts`: deposit receipt amounts whose linked `DEPOSIT_RECEIPT` PaymentTransactions are `SETTLED`.
+- `applied`: committed DepositApplication amounts linked to this exact deposit.
+- `settled_refunds`: `DEPOSIT_REFUND` amounts linked to this exact deposit and backed by settled refund transactions.
+- `approved_forfeitures`: amounts in valid, authorized `FORFEITED` events with mandatory reason and required Manager authorization.
+- `RELEASED` has zero financial effect. It is an administrative unhold only and must not reduce liability.
+- Pending, failed, voided or otherwise unsettled receipt/refund transactions do not affect the formula. An event cannot count an amount unless its required source transaction/application is valid and committed.
+- The deposit event ledger is the reconciliation trail. A referenced PaymentTransaction or DepositApplication is evidence for the event, not a second amount to add. Never sum the same financial effect once from the event and again from its referenced transaction/application.
+- All components must use the deposit's currency. Deposits are reconciled independently; no pooling, offsetting or reallocation between deposits is allowed.
+- The result must be non-negative. Any event/transaction mismatch, duplicate reference, unsupported event, currency mismatch or negative result is a reconciliation failure—not a value to clamp to zero.
+- Before deposit receipt/refund/application/forfeiture or transfer acceptance, recalculate under the ServiceOrder-first and deposit-row lock strategy. If the calculated result differs from any materialized held balance, block the command and require explicit reconciliation.
+- Materialized deposit balance is a cache/projection only. A read-only reconciliation process reports mismatches; it must not auto-correct or create compensating ledger events.
+
+**Deposit event source integrity (approved 2026-11-22):** Each `RECEIVED`, `APPLIED` or `REFUNDED` event must reference exactly one source record of the matching type: respectively a settled `DEPOSIT_RECEIPT` transaction, a committed `DepositApplication`, or a settled `DEPOSIT_REFUND` transaction. `FORFEITED` and `RELEASED` events have no payment/application reference. A source transaction or application can back only one event. Composite relational constraints must ensure the source belongs to the exact deposit. Event amount must equal its source amount for receipt, application and refund; those amounts are positive. A forfeiture amount is positive, cannot exceed the authoritative available-held amount, and requires a reason plus fresh `MANAGER` credential validation. A release amount is exactly zero. Every event has a server-resolved employee actor and is append-only. Cross-table type, settlement/commitment and amount checks must be enforced atomically, using PostgreSQL constraint triggers or an equivalently strong mechanism where ordinary constraints cannot express them. The event is the audit trail for its referenced source and is never added as a second liability amount.
+
+A ServiceOrder transfer may move only this per-deposit `available_held` value. It must preserve all historical receipt, application, refund, forfeiture and RELEASED records and must not treat a released deposit as extinguished.
+
+### ServiceOrder balance and refund separation (technical review 3 — decision 1 approved)
+
+The Product Owner approved on 2026-11-22 that a `REFUND` or `DEPOSIT_REFUND` is an outgoing-funds event and must not directly mutate or recalculate `ServiceOrder.balance_due`.
+
+- A settled `PAYMENT` credits the ServiceOrder balance once. A `DepositApplication` credits the ServiceOrder balance once and reduces the originating deposit's held liability by the same amount.
+- A `REFUND` records the outgoing amount against its original settled `PAYMENT`, subject to the original-tender and refundable-remainder rules. It does not reverse the original payment credit in `balance_due`, create a new customer debt, or change the order total.
+- A `DEPOSIT_REFUND` reduces only the originating deposit's remaining held liability and records the outgoing funds against its original settled `DEPOSIT_RECEIPT`. It does not change `balance_due`; the refunded amount must be from the deposit's un-applied refundable balance.
+- A refund is not an order-price correction, discount, write-off or balance adjustment. If a future business case requires changing the amount owed, it must use a separate explicit, authorized, reasoned and auditable balance-adjustment operation. Such an operation, its permissions, accounting treatment and persistence schema are not approved or defined by this decision; do not infer or implement one.
+- Refund records remain separate from payment credits and from inventory returns. A refund does not automatically restock stock or alter ServiceOrder technical/lifecycle status.
+
+The balance cache must be updated atomically with each qualifying credit/application and protected by the ServiceOrder aggregate lock. The exact reconciliation formula and treatment of any future balance-adjustment events remain part of technical review 3; do not derive `balance_due` by subtracting refund transactions.
+
+### Canonical ServiceOrder balance formula (technical review 3 — decision 2 approved)
+
+The Product Owner approved on 2026-11-22 the following canonical formula:
+
+```text
+balance_due = total
+            - sum(settled PAYMENT amounts targeting this ServiceOrder)
+            - sum(DepositApplication amounts credited to this ServiceOrder)
+```
+
+Rules and enforcement:
+
+- `total` is the current approved ServiceOrder total after discounts and applicable tax calculation, using the order's currency and persisted monetary snapshots.
+- Count only `PaymentTransaction` rows with kind `PAYMENT`, target `service_order_id`, status `SETTLED`, and the same currency. Use the transaction's applied amount once; do not sum its tender allocations again because those allocations reconcile to that amount.
+- Count each committed `DepositApplication` exactly once. Its amount is a non-cash credit to the order and a corresponding reduction of that same deposit's held liability.
+- Do not count `DEPOSIT_RECEIPT` as an order payment before an explicit application. Do not subtract `REFUND` or `DEPOSIT_REFUND` transactions from this formula. Do not count transfer-financial-event lines as payments or credits.
+- A new settled payment or deposit application must not make the resulting balance negative. Reject an amount greater than the current outstanding balance; any future overpayment/credit-balance workflow requires separate Product Owner approval.
+- A refund does not reopen the ServiceOrder balance. A future change to the amount owed must use a separately approved balance-adjustment operation; no such operation is defined by this decision.
+- Recalculate and validate the formula under the ServiceOrder aggregate lock. Persist the resulting `balance_due` in the same transaction as the qualifying payment/application and its ledger/event/ServiceOrderHistory/idempotency effects. If the computed result differs from the materialized value before a new financial command, block the command and require reconciliation; never silently overwrite the discrepancy.
+- The materialized `balance_due` is a transactionally maintained cache/projection, not an independent financial source of truth. Provide a read-only reconciliation process that compares it with the formula and reports mismatches. It must not auto-correct balances.
+
+This formula supersedes any ambiguous interpretation of `balance_due` elsewhere in the specs. All features, reports and transfer acceptance must use the same definition.
+
+A parts pre-order deposit is a financial arrangement only. The application does not capture supplier/source, purchase orders, purchase links, ETA, tracking or supplier receipt. Parts are purchased outside the application and physical stock replenishment is recorded independently through the Stock module.
 
 ## 5. Weekly instalment plans for refurbished sales
 
@@ -115,25 +254,46 @@ No interest, APR, setup fee, late fee, default charge, repossession, title reten
 
 Every refund is a separate positive-magnitude `PaymentTransaction` with kind `REFUND` and a reference to the original settled incoming `PAYMENT`. Multiple partial refunds are allowed until the amount remaining refundable reaches zero.
 
-`refundable_remaining(original) = original_settled_amount - sum(settled_refunds_referencing_original)`
+`refundable_remaining(original, allocation) = original_allocation_received_amount - sum(PENDING and SETTLED refund allocations referencing that original allocation)`; the original transaction's overall cap is the sum of its per-allocation remaining caps. PENDING refunds reserve capacity immediately; FAILED and VOIDED refunds release it; REVERSED refunds keep capacity blocked pending explicit reconciliation/correction.
 
-Validation must lock or use optimistic concurrency on the original transaction so concurrent refund requests cannot over-refund it. A full refund is simply a refund whose amount equals the remaining refundable amount. Partial refunds may be item-linked through `PaymentRefundLine`; order-level refunds are allowed with a documented reason.
+Validation must lock the original transaction and affected original `PaymentAllocation` rows in deterministic ID order, then recalculate capacity after locks. For ServiceOrder-linked refunds, lock the `ServiceOrder` first, following the shared lock order; for other targets, lock the original transaction before allocation rows. A PENDING refund reserves capacity in the same transaction as its header and allocations, so concurrent requests cannot reserve the same amount. A full refund is an amount equal to the remaining refundable capacity. Partial refunds may be item-linked through `PaymentRefundLine`; order-level refunds are allowed with a documented reason.
 
-- Every refund requires a fresh Manager password challenge and one-use action authorization, regardless of amount. No second Manager approver is required. TECHNICIAN cannot execute refunds.
-- Refund is allocated back to the original tender by default. For a split CASH/CARD receipt, each refund allocation is linked to the original `PaymentAllocation` and cannot exceed that allocation's remaining refundable amount. Alternative tender is disabled in v1.
-- For CARD, the Manager performs the refund on the external terminal against the original card transaction, then records the result/reference in the application. Do not store card numbers or security data.
+- Every refund requires a fresh `MANAGER` or `ADMIN` code/password challenge, regardless of amount. The backend directly validates the employee credential, active status, Company membership and permission; no action-authorization token/entity/endpoint is created, persisted or consumed. No second approver is required.
+- Refund is allocated back to the original tender only. For a split CASH/CARD receipt, each refund allocation is linked to the original `PaymentAllocation` and cannot exceed that allocation's remaining refundable amount. Alternative tender is disabled in v1.
+- For CARD, the authorized `MANAGER` or `ADMIN` performs the refund on the external terminal against the original card transaction, then records the result/reference in the application. Do not store card numbers or security data.
 - A refund transaction does not automatically restock inventory. Physical items returned to the Shop are selected separately through `StockReturn`/`StockReturnLine`, with quantity capped at previously consumed less already returned. A monetary refund and physical return are separate records.
 - Partial refunds can be linked to one or more SaleItems/ServiceOrderItems and a reason. A total refund is the residual refundable amount after prior settled refunds.
 
+- Refund header integrity: `REFUND` must reference an original settled incoming `PAYMENT`; `DEPOSIT_REFUND` must reference an original settled incoming `DEPOSIT_RECEIPT`. Original and refund must target the same aggregate and use the same currency.
+- Allocation integrity: every refund allocation references the exact original `PaymentAllocation` from the transaction named by the refund header, with the same tender and currency. Each refund allocation is positive, and allocation totals must equal the transaction amount. Non-refund allocations must not carry an original-allocation reference.
+- Refund capacity is calculated independently for each original allocation. CASH capacity is based on actual physical cash received (`amount_tendered - change_amount)); CARD capacity is based on the approved/settled original allocation amount. Prior linked PENDING and SETTLED refunds reserve/consume capacity; FAILED and VOIDED refunds release it. A REVERSED refund blocks further refunds until explicit reconciliation/correction and does not automatically release capacity.
+- Lock the original transaction before calculating refund capacity, then lock affected original allocation rows in deterministic ID order and recalculate after locks. For ServiceOrder refunds, lock the ServiceOrder first according to the shared lock order. No cross-tender substitution, cross-allocation offset or reallocation is allowed.
+- Persist the refund transaction and allocations, idempotency record, and required ServiceOrder `ServiceOrderHistory` entry atomically. A pending refund has no cash-drawer effect; only a settled cash refund reduces physical cash.
+
 ## 7. Approval and employee accountability
 
-The persistent ShopSession remains the store context only. Every receipt, deposit application, deposit refund/forfeiture, instalment plan acceptance, instalment receipt, refund, adjustment and cash movement requires a fresh employee credential challenge.
+The persistent ShopSession remains the store context only. Every receipt, deposit application, deposit refund/forfeiture, instalment plan acceptance, instalment receipt, refund, adjustment and cash movement requires fresh direct employee credential validation in the backend, including active status, Company membership and feature-specific permission.
 
-The v1 refund policy is role-based, not amount-threshold based: only a `MANAGER` can execute a refund or deposit forfeiture, using one fresh employee authorization. No second Manager approval is required. `BusinessActionApproval` remains available for future actions that explicitly need dual control, but it is not inserted into the standard refund/deposit-forfeiture flow. The actor is Company-wide and may operate in any Shop under the same Company.
+The v1 approval policy is role-based, not amount-threshold based: `MANAGER` and `ADMIN` can execute payment refunds and deposit refunds, each after fresh direct backend validation of the employee's code/password, active status, Company membership and feature-specific permission. Deposit forfeiture remains `MANAGER`-only and requires the same fresh direct validation. Do not issue, persist, consume or reuse an `EmployeeActionAuthorization`. No second approver is required. `BusinessActionApproval` remains available for future actions that explicitly need dual control, but it is not inserted into these standard flows. `ADMIN` inherits the Manager permission set except where a feature-specific rule explicitly restricts an action. The actor is Company-wide and may operate in any Shop under the same Company.
 
-## 8. Accounting and daily close semantics
+## 8. ServiceOrder financial and stock orchestration
 
-Daily closing is one immutable cash reconciliation per Shop and business date. The full operational procedure and formula are specified in [Cash Closing Policy](cash-closing-policy.md). The system creates the `DailyClosing` row in `OPEN` state with a physically counted `opening_float`; it closes once, and any later correction is an append-only manager-authorized record.
+FIN-01 owns the financial command and ledger rules. For a financial action associated with a ServiceOrder, the application must use one PostgreSQL transaction for all effects that form that business operation; Stock owns inventory rules and exposes domain operations to the coordinating financial command. Stock operations must participate in the caller's transaction and must never commit independently.
+
+- For a settled `PAYMENT`, or an explicit `DepositApplication`, that reduces a `FIXED` ServiceOrder's `balance_due` to zero, the same transaction must persist the payment/application, update the balance, consume the applicable active reservations through the Stock domain operation, insert the corresponding `InventoryMovement` records, persist the relevant financial/domain events, append exactly one ServiceOrder `ServiceOrderHistory` entry, and persist the committed idempotency result.
+- If any step fails, the entire operation rolls back: no payment/application, balance update, stock movement, reservation mutation, event, ServiceOrderHistory entry or committed idempotency result may remain.
+- A partial payment or an unapplied deposit does not consume stock. A `NOT_FIXED` ServiceOrder payment settlement or deposit application never consumes or releases reservations; its stock disposition remains exclusively part of the Pickup command.
+- A financial action that does not trigger stock consumption still persists its financial record/event and required ServiceOrder `ServiceOrderHistory` entry atomically in one transaction.
+- Every successfully committed financial action associated with a ServiceOrder—including payment, deposit receipt, deposit application, payment refund and deposit refund—must append an employee-attributed `ServiceOrderHistory` containing the action/result and relevant transaction reference. Resolve the employee from the fresh direct credential validation; never accept the actor identity from the client. Store the resolved employee identity and name snapshot plus timestamp as structured metadata. The financial ledger/event remains authoritative; the history entry is append-only and immutable. A failed or rolled-back action creates no history entry.
+- `REFUND` eligibility for a ServiceOrder payment requires an existing settled incoming `PAYMENT`, a positive refundable remainder, technical outcome `NOT_FIXED`, and lifecycle status `NOT_FIXED` or `PICKED`. This condition must be enforced by the backend, not only by UI visibility. A `DEPOSIT_REFUND` is a separate operation governed by the deposit's refundable held balance and lifecycle; it must not be represented as `REFUND` or counted against a payment's refundable remainder.
+- Payment settlement and deposit application commands that can be retried must use the shared idempotency persistence rules. A committed replay returns the original result without repeating financial, stock, event or ServiceOrderHistory effects; a rolled-back attempt leaves no committed record and may be retried.
+
+- **Concurrency baseline (approved 2026-11-21):** ServiceOrder-linked financial commands use PostgreSQL `READ COMMITTED` and explicitly lock the parent `service_order` row first with `SELECT ... FOR UPDATE`. This applies to payment settlement, deposit receipt/application/refund/forfeiture and payment refunds. After the parent lock, lock the affected deposit rows (ascending ID) and existing original payment transaction rows (ascending ID) as applicable, then any reservation rows and ShopInventory rows in the shared order defined in [Relational Database Model](database-model.md), section 4. Re-read authoritative balances/refundable amounts after locks; pre-lock values are not authoritative.
+- All financial mutations for the same ServiceOrder must follow the same parent-lock convention, so a cross-Shop transfer cannot race a payment, deposit application or refund. Persist idempotency records in the same transaction as financial, stock, event and ServiceOrderHistory effects. Use bounded whole-transaction retries only for deadlocks/transient database failures; stale-version and business conflicts are returned without automatic replay. Exact provider implementation and retry limits remain DATA-05 review items.
+
+## 9. Accounting and daily close semantics
+
+Daily closing is one immutable cash reconciliation per Shop and business date. The full operational procedure and formula are specified in [Cash Closing Policy](cash-closing-policy.md). The system creates the `DailyClosing` row in `OPEN` state with a physically counted `opening_float`; it closes once, and any later correction is an append-only record created/approved by `MANAGER` or `ADMIN` after fresh direct credential validation.
 
 ```text
 expected_cash = opening_float
@@ -173,7 +333,7 @@ The formula is the v1 operational till-control baseline. Detailed accounting cha
 12. Cash total €10.22 may be rounded to €10.20 only when the Shop has opted in and the bill is fully cash-paid; line/tax values remain €10.22-derived and the adjustment is stored separately.
 13. Card/bank-transfer totals are never rounded. Exact cash payment can bypass rounding.
 14. A mixed cash/card transaction is not rounded under the initial implementation rule.
-15. Procurement purchase creation/linkage/receipt succeeds without a separate approval record, but still requires the acting employee password challenge and event audit. Financial approvals for refunds/deposit forfeiture remain policy-configured and are independently tested.
+15. Payment refunds and deposit refunds require one fresh `MANAGER` or `ADMIN` code/password challenge at every amount; deposit forfeiture requires a fresh `MANAGER` challenge only. No second approver or configurable threshold applies. Stock replenishment is a separate stock operation and is not linked to supplier procurement records.
 
 ## 10. Open and deferred items
 
