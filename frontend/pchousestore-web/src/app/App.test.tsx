@@ -82,9 +82,7 @@ describe("Application shell navigation", () => {
     vi.unstubAllGlobals();
   });
 
-  it(
-    "renders the authenticated Shop shell and the four operational destinations",
-    async () => {
+  it("renders Shop shell and operational destinations", async () => {
     await renderAuthenticatedApp();
 
     expect(screen.getByText("Dublin Central")).toBeInTheDocument();
@@ -112,9 +110,7 @@ describe("Application shell navigation", () => {
     expect(screen.queryByPlaceholderText(/search/i)).not.toBeInTheDocument();
   });
 
-  it(
-    "shows the approved Shop, Employee Settings and Session menu entries",
-    async () => {
+  it("shows approved administration menu entries", async () => {
     const user = userEvent.setup();
     await renderAuthenticatedApp();
     await openAdministrationMenu(user);
@@ -161,9 +157,7 @@ describe("Application shell navigation", () => {
     },
   );
 
-  it(
-    "closes the administration menu after selecting a settings destination",
-    async () => {
+  it("closes menu after selecting a settings destination", async () => {
     const user = userEvent.setup();
     await renderAuthenticatedApp();
     await openAdministrationMenu(user);
@@ -180,9 +174,7 @@ describe("Application shell navigation", () => {
     ).toBeInTheDocument();
   });
 
-  it(
-    "closes the menu and initiates the existing OIDC sign-out flow",
-    async () => {
+  it("closes menu and initiates OIDC sign-out", async () => {
     const user = userEvent.setup();
     await renderAuthenticatedApp();
     await openAdministrationMenu(user);
