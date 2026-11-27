@@ -62,7 +62,9 @@ async function renderAuthenticatedApp() {
   await screen.findByRole("navigation", { name: "Main navigation" });
 }
 
-async function openAdministrationMenu(user: ReturnType<typeof userEvent.setup>) {
+async function openAdministrationMenu(
+  user: ReturnType<typeof userEvent.setup>,
+) {
   await user.click(
     screen.getByRole("button", { name: "Open administration menu" }),
   );
@@ -93,7 +95,9 @@ describe("Application shell navigation", () => {
     expect(
       screen.getByRole("button", { name: "Products & Services" }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Categories" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Categories" }),
+    ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Fault catalogue" }),
     ).toBeInTheDocument();
@@ -130,7 +134,9 @@ describe("Application shell navigation", () => {
     ["Products & Services", "catalog-items"],
     ["Categories", "product-categories"],
     ["Fault catalogue", "fault-catalogue"],
-  ])("navigates to %s and marks it as the current page", async (label, page) => {
+  ])(
+    "navigates to %s and marks it as the current page",
+    async (label, page) => {
     const user = userEvent.setup();
     await renderAuthenticatedApp();
 
@@ -139,17 +145,20 @@ describe("Application shell navigation", () => {
     expect(
       screen.getByRole("button", { name: label }),
     ).toHaveAttribute("aria-current", "page");
-    expect(screen.getByTestId("catalogue-administration")).toHaveTextContent(
-      page,
-    );
-  });
+      expect(
+        screen.getByTestId("catalogue-administration"),
+      ).toHaveTextContent(page);
+    },
+  );
 
   it("closes the administration menu after selecting a settings destination", async () => {
     const user = userEvent.setup();
     await renderAuthenticatedApp();
     await openAdministrationMenu(user);
 
-    await user.click(screen.getByRole("button", { name: "Shop access credential" }));
+    await user.click(
+      screen.getByRole("button", { name: "Shop access credential" }),
+    );
 
     expect(
       screen.queryByRole("navigation", { name: "Administration" }),
