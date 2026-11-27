@@ -1,0 +1,163 @@
+using Microsoft.EntityFrameworkCore.Migrations;
+using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
+
+#nullable disable
+
+namespace PcHouseStore.Infrastructure.Persistence.Migrations;
+
+public partial class AddServiceOrderFoundation : Migration
+{
+    protected override void Up(MigrationBuilder migrationBuilder)
+    {
+        migrationBuilder.CreateTable(
+            name: "service_order",
+            columns: table => new
+            {
+                id = table.Column<long>(type: "bigint", nullable: false)
+                    .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                company_id = table.Column<long>(type: "bigint", nullable: false),
+                origin_shop_id = table.Column<long>(type: "bigint", nullable: false),
+                shop_id = table.Column<long>(type: "bigint", nullable: false),
+                display_number = table.Column<long>(type: "bigint", nullable: false),
+                customer_id = table.Column<long>(type: "bigint", nullable: false),
+                device_id = table.Column<long>(type: "bigint", nullable: false),
+                created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                responsible_employee_id = table.Column<long>(type: "bigint", nullable: true),
+                created_by_employee_id = table.Column<long>(type: "bigint", nullable: false),
+                refurbished_unit_warranty_id = table.Column<long>(type: "bigint", nullable: true),
+                status = table.Column<string>(type: "character varying(24)", maxLength: 24, nullable: false, defaultValue: "CREATED"),
+                technical_outcome = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: true),
+                currency_code = table.Column<string>(type: "character(3)", nullable: false, defaultValue: "EUR"),
+                subtotal = table.Column<decimal>(type: "numeric(19,2)", nullable: false),
+                tax_total = table.Column<decimal>(type: "numeric(19,2)", nullable: false),
+                total = table.Column<decimal>(type: "numeric(19,2)", nullable: false),
+                balance_due = table.Column<decimal>(type: "numeric(19,2)", nullable: false),
+                picked_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                bad_sector = table.Column<int>(type: "integer", nullable: true)
+            },
+            constraints: table =>
+            {
+                table.PrimaryKey("PK_service_order", x => x.id);
+                table.UniqueConstraint("ak_service_order_id_company", x => new { x.id, x.company_id });
+                table.ForeignKey(
+                    name: "FK_service_order_company_company_id",
+                    column: x => x.company_id,
+                    principalTable: "company",
+                    principalColumn: "id",
+                    onDelete: ReferentialAction.Restrict);
+                table.ForeignKey(
+                    name: "FK_service_order_shop_origin_shop_id_company_id",
+                    columns: x => new { x.origin_shop_id, x.company_id },
+                    principalTable: "shop",
+                    principalColumns: new[] { "id", "company_id" },
+                    onDelete: ReferentialAction.Restrict);
+                table.ForeignKey(
+                    name: "FK_service_order_shop_shop_id_company_id",
+                    columns: x => new { x.shop_id, x.company_id },
+                    principalTable: "shop",
+                    principalColumns: new[] { "id", "company_id" },
+                    onDelete: ReferentialAction.Restrict);
+                table.ForeignKey(
+                    name: "FK_service_order_customer_customer_id_company_id",
+                    columns: x => new { x.customer_id, x.company_id },
+                    principalTable: "customer",
+                    principalColumns: new[] { "id", "company_id" },
+                    onDelete: ReferentialAction.Restrict);
+                table.ForeignKey(
+                    name: "FK_service_order_device_device_id_company_id",
+                    columns: x => new { x.device_id, x.company_id },
+                    principalTable: "device",
+                    principalColumns: new[] { "id", "company_id" },
+                    onDelete: ReferentialAction.Restrict);
+                table.ForeignKey(
+                    name: "FK_service_order_employee_created_by_employee_id_company_id",
+                    columns: x => new { x.created_by_employee_id, x.company_id },
+                    principalTable: "employee",
+                    principalColumns: new[] { "id", "company_id" },
+                    onDelete: ReferentialAction.Restrict);
+                table.ForeignKey(
+                    name: "FK_service_order_employee_responsible_employee_id_company_id",
+                    columns: x => new { x.responsible_employee_id, x.company_id },
+                    principalTable: "employee",
+                    principalColumns: new[] { "id", "company_id" },
+                    onDelete: ReferentialAction.Restrict);
+                table.CheckConstraint("ck_service_order_display_number", "display_number > 0");
+                table.CheckConstraint("ck_service_order_status", "status IN ('CREATED', 'IN_PROGRESS', 'AWAITING_PARTS', 'FIXED', 'NOT_FIXED', 'PICKED', 'CANCELLED')");
+                table.CheckConstraint("ck_service_order_technical_outcome", "technical_outcome IS NULL OR technical_outcome IN ('FIXED', 'NOT_FIXED')");
+                table.CheckConstraint("ck_service_order_amounts_non_negative", "subtotal >= 0 AND tax_total >= 0 AND total >= 0 AND balance_due >= 0");
+                table.CheckConstraint("ck_service_order_bad_sector", "bad_sector IS NULL OR bad_sector >= 0");
+            });
+
+        migrationBuilder.CreateIndex("IX_service_order_company_id", "service_order", "company_id");
+        migrationBuilder.CreateIndex("IX_service_order_origin_shop_id_company_id", "service_order", new[] { "origin_shop_id", "company_id" });
+        migrationBuilder.CreateIndex("IX_service_order_shop_id_company_id", "service_order", new[] { "shop_id", "company_id" });
+        migrationBuilder.CreateIndex("IX_service_order_customer_id_company_id", "service_order", new[] { "customer_id", "company_id" });
+        migrationBuilder.CreateIndex("IX_service_order_device_id_company_id", "service_order", new[] { "device_id", "company_id" });
+        migrationBuilder.CreateIndex("IX_service_order_created_by_employee_id_company_id", "service_order", new[] { "created_by_employee_id", "company_id" });
+        migrationBuilder.CreateIndex("IX_service_order_responsible_employee_id_company_id", "service_order", new[] { "responsible_employee_id", "company_id" });
+        migrationBuilder.CreateIndex("uq_service_order_shop_display_number", "service_order", new[] { "shop_id", "display_number" }, unique: true);
+
+        migrationBuilder.CreateTable(
+            name: "service_order_item",
+            columns: table => new
+            {
+                id = table.Column<long>(type: "bigint", nullable: false)
+                    .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                company_id = table.Column<long>(type: "bigint", nullable: false),
+                service_order_id = table.Column<long>(type: "bigint", nullable: false),
+                catalog_item_id = table.Column<long>(type: "bigint", nullable: false),
+                item_type = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                name_snapshot = table.Column<string>(type: "text", nullable: false),
+                description_snapshot = table.Column<string>(type: "text", nullable: true),
+                quantity = table.Column<int>(type: "integer", nullable: false),
+                unit_price = table.Column<decimal>(type: "numeric(19,2)", nullable: false),
+                discount = table.Column<decimal>(type: "numeric(19,2)", nullable: false, defaultValue: 0m),
+                taxable_amount = table.Column<decimal>(type: "numeric(19,2)", nullable: false),
+                tax_code_snapshot = table.Column<string>(type: "text", nullable: true),
+                tax_rate_snapshot = table.Column<decimal>(type: "numeric(9,6)", nullable: true),
+                tax_amount = table.Column<decimal>(type: "numeric(19,2)", nullable: false),
+                line_total = table.Column<decimal>(type: "numeric(19,2)", nullable: false),
+                removed_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
+            },
+            constraints: table =>
+            {
+                table.PrimaryKey("PK_service_order_item", x => x.id);
+                table.ForeignKey(
+                    name: "FK_service_order_item_service_order_service_order_id_company_id",
+                    columns: x => new { x.service_order_id, x.company_id },
+                    principalTable: "service_order",
+                    principalColumns: new[] { "id", "company_id" },
+                    onDelete: ReferentialAction.Restrict);
+                table.ForeignKey(
+                    name: "FK_service_order_item_catalog_item_catalog_item_id_company_id",
+                    columns: x => new { x.catalog_item_id, x.company_id },
+                    principalTable: "catalog_item",
+                    principalColumns: new[] { "id", "company_id" },
+                    onDelete: ReferentialAction.Restrict);
+                table.CheckConstraint(
+                    "ck_service_order_item_type_quantity",
+                    "(item_type = 'PRODUCT' AND quantity > 0) OR (item_type = 'SERVICE' AND quantity = 1)");
+                table.CheckConstraint(
+                    "ck_service_order_item_amounts",
+                    "unit_price >= 0 AND discount >= 0 AND discount <= quantity * unit_price AND taxable_amount >= 0 AND tax_amount >= 0 AND line_total >= 0 AND line_total = quantity * unit_price - discount");
+                table.CheckConstraint(
+                    "ck_service_order_item_tax_rate",
+                    "(tax_code_snapshot IS NULL AND tax_rate_snapshot IS NULL) OR (tax_code_snapshot IS NOT NULL AND tax_rate_snapshot IS NOT NULL AND tax_rate_snapshot >= 0)");
+            });
+
+        migrationBuilder.CreateIndex(
+            name: "ix_service_order_item_order_company",
+            table: "service_order_item",
+            columns: new[] { "service_order_id", "company_id" });
+        migrationBuilder.CreateIndex(
+            name: "ix_service_order_item_catalog_company",
+            table: "service_order_item",
+            columns: new[] { "catalog_item_id", "company_id" });
+    }
+
+    protected override void Down(MigrationBuilder migrationBuilder)
+    {
+        migrationBuilder.DropTable(name: "service_order_item");
+        migrationBuilder.DropTable(name: "service_order");
+    }
+}

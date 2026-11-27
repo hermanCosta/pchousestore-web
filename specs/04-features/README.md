@@ -1,5 +1,10 @@
 # Feature Specifications
 
+- [Application shell and primary navigation](application-shell-and-navigation.md) — DONE; implementation validated by product owner 2026-11-18.
+
+- [Employee administration](employee-administration.md) — approved and implemented as a local foundation 2026-11-12; bootstrap runbook and end-to-end validation remain.
+- [CAT-01 Customers and Shared Catalogues](customer-and-catalog.md) — DRAFT; legacy audit recorded, product rules remain open; no implementation authorized.
+
 Feature folders are created only when the corresponding legacy behavior has been investigated.
 
 Each feature SPEC must contain:
@@ -32,3 +37,14 @@ Do not use guessed requirements to fill gaps.
 - Reports and receipts
 
 Feature scopes must be approved after discovery. A Java class is not automatically a distinct web feature.
+
+## Current drafts
+
+- [Legacy stock and ServiceOrder reconciliation](../02-architecture/legacy-stock-service-order-reconciliation.md) — evidence review completed 2026-11-20; legacy behavior is separated from approved redesign; no implementation or migration approved.
+
+- [SO-01 Service Orders](service-orders.md) — product decisions complete; status lifecycle, handover, cancellation, balance handling, line-edit lock, Notes traceability and Parts to Buy scope are approved. Technical reconciliation with shared architecture and legacy evidence remains; implementation not authorized.
+
+- [Shop authentication and API access](authentication-and-shop-context.md) — approved and implemented foundation; session-grant revocation and end-to-end validation remain.
+- [Authentication and signing-key persistence](../02-architecture/authentication-persistence.md) — DATA-05 logical/physical design approved for implementation; PostgreSQL/Npgsql provider validation remains.
+- [Cross-Shop ServiceOrder transfer](service-order-shop-transfer.md) — DRAFT; custody, parts, eligibility and authorization rules remain OPEN.
+- [Shop printable identity fields](shop-print-identity.md) — data and print-snapshot requirements approved 2026-11-11; production branch contact values remain OPEN.

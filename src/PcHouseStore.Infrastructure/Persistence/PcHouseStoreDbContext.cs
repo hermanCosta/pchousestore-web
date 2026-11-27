@@ -1,0 +1,34 @@
+using Microsoft.EntityFrameworkCore;
+using PcHouseStore.Infrastructure.Persistence.Entities;
+
+namespace PcHouseStore.Infrastructure.Persistence;
+
+public sealed class PcHouseStoreDbContext(DbContextOptions<PcHouseStoreDbContext> options)
+    : DbContext(options)
+{
+    public DbSet<CompanyRecord> Companies => Set<CompanyRecord>();
+    public DbSet<ShopRecord> Shops => Set<ShopRecord>();
+    public DbSet<PersonRecord> People => Set<PersonRecord>();
+    public DbSet<CustomerRecord> Customers => Set<CustomerRecord>();
+    public DbSet<DeviceRecord> Devices => Set<DeviceRecord>();
+    public DbSet<ServiceOrderRecord> ServiceOrders => Set<ServiceOrderRecord>();
+    public DbSet<ServiceOrderItemRecord> ServiceOrderItems => Set<ServiceOrderItemRecord>();
+    public DbSet<ProductCategoryRecord> ProductCategories => Set<ProductCategoryRecord>();
+    public DbSet<CatalogItemRecord> CatalogItems => Set<CatalogItemRecord>();
+    public DbSet<FaultRecord> Faults => Set<FaultRecord>();
+    public DbSet<CatalogueAuditEventRecord> CatalogueAuditEvents => Set<CatalogueAuditEventRecord>();
+    public DbSet<EmployeeRecord> Employees => Set<EmployeeRecord>();
+    public DbSet<EmployeeRoleAssignmentRecord> EmployeeRoleAssignments => Set<EmployeeRoleAssignmentRecord>();
+    public DbSet<ShopAccessCredentialRecord> ShopAccessCredentials => Set<ShopAccessCredentialRecord>();
+    public DbSet<ShopAccessCredentialEventRecord> ShopAccessCredentialEvents => Set<ShopAccessCredentialEventRecord>();
+    public DbSet<ShopSessionRecord> ShopSessions => Set<ShopSessionRecord>();
+    public DbSet<SystemServiceSigningKeyRecord> SystemServices => Set<SystemServiceSigningKeyRecord>();
+    public DbSet<SystemServiceKeyEventRecord> SystemServiceKeyEvents => Set<SystemServiceKeyEventRecord>();
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(PcHouseStoreDbContext).Assembly);
+        modelBuilder.UseOpenIddict();
+        base.OnModelCreating(modelBuilder);
+    }
+}

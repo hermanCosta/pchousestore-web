@@ -1,6 +1,6 @@
 # Product-owner Decisions and Remaining Questions — pcHouseStore Web
 
-**Revision:** v16 · 5 November 2026  
+**Revision:** v50 · 21 November 2026
 **Status:** Confirmed product decisions are incorporated. A small set of commercial/legal details remains explicitly proposed or deferred; the model is not a production-approved DDL.
 
 ## Confirmed decisions
@@ -8,15 +8,39 @@
 | Area | Confirmed rule |
 |---|---|
 | Organization | One legal Company with multiple operational Shops/branches. |
+| Database platform | PostgreSQL is selected; use EF Core with the Npgsql provider. This supersedes the earlier MySQL decision. |
+| Shop printable identity | Each Shop has optional branch-specific address and phone fields for print reports/documents. Snapshot their values when a document is issued; populate only after the owner confirms the authoritative branch details. |
 | Shop access | Persistent session represents the active Shop only; it has no Employee identity. |
-| Employee identity | One Company-wide employee identity; employee code + individual password works in every Shop. Every protected operation requires a fresh, one-use employee authorization. |
-| Roles | `MANAGER` has full access across every Shop. `TECHNICIAN` has partial technical/operational access under the matrix in `employee-access-and-roles.md`; the proposed baseline is ready for implementation subject to owner review. |
-| Inventory | Only Product catalogue items have stock. Product quantities are whole units. Quantity-tracked stock may become negative; reservations cannot. One stock pool per Shop; no reservation-expiry automation or multiple internal locations in v1. |
-| Stock deduction | Sale and ServiceOrder product stock is consumed when the outstanding balance reaches zero through settled payments and explicitly applied service deposits. Partial payment does not consume stock. Service parts stay reserved at `FIXED` until full settlement; payment consumes them before `PICKED`. |
+| Active profile and application header | The persistent header shows the owner-supplied PC House logo with the wordmark `PC House` and displays the address of the authenticated Shop in place of a search field, sourced only from `ShopSession.shopAddress`. The hamburger Settings menu retains Shop profile and Shop access credential; Shop profile shows the full Shop name, address, phone and Company email where available. No persistent Employee identity is displayed. Employee registration details remain staff-administration data only. |
+| Employee registration profile | Employee registration requires name, email and profile (`EMPLOYEE`, `MANAGER` or `ADMIN`). Other employee data is optional. Employee email is unique case-insensitively within the Company; duplicate names are allowed. |
+| Employee administration | `MANAGER` and `ADMIN` administer employee accounts according to `specs/04-features/employee-management.md`. Use deactivation rather than hard deletion. The immutable account identifier is not editable. |
+| Shop sign-in identifier | Stable Shop code + Shop credential password. |
+| Employee identity | One Company-wide employee identity works in every Shop. Each feature-defined protected operation requires fresh direct backend validation of the acting employee's own password; no employee authorization token is issued or reused. |
+| Customer/catalogue operations | Customer, Product, Service, product-category and Fault create/edit/deactivate/reactivate operations require an active Shop session and Company scope, but no individual employee credential challenge. Attribute their audit events to the authenticated ShopSession. |
+| Customer duplicates and phone entry | A Company must not contain duplicate customer records for the same phone number. A match is a hard block on create, not a warning or automatic merge. Phone entry defaults to Ireland; an “International number” checkbox switches the text field to international input. Store/compare the canonical phone in E.164 format. A customer's phone remains reserved while its soft-deleted record exists. |
+| Customer directory and email | Employee customer-directory access is defined by the approved Customer/Catalogue feature SPEC and Employee Management; do not use the retired TECHNICIAN profile. Customer email is optional and may repeat; do not enforce a unique email constraint. |
+| Product/Service kind and SKU | Catalogue items are only `PRODUCT` or `SERVICE`; remove legacy `OTHER` from the target UI/model. SKU is optional. When present it must match `SKU-[A-Z0-9]{8}`, is normalized to uppercase, unique per Company and remains reserved after deactivation. |
+| Fault catalogue | Fault description remains the primary value used to display/select/search faults. Fault records also include an immutable Company-unique code generated automatically as `FLT-` plus a Company sequence, zero-padded to at least 6 digits (for example `FLT-000001`). Codes are never reused. |
+| Catalogue stock quantity | `qty` represents physical on-hand stock (`quantity_on_hand`) per Shop. There is no `min_qty`, minimum-stock threshold, reorder threshold or low-stock alert based on a minimum. Reserved quantity is tracked separately and reduces availability, not physical on-hand. |
+| Catalogue deactivation and legacy OTHER | Deactivated customers/catalogue entries remain visible in existing histories but are unavailable for new operations. Existing drafts may display existing references but may not add another reference to an inactive record. MANAGER and ADMIN may reactivate records, subject to the owning feature's permission rules. Legacy `OTHER` catalogue records are excluded from the target catalogue and are not migrated. |
+| Roles | Active profiles are `EMPLOYEE`, `MANAGER` and `ADMIN`. All profiles access every Shop in the Company. `MANAGER` administers employee/manager accounts but cannot grant `ADMIN`; `ADMIN` has full Company-wide administrative authority. No dual-role assignment. Business-operation permission matrices remain in their feature SPECs. |
+| Authentication credential operations | `MANAGER` and `ADMIN` provision, disable and reset employee credentials using the existing `EmployeeCredential` and reset flow. Employee reset forces a password change before protected operations. Employee recovery is administrative only. Shop credential bootstrap remains governed by the Shop authentication process. |
+| Employee initial credential | Generate `<normalized-first-name>@pchouse` for creation/reset. Normalize by removing accents, spaces and special characters. Display once to the authorized Manager/Admin; require change before protected operations. The pattern is temporary only and must be reconciled with the permanent-password minimum-length policy before implementation. |
+| Employee password policy | No arbitrary periodic expiry. Creation/reset credentials must be changed before protected operations. Self-service password change requires the current password. No dedicated employee-administration audit log is introduced. Never log passwords or hashes. |
+| Employee administration audit | Do not write employee-administration actions to business `notes` and do not introduce a dedicated employee-administration audit log. General application logs remain subject to existing redaction rules. |
+| Last active administrator/manager | A Company must retain at least one active `ADMIN` and at least one active user with management authority (`MANAGER` or `ADMIN`). Reject profile/status changes that violate either invariant. |
+| Employee removal | Use deactivation rather than hard deletion; preserve historical employee references. `MANAGER`/`ADMIN` deactivation permissions and invariants are defined in Employee Management. |
+| Employee password baseline and failed attempts | Minimum 6 characters; support at least 128 characters and password managers/paste; no arbitrary periodic expiry; rotate after compromise or authorized reset; use vetted adaptive hashing. Failed attempts never lock or disable an account or trigger credential-specific waiting/rejection windows. Limit authentication request rates by source/network and endpoint. |
+| Authentication request-rate limit | Maximum 10 requests per minute per source IP and authentication endpoint, counting successes and failures. Excess requests receive HTTP 429 through the end of that one-minute window; no credential lockout. |
+| Inventory | Only Product catalogue items have stock. Product quantities are whole units. Quantity-tracked stock may become negative; reservations cannot. One stock pool per Shop; no reservation-expiry automation or multiple internal locations in v1. There is no minimum quantity or reorder threshold; physical on-hand and reserved quantities are tracked separately. |
+| Physical stock returns | Receive selected returned goods as `PENDING_INSPECTION`, outside sellable stock. Only an explicit inspection disposition `RESTOCK` creates an inbound movement; `QUARANTINE` and `DISPOSE` do not increase sellable stock. A serialized refurbished return remains `QUARANTINED` until inspection passes and it is explicitly restocked. |
+| Inter-Shop transfer scope | Transfers support physical Product stock and service orders sent to another Shop. On service-order transfer, the destination Shop assumes operational and financial responsibility after acceptance; all transactions from the transfer onward run through that destination. EMPLOYEE, MANAGER and ADMIN may initiate at the source and accept at the destination, each with a fresh direct credential challenge. Product movement remains dispatch/in-transit/receipt. Previously settled transactions remain attributed to the source; outstanding balance and held/unapplied deposit liability transfer to the destination through an audited internal event. |
+| Product transfer discrepancies | Receive only verified, acceptable quantities up to the dispatched quantity. Short/damaged units remain outstanding and keep the transfer open; overage is excluded from stock and needs a separate transfer/document. EMPLOYEE, MANAGER and ADMIN may register discrepancies, add evidence and record later physical receipt; only MANAGER and ADMIN may authorize administrative resolution or exceptional closure. Every protected action requires a fresh direct employee credential challenge. No automatic loss write-off or closure. |
+| Stock deduction | Sale stock and `FIXED` ServiceOrder parts are consumed when the outstanding balance reaches zero through settled payments (and explicitly applied ServiceOrder deposits). Partial payment does not consume stock. For `NOT_FIXED`, full settlement alone does not consume or release parts: at handover, the employee records actual quantities used from active reservations; used quantities are consumed and unused reservations are released atomically, whether a balance remains due or not. |
 | Payment transaction | One `PaymentTransaction` may have multiple `PaymentAllocation` records; mixed cash/card is one financial transaction, not duplicate gross sales. |
 | Tender methods | Initial release supports `CASH` and `CARD` only. Card is recorded after approval on an external card terminal; no payment-processor integration is selected or required for v1. |
 | Processor terminology | A payment processor/acquirer is the provider behind a card terminal that authorizes/processes card payments and later settles funds. It is not a payment method. Provider choice/integration is deferred. |
-| Refunds | Partial and full refunds are supported. Every refund is Manager-only (one Manager authorization; no second Manager approver). Default is return to the original tender; mixed-tender refunds are bounded by the remaining refundable amount of each original allocation. |
+| Refunds | Partial and full payment/deposit refunds are available to `MANAGER` and `ADMIN`, each with one fresh credential challenge and no second approver. Deposit forfeiture is a separate `MANAGER`-only action. Default refund tender is the original tender; mixed-tender refunds are bounded by the remaining refundable amount of each original allocation. |
 | Deposits | Service deposits are recorded at booking, have a written terms snapshot, no automatic expiry and no automatic forfeiture. After 90 days with no customer response, flag for Manager review/contact only. Cancellation/forfeiture rules are in `financial-model.md`. |
 | Instalments | Weekly refurbished-sale plans remain in scope, with `LAYAWAY` as the initial mode. Missed-payment fees, collections and renegotiation are out of initial scope; overdue is shown as a status only. Early handover/credit-sale remains disabled pending Irish legal review. |
 | Currency | EUR, `decimal`/`DECIMAL(19,2)`, `Europe/Dublin`; optional €0.05 cash-only rounding per Shop. |
@@ -25,9 +49,10 @@
 | Refurbished identity | Every physical refurbished unit has a Company-unique internal `asset_code`. Capture manufacturer serial when present; serial is not required if manufacturer did not provide one. Serial uniqueness is Company-wide when populated, with normalized manufacturer + serial values. |
 | Refurbished guarantee | 12-month commercial guarantee begins at actual documented customer handover. Proposed coverage/exclusions are documented separately and remain subject to owner/legal review; statutory rights are not limited. |
 | Complaints | `CustomerComplaintCase` tracks product/service claims, evidence, inspection, manager resolution and remedy history. The 12-month commercial guarantee must not auto-reject statutory-rights claims. |
-| Supplier procurement | Separate service-part purchase request queue linked to a ServiceOrder, multiple request rounds, line-level reference images, purchase links, ETA/tracking and partial receipts. Supplier purchase creation/update/receipt does not require second approval. |
-| Images | Multiple images are uploaded and stored inside the same MySQL database. No external object storage, file share or filesystem path is used. Binary storage uses `MEDIUMBLOB`; thumbnails use bounded `BLOB`. Initial image limits remain 10 MiB/file, 10 images and 100 MiB aggregate per target. |
-| Cash closing | One `DailyClosing` per Shop/business date. Opening float, cash receipts/change, cash-in/out, cash refunds, deposit refunds, safe drops, denomination count and variance are recorded. Close is immutable; corrections are separate Manager-authorized records. |
+| Service parts visibility | A Shop-scoped Parts to Buy list presents automatically calculated uncovered ServiceOrder part requirements and manually added reminders as visibly distinct sources. Keep their quantities and totals separate; manual entries must never be included in calculated ServiceOrder demand totals. Sort both sources by creation date descending (newest first): manual entries by entry creation time and calculated Product groups by the newest contributing ServiceOrder creation time, with contributing orders newest first. Provide one search across both sources by Product name or manual free-text description; update results automatically as the user types, without requiring Enter or a separate submit action. Search is case-insensitive and supports partial matches within Product names and free-text descriptions (for example, `mem` matches `Memória RAM`). When a search returns no matches, display the empty-state message `No parts found`. If both sources contain no items, display `No parts to buy yet` and keep the manual-entry action available. If only one source is empty, retain its section and show a concise `No items` message within that section. Preserve source labels and separate quantities in the results. Manual entries may select an existing Product or use a free-text description for a part not yet catalogued, and may switch between these modes during editing; quantity defaults to `1` and remains editable as a positive whole number. Existing Products display multiple external reference links maintained centrally in the Product catalogue; free-text entries may store multiple links directly on the entry. Manual entries can be duplicated, including entries referencing the same Product or using the same free-text description. Keep each entry independent, with its own quantity and reference URLs; do not automatically merge, group or deduplicate manual entries. A manual entry remains visible until the operator explicitly removes it, regardless of current stock availability or ServiceOrder reservations; stock changes recalculate only the automatic ServiceOrder demand. They can be edited after creation, including changing the Product reference or switching between Product-backed and free-text modes. Quantity may be changed directly in the normal edit flow to any positive whole number, without separate justification or confirmation. Deletion is a separate explicit action. Trim leading/trailing whitespace from free-text descriptions and URL values, ignore blank URL rows, and do not create an edit-audit entry when an edit makes no effective change. Neither operation affects ServiceOrder data or history. Removed manual entries are permanently deleted; no removal history or restoration feature is required. Edits are audited with timestamp and employee attribution. Links are informational only. No supplier, purchase-order, external-purchase, delivery-tracking or supplier-receipt workflow is included; stock replenishment remains in the Stock module. Stock replenishment increases Shop on-hand and available quantity only; it never automatically reserves or allocates stock to a ServiceOrder. An `EMPLOYEE`, `MANAGER` or `ADMIN` must explicitly select a ServiceOrder requirement and requested whole-unit quantity in a separate action authenticated with a fresh employee code/password challenge. The backend atomically checks current availability and reserves no more than is available; when less than requested is available, it creates a partial reservation and reports the actual reserved and remaining quantities; when none is available, it creates no reservation. Successful reservation/release records the employee and timestamp atomically in inventory/ServiceOrder history and `Notes`. The Parts to Buy demand recalculates when stock availability changes, independently of whether a reservation is made. |
+| Manual Parts to Buy maintenance | `EMPLOYEE`, `MANAGER` and `ADMIN` may add, edit and remove manual entries in their active Shop. Each action requires the standard fresh employee code/password challenge and backend authorization; the Shop is derived from ShopSession. Removal permanently deletes the manual entry and its entry-owned reference URLs. No removal history or restoration feature is required; the delete action remains protected by the standard fresh employee code/password challenge. |
+| Images | Multiple images are uploaded and stored inside the same PostgreSQL database. No external object storage, file share or filesystem path is used. Binary storage uses `BYTEA`. Initial image limits remain 10 MiB/file, 10 images and 100 MiB aggregate per target. |
+| Cash closing | One `DailyClosing` per Shop/business date. Expected cash is opening float + settled cash receipts net of change + cash-in − cash-out − cash refunds − cash deposit refunds − safe drops. Non-zero variance requires a reason; close is immutable, cannot be reopened, and is corrected only through separate Manager-authorized records. |
 
 ## Financial policies incorporated as recommended v1 defaults
 
@@ -36,7 +61,7 @@ These policies turn the owner's request to use a standard, controlled approach i
 ### Refund policy
 
 - Refund may be partial or full, but cannot exceed the original settled amount less all prior settled refunds.
-- Every refund requires a fresh `MANAGER` employee authorization, regardless of amount. No second Manager approval is required.
+- Every payment refund and deposit refund requires a fresh `MANAGER` or `ADMIN` employee authorization, regardless of amount. No second approver is required. Deposit forfeiture remains `MANAGER`-only.
 - Refunds default to the original tender. For a split payment, each refund allocation must not exceed the refundable balance of its corresponding original allocation.
 - A card refund is processed on the external terminal/provider against the original card transaction; the application records the result and external reference. Do not store PAN, CVV or card credentials.
 - An alternative refund tender is disabled in v1. Exceptional cases are handled manually outside the automated refund flow and require documented Manager review before being recorded.
@@ -51,7 +76,7 @@ These policies turn the owner's request to use a standard, controlled approach i
 - If the customer changes their mind, apply the terms disclosed and accepted before payment. A deposit may be retained only where the contractual term is clear, fair and legally valid. Do not automatically forfeit the entire deposit.
 - For special-order parts, any non-refundable amount must be disclosed and accepted in advance and must be supported by the actual, documented, non-recoverable supplier cost. Manager review is required; no hidden or invented cancellation fee is allowed.
 - A `SECURITY` deposit is returned when its stated purpose is satisfied, less only documented deductions accepted in the terms and permitted by law.
-- `FORFEITED` is never automatic. It requires a Manager authorization, reason, terms snapshot and evidence/cost reference. The application must support full refund, partial refund, partial application and remaining held balance.
+- `FORFEITED` is never automatic. It requires a fresh `MANAGER` authorization, reason, terms snapshot and evidence/cost reference. The application must support full refund, partial refund, partial application and remaining held balance.
 - CCPC guidance says deposits form part of a contract; businesses should disclose refundability/cancellation charges in writing. A business generally does not have to refund merely because a customer changes their mind, but a refund may be due where the business cannot supply what was agreed. See the official [CCPC deposits guidance](https://www.ccpc.ie/consumer-advice/consumer-rights/buying-goods/deposits/).
 
 ### Instalment arrears
@@ -69,9 +94,9 @@ These policies turn the owner's request to use a standard, controlled approach i
 
 The Company tax tables and `vat_enabled` switch are implemented in the model and default OFF. The Company has not yet confirmed its VAT registration/status or tax treatments. Those details remain pending the owner's later discussion with an Irish accountant. Do not issue VAT invoices or infer a 0%/exempt treatment from the OFF switch. Keep `setup_status=NOT_REVIEWED`; no VAT rate is hard-coded.
 
-## MySQL image storage decision
+## PostgreSQL image storage decision
 
-All uploaded image bytes stay in MySQL. A shared `stored_image` table contains the normalized binary image in `MEDIUMBLOB` and an optional compact thumbnail in `BLOB`; business-specific tables (`service_procurement_request_image`, `refurbished_unit_image`, `customer_complaint_case_attachment`) reference the image through `stored_image_id`. There is no S3/object-storage provider, local filesystem path or external storage workflow. The 10 MiB per-image cap is below MySQL `MEDIUMBLOB` capacity (16,777,215 bytes). See the [MySQL 8.0 BLOB/TEXT type reference](https://dev.mysql.com/doc/refman/8.0/en/blob.html).
+All uploaded image bytes stay in PostgreSQL. A shared `stored_image` table contains normalized binary image content in `BYTEA`; business-specific tables (`refurbished_unit_image`, `customer_complaint_case_attachment`) reference the image through `stored_image_id`. There is no S3/object-storage provider, local filesystem path or external storage workflow. Enforce existing per-file and per-target limits in application validation and database capacity planning.
 
 Image retention is tied to the business record. Deletion is initially soft/audited; automated physical purge is not enabled in v1. The Company still needs a documented GDPR/data-retention schedule before production, but it will be implemented as database-controlled retention/purge jobs, not as manual external file management.
 
@@ -79,22 +104,30 @@ Image retention is tied to the business record. Deletion is initially soft/audit
 
 1. **VAT/legal setup:** Company VAT registration/status, applicable rates/tax codes, tax-inclusive/exclusive display and legal reason for the chosen flag setting. Owner will confirm with an Irish accountant; `vat_enabled=false` is only the initial software switch.
 2. **Card processor:** no provider selection is needed for v1; the existing physical terminal is used and CARD is manually recorded after approval. Integration can be considered later.
-3. **Refund exception policy:** v1 uses Manager-only and original-tender refund. Alternative tender is disabled; exceptional out-of-band case handling may be defined later.
+3. **Refund exception policy:** v1 allows `MANAGER` and `ADMIN` to execute eligible payment/deposit refunds with fresh credentials; deposit forfeiture remains `MANAGER`-only. Original-tender refund applies. Alternative tender is disabled; exceptional out-of-band case handling may be defined later.
 4. **Deposit contract wording:** operational default is defined above, but the final written terms/non-refundable special-order wording must be reviewed for fairness and Irish consumer-law compliance.
 5. **Refurbished commercial guarantee:** 12 months is confirmed; the detailed coverage/exclusions below are a proposed default and require owner/legal review before publishing to customers.
-6. **Customer data/image retention:** image storage is MySQL-only, but exact business-record retention period and lawful purge schedule remain to be approved. Soft delete is used in v1.
-7. **TECHNICIAN permission matrix:** partial access is confirmed; the proposed action-level matrix is in `employee-access-and-roles.md` and still needs owner sign-off before fine-grained API policies are frozen.
-8. **Complete Sale/ServiceOrder status transition matrix and executable production DDL/EF Core migration review.**
+6. **Customer data/image retention:** image storage is PostgreSQL-only, but exact business-record retention period and lawful purge schedule remain to be approved. Soft delete is used in v1.
+7. **Employee access:** the current Company-wide `EMPLOYEE`, `MANAGER` and `ADMIN` profiles are defined in [Employee Management](../04-features/employee-management.md). Feature-specific permissions are defined by each owning SPEC. The former `TECHNICIAN` profile and its legacy permission matrix are retired.
+8. **Sale lifecycle matrix and executable production DDL/EF Core migration review.** ServiceOrder lifecycle transitions and owner business rules are approved in `service-orders.md`; Sale lifecycle transitions still require completion.
+9. **Shop authentication operations:** employee credential administration, password policy, failed-attempt throttling and role authorization are defined in `employee-management.md`. ShopSession timeout values and multi-device/sign-out policy remain configurable and must be decided before production.
+10. **Service-order transfer details:** Device custody, service-part inventory attribution, transfer authorization and final audit fields remain to define. The financial handling is decided: preserve already-settled transactions against the source Shop; transfer the outstanding balance and held/unapplied deposit liability to the destination through an auditable internal event; all post-transfer transactions use the destination.
 
 **Deferred by owner instruction:** installment delinquency treatment beyond `OVERDUE`, renegotiation/late fees, and accounting/bookkeeper reconciliation mapping. These are not v1 implementation blockers.
 
+## OIDC access-token renewal
+
+On 2026-11-14 the owner approved automatic renewal of the SPA's short-lived access token. Renew through OIDC Authorization Code + PKCE silent reauthorization against the existing Shop sign-in cookie; keep access tokens in memory and continue to disable refresh-token issuance. If the Shop session/cookie has expired or been revoked, silent renewal fails, the SPA clears its local user and asks the operator to sign in again. This does not extend or alter the ShopSession timeout policy.
+
 ## Website-derived brand and operating profile
+
+- On 2026-11-11 the owner requested branch-specific address and phone fields on `shop` for printed reports. On 2026-11-13 the owner approved local seed data from the official PC House homepage, selecting its ILAC address over the conflicting directory listing. The legal Company identity/registered address remain unconfirmed; this approval applies to local operational display data only.
 
 - PC House identity is blue-led, with a deep-blue header/nav, blue/cyan wordmark and orange promotional `SALE` badges. The proposed CSS palette is explicitly approximate pending comparison with master artwork.
 - The official logo reference is linked from the ILAC retailer directory; a local binary logo could not be bundled because the image host did not allow reliable retrieval. The source link and instructions are in `specs/03-design/brand-assets/README.md`.
 - Product category seed candidates: MacBook, Laptop, TV, iMac, All-in-one, Desktop, Monitor, Console, Accessories; Phone appears in a secondary browse/filter view.
 - Public business profile, candidate Shop records, contact details, opening hours, warranty marketing statement and repair description are documented in `specs/01-discovery/business-profile-from-website.md`.
-- The ILAC branch address differs between the PC House homepage and the ILAC directory; do not seed the final postal address until owner confirmation.
+- The ILAC branch address differs between the PC House homepage and the ILAC directory. The owner selected the homepage value for the local development seed; production/legal postal address confirmation remains open.
 
 ## Processor terminology — owner clarification
 
@@ -102,14 +135,96 @@ No processor must be selected for v1. `CASH` and `CARD` are the payment methods.
 
 ## Current approval status after website review
 
-- **Confirmed:** CASH/CARD only; no processor integration in v1; MySQL-only image storage; the current website's publicly listed categories/contact/branch data are captured as a reference snapshot.
-- **Recommended defaults (not yet approved contract terms):** 90-day deposit inactivity review reminder; no automatic expiry/forfeiture; Manager-only original-tender refunds; TECHNICIAN permissions matrix; proposed refurbished guarantee coverage/exclusion wording.
-- **Owner/accountant confirmation still needed:** VAT registration/tax codes/rates and price display; exact legal Company name; final ILAC address/display name; final warranty policy wording; official logo and exact brand colours; GDPR retention period; final action-level TECHNICIAN permissions.
+- **Confirmed:** CASH/CARD only; no processor integration in v1; PostgreSQL-only image storage; the current website's publicly listed categories/contact/branch data are captured as a reference snapshot.
+- **Recommended terms still pending approval:** final customer-facing deposit cancellation/non-refundable-cost wording and the detailed refurbished guarantee coverage/exclusions. The 90-day deposit review reminder, no automatic expiry/forfeiture, `MANAGER`/`ADMIN` original-tender refunds, `MANAGER`-only deposit forfeiture and immutable cash-close policy are approved operational rules. Employee profiles and permissions are governed by the current `employee-management.md`; the former TECHNICIAN profile is retired.
+- **Owner/accountant confirmation still needed:** VAT registration/tax codes/rates and price display; exact legal Company name and registered address; final ILAC legal/postal address; final warranty policy wording; official logo and exact brand colours; GDPR retention period.
 
 ## External references used
 
 - CCPC, [Deposits](https://www.ccpc.ie/consumer-advice/consumer-rights/buying-goods/deposits/) — deposit contract terms, cancellation/refund conditions and written disclosure.
 - CCPC, [Your rights when buying goods](https://www.ccpc.ie/consumer-advice/consumer-rights/buying-goods/your-rights-when-buying-goods/) — consumer rights also apply to second-hand goods.
 - CCPC, [Repairs and replacements](https://www.ccpc.ie/consumer-advice/faulty-products-and-goods/repairs-and-replacements) — remedies and reasonable-time principles.
-- MySQL 8.0, [BLOB and TEXT types](https://dev.mysql.com/doc/refman/8.0/en/blob.html) — BLOB family capacities and behavior.
 - OWASP, [File Upload Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html) — secure upload validation, re-encoding and controlled access.
+
+
+## ServiceOrder owner decisions — 19 November 2026
+
+- New ServiceOrders start in `CREATED`, not the legacy `IN_PROGRESS` initial state.
+- Device serial number is mandatory at booking. Brand and model remain required as in the inspected legacy booking form. Serial-number uniqueness across the Company remains undecided.
+- The legacy `badSector` integer represents the count of defective/bad sectors on the device HDD. It is required only for selected Services that need this measurement; operating-system installation is a confirmed example. The exact Service trigger list/configuration and numeric bounds remain open.
+- ServiceOrder workflows must not edit Customer master data. Equipment and service details may be edited through the ServiceOrder edit workflow. Product/Service lines are locked after the first stock reservation or first recorded payment, whichever occurs first; before that point, edits preserve before/after snapshots in immutable events.
+- Payment and handover actions must not modify Customer, Device, Fault or ServiceOrder line details. They may append a Note alongside their own financial or handover event.
+- Customer handover is allowed only for a ServiceOrder whose technical outcome is `NOT_FIXED`, and is prohibited while its current status is `FIXED`. On handover, the lifecycle status changes to `PICKED`; the technical outcome `NOT_FIXED` must remain independently persisted and visible.
+- `EMPLOYEE`, `MANAGER` and `ADMIN` may mark a ServiceOrder `NOT_FIXED` and record eligible handover. Cancellation and financial actions are restricted to `MANAGER`/`ADMIN` where specified by the ServiceOrder SPEC and FIN-01.
+- Every successfully committed action in the ServiceOrder context must append an immutable, chronological, employee-attributed entry to `Notes`, describing the action, timestamp and concise result/reference. The corresponding structured domain or financial record remains authoritative; its Note is committed atomically. Failed/rolled-back actions do not create Notes.
+- For a `NOT_FIXED` order, payment refunds require a settled incoming `PAYMENT`, positive refundable remainder, technical outcome `NOT_FIXED`, and lifecycle status `NOT_FIXED` or `PICKED`. A refundable held deposit is returned through the distinct `DEPOSIT_REFUND` flow. Both payment and deposit refunds are separate, explicit actions available to `MANAGER` and `ADMIN` with fresh credentials; neither is automatic on handover. Original-tender, deposit-lifecycle and refundable-balance limits remain in force.
+- A `NOT_FIXED` order may be handed over with an outstanding balance or held deposit. Handover does not settle, waive or automatically refund the balance; eligible refunds remain separate explicit `MANAGER`/`ADMIN` actions under FIN-01.
+
+
+## Employee Management — approved 20 November 2026
+
+The detailed approved requirements are maintained in [Employee Management](../04-features/employee-management.md). The following decisions are authoritative:
+
+- Active profiles are `EMPLOYEE`, `MANAGER` and `ADMIN`; retire `TECHNICIAN` and do not use dual-role assignment.
+- All three profiles can operate in every Shop in the same Company; no per-Shop employee assignment exists.
+- `MANAGER` retains the full application permission set assigned to the Manager profile in approved feature SPECs and administers `EMPLOYEE`/`MANAGER` accounts, but cannot create/grant `ADMIN`. `ADMIN` inherits all Manager permissions and has full Company-wide administrative authority, can manage other administrators and multiple admins are allowed.
+- Keep at least one active `ADMIN` and at least one active user with management authority in each Company.
+- Employee registration requires name, email and profile. Email is unique case-insensitively within the Company; duplicate names are allowed.
+- Reuse `EmployeeCredential` and the existing reset flow. Temporary password is `<normalized-first-name>@pchouse`, displayed once after creation/reset and changed before protected operations. Employee recovery is performed only by `MANAGER` or `ADMIN`; self-service change requires the current password.
+- Every protected operation requires a fresh direct backend validation of the acting employee's own password, active status, Company membership and feature-specific permission. Do not cache/reuse employee authentication.
+- Remove `EmployeeActionAuthorization` token/entity/endpoint from the target design. Keep employee identity out of ShopSession and Shop OIDC tokens.
+- Deactivation blocks further employee operations immediately but does not revoke the shared ShopSession. Reactivation preserves the credential and any pending password-change requirement.
+- Successful protected business operations record the employee name as an immutable snapshot in business `notes`. Employee-administration operations and failed challenges create no `notes` entries; no dedicated employee-administration audit log is added.
+- The operation-to-profile matrix for business workflows remains defined by each feature SPEC. The legacy TECHNICIAN matrix is historical and is not an authorization source.
+- Employee passwords have a minimum length of 6 characters; accept at least 128 characters and support password managers/paste. Do not require arbitrary periodic expiry.
+- The Company-wide employee directory is available to any authenticated Shop session and shows only name, email, profile and active/inactive status. Search by name or email is case-insensitive, results are alphabetical by name, and status filtering is supported.
+- Editing an employee's email or profile does not invalidate or change the password and does not force a password change.
+- Deactivation blocks new protected operations but does not close the shared ShopSession. An operation that already passed credential, active-status, Company-membership and permission checks may complete even if the employee is deactivated while it is in flight.
+- Reactivation is immediate, requires no additional approval, and preserves the existing credential and any pending mandatory-password-change state.
+
+
+## ServiceOrder owner decisions — 20 November 2026 (continued)
+
+- Preserve the legacy `Undo Fixed` capability with a settlement guard: a `FIXED` ServiceOrder may return to `IN_PROGRESS` only while its balance remains outstanding. Keep active stock reservations; do not reverse payments or inventory postings. Once full settlement consumes reserved parts, block direct reversal. Any later rework must use a separate corrective workflow that does not undo settled financial or stock movements.
+
+- ServiceOrder booking creates the order in `CREATED` and does not imply repair has started. An explicit employee-authorized start-work action moves it to `IN_PROGRESS`. A blocking part shortage found before work starts may move it directly from `CREATED` to `AWAITING_PARTS`; receiving/reserving parts never starts work automatically, and resumption remains explicit.
+
+- Starting ServiceOrder work (`CREATED` → `IN_PROGRESS`) requires fresh employee code/password authentication. Record the server-resolved employee as the actor in the immutable ServiceOrder event and `Notes`; ShopSession alone is insufficient for this protected action. Resuming from `AWAITING_PARTS` likewise remains an employee-authenticated explicit action.
+
+- A ServiceOrder in `AWAITING_PARTS` returns to `IN_PROGRESS` only after every blocking part requirement is fully reserved. Resumption is an explicit action requiring fresh employee code/password authentication; receipt/reservation alone never restarts work. Record the authenticated employee in the event and `Notes`.
+
+- ServiceOrder blocking Product-part requirements support partial reservations as stock becomes available. The order remains in `AWAITING_PARTS` while any blocking requirement is not fully reserved. Resume to `IN_PROGRESS` is allowed only after all blocking requirements are fully reserved; partial reservation alone is insufficient.
+
+- A ServiceOrder stock shortage does not create a purchase request. The order remains `AWAITING_PARTS` while blocking requirements are not fully reserved. Parts may be purchased outside the application; stock receipt increases availability only, and the employee must explicitly reserve quantities for the target requirement before the order can resume.
+
+
+
+
+
+
+## Simplified parts purchasing scope — owner decision
+
+The owner has replaced the earlier supplier-procurement workflow with a simple **Parts to Buy** list. The earlier approvals for multiple procurement request rounds, request cancellation, released demand, supplier selection, grouped supplier purchases, purchase allocations, ETA/tracking and supplier receipt tracking are superseded and must not be implemented. The list presents uncovered Product-part requirements calculated from ServiceOrders (grouped by Product and broken down by originating order) separately from manual entries for additional parts not planned on an order. Clearly label each source and never combine manual quantities into calculated ServiceOrder demand totals. Manual entries may reference an existing Product or use a free-text description for a part not yet catalogued; quantity defaults to `1` and remains editable as a positive whole number. Existing Products reuse their multiple informational URLs from the Product catalogue; free-text entries may store multiple URLs directly on the manual entry. Manual entries can be removed from the active list without changing ServiceOrder requirements, events or Notes. These links are references only, not supplier or purchase records. An unavailable or unreachable URL does not hide or disable its associated part entry; the user can edit or remove the URL. URLs are simple operator-managed fields. The operator is responsible for entering and removing links; do not add URL availability checks, reachability checks or special URL validation rules. The automatic portion updates as stock is replenished and reserved through the Stock module. The business may purchase parts from any source outside the application; no supplier or purchase workflow information is captured.
+
+
+## Pickup decisions confirmed — 2026-11-20
+
+- Pickup is permitted from both `FIXED` and `NOT_FIXED`; it sets lifecycle status `PICKED` and preserves technical outcome independently.
+- Outstanding balance or held deposit does not block Pickup. Pickup never changes payment, deposit or refund balances.
+- `FIXED` Pickup has no stock/reservation effect. Active reservations remain until the existing full-settlement rule consumes them.
+- `NOT_FIXED` Pickup displays all active reservations and records whole-unit used quantities, default zero. Only active reserved quantities can be used. The system consumes used quantities and releases the unused remainder atomically. Zero usage releases all; no active reservations skips disposition. No unreserved part can be added.
+- `EMPLOYEE`, `MANAGER` and `ADMIN` may perform Pickup after a fresh employee code/password challenge and explicit final confirmation.
+- State, timestamp, `SERVICE_ORDER_PICKED_UP` event, Note and applicable stock effects commit in one transaction. Require `IdempotencyKey`; committed replay returns the original result, while concurrent distinct commands for the same order produce one success and one conflict.
+- Pickup has no direct undo/cancel. Any correction is a separate auditable operation and does not automatically reactivate reservations.
+- Notes: `Service order picked up by {Employee}.`; append `Parts used: {details}. Parts released: {details}.` for `NOT_FIXED` with usage, or `All reserved parts released.` when active reservations exist but usage is zero. If no active reservations exist, use only the general Note. Timestamp is metadata.
+
+
+## Documentation authority and supersession — 2026-11-21
+
+This decision register is the current product-owner summary, but feature-specific contracts remain authoritative for their operations. Apply these rules when reading older sections or linked historical material:
+
+- Active profiles are exactly `EMPLOYEE`, `MANAGER` and `ADMIN`; no dual-role assignment. `ADMIN` inherits `MANAGER` except where a feature-specific rule explicitly restricts the action.
+- Each protected operation validates the acting employee's code/password directly in the backend for that request. Do not issue, persist, consume or replay an `EmployeeActionAuthorization` token.
+- Payment refunds and deposit refunds are available to `MANAGER` and `ADMIN`; deposit forfeiture remains `MANAGER`-only. Refunds use the original tender in v1; alternative-tender refunds are disabled.
+- The former supplier-procurement workflow and its request rounds, supplier purchases, allocations, ETA/tracking, reference images and receipts are superseded. The current Parts to Buy list is informational, with calculated ServiceOrder demand kept separate from manual reminders.
+- Historical decision notes that mention TECHNICIAN, one-use employee authorization or supplier procurement are retained only as a record of earlier decisions; they do not override this section or the current feature SPECs.

@@ -1,6 +1,6 @@
 # Cash Closing Policy — one daily close per Shop
 
-**Status:** DRAFT — recommended operational rule set for owner review. This policy defines register reconciliation, not a statutory accounting ledger or tax opinion.
+**Status:** Approved v1 operational cash-reconciliation baseline. This policy defines register reconciliation, not a statutory accounting ledger or tax opinion; accounting/tax mappings and processor settlement reconciliation remain deferred for finance review.
 
 ## 1. Operating model
 
@@ -8,11 +8,11 @@
 - There is at most one `DailyClosing` per `(shop_id, business_date)`. The row is created in `OPEN` state when the Shop's cash day begins and transitions once to `CLOSED`.
 - `business_date` is derived using the Shop's configured time zone; the Ireland default is `Europe/Dublin`.
 - A cash payment, cash movement or cash refund must belong to the active Shop business date. A card/bank payment can be recorded without affecting physical drawer cash.
-- `MANAGER` opens and closes the cash day in the initial permission matrix. `TECHNICIAN` cannot perform cash operations.
+- `MANAGER` and `ADMIN` may open and close the cash day. `EMPLOYEE` cannot perform these manager-restricted operations. `ADMIN` inherits `MANAGER` permissions unless a feature-specific exception is explicitly defined.
 
 ## 2. Opening float
 
-At opening, the manager physically counts the cash placed in the drawer and records it as `opening_float`. Record the employee authorization and opening timestamp.
+At opening, an authorized `MANAGER` or `ADMIN` physically counts the cash placed in the drawer and records it as `opening_float`. The operation requires fresh employee credentials and records the resolved employee actor and opening timestamp.
 
 The prior day's `counted_cash` may be suggested as the next day's opening value, but it must be recounted and explicitly confirmed. Do not carry forward the prior day's `expected_cash` automatically.
 
@@ -51,7 +51,7 @@ Do not count `PENDING`, `FAILED`, `VOIDED` or `REVERSED` payment transactions. D
 
 ### Cash rounding
 
-Use the recorded cash tender less change to calculate what physically entered the drawer. Persist the separate `cash_rounding_adjustment` for audit and reconciliation to the customer balance, but do not add it to the drawer formula a second time. Cash rounding must not change the original line prices or tax calculation base.
+Use the recorded cash tender less change to calculate what physically entered the drawer. For an eligible all-CASH rounded payment, `amount_tendered - change_amount` must equal `amount_applied + cash_rounding_adjustment`; for example, €10.02 applied with a -€0.02 adjustment yields €10.00 physically received. Persist the separate signed adjustment for audit, but do not add it to or subtract it from the drawer formula a second time. The maximum cumulative cash refund is the physically received amount (€10.00 in this example), less prior settled cash refunds linked to the original allocation—not the larger amount applied to the customer balance. Cash rounding must not change original line prices or tax calculation base.
 
 ## 4. Counting and variance
 
@@ -81,13 +81,13 @@ Processor fees, chargebacks, settlement timing and terminal/bank batch matching 
 - `CASH_OUT` / `OUT`: documented petty cash expense or payout.
 - `SAFE_DROP` / `OUT`: cash removed from the drawer and transferred to a safe/bank bag.
 
-Every movement requires a reason, business date, employee, single-use authorization and timestamp. The sum is included once in the expected drawer calculation.
+Every movement requires a reason, business date, employee actor, fresh employee credential validation and timestamp. The backend resolves and records the employee actor; no one-use employee authorization token is used. The sum is included once in the expected drawer calculation.
 
 ## 7. Closing and corrections
 
 - Closing is a one-way transition `OPEN -> CLOSED`; the original closing snapshot is immutable.
 - If a mistake is discovered after close, create a `DailyClosingCorrection` referencing the original close. A correction has a signed amount, reason, actor authorization and timestamp. It must not rewrite the original count or variance.
-- `MANAGER` is the only role allowed to create/approve a correction in the initial matrix. The report displays original close and later corrections separately.
+- `MANAGER` and `ADMIN` may create/approve a correction; `EMPLOYEE` may not. The operation requires fresh employee credentials. The report displays original close and later corrections separately.
 - A new business date gets a new `DailyClosing` row. It cannot reuse another Shop's drawer or close.
 
 ## 8. Numerical example
@@ -118,6 +118,6 @@ Card receipts of €300.00 and bank transfers of €80.00 are listed in electron
 8. Closing one Shop does not include transactions or cash movements from another Shop.
 9. A closed snapshot cannot be edited; a manager correction is appended and remains separately visible.
 
-## 10. Remaining finance decisions
+## 10. Deferred finance work
 
-The above formula and opening-float model are the recommended baseline. Still requiring owner/accountant/payment-provider decisions: enabled payment methods, provider fees/settlement and chargeback handling, refund approval thresholds and alternative-tender policy, deposit forfeiture/expiry terms, accounting chart/VAT posting, cash-rounding posting account and whether any future Shop needs more than one physical till. No numeric approval thresholds are invented here.
+The formula, opening-float model, immutable close and correction-only recovery are approved v1 operational rules. Refunds are restricted to `MANAGER` and `ADMIN` and require fresh employee credentials; they return to original tender. There is no amount threshold or second Manager approver. Deposits do not expire or forfeit automatically; 90 days without customer response triggers review/contact only. Final customer-facing deposit wording requires Irish consumer-law review. Provider fees/settlement and chargebacks, accounting chart/VAT posting, cash-rounding posting account and future multi-till support remain outside this approval. No drawer may be reopened or overwritten after close; use an append-only correction with reason and authorization.

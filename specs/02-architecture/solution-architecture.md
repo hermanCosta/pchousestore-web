@@ -14,7 +14,7 @@ Modular monolith with explicit module boundaries.
 - Application — use cases, orchestration, validation and authorization policies.
 - Domain — entities, value objects, invariants and domain services.
 - Infrastructure — EF Core mappings, persistence, file/report generation and external adapters.
-- MySQL — relational persistence.
+- PostgreSQL — relational persistence.
 
 ## 3. Approved repository layout
 
@@ -47,7 +47,7 @@ Feature-oriented Application organization:
 
 - Company & Shops (one Company, multiple branches)
 - Shop Access (ShopAccessCredential and ShopSession; session identity is the Shop)
-- Employee Operations (Company-wide Employee credentials, EmployeeRoleAssignment and one-time EmployeeActionAuthorization)
+- Employee Operations (Company-wide Employee credentials and one active EmployeeRoleAssignment profile; direct credential validation per protected operation)
 - People & Customers (shared at Company level)
 - Catalog & Inventory (shared catalogue; Product and Service subtypes; integer ShopInventory, reservations, transfers and selected returns)
 - Sales (Shop-scoped)
@@ -61,12 +61,12 @@ Feature-oriented Application organization:
 
 - The feature areas above are the first-release modules. Each module owns its use cases, domain rules and tables; another module must not read or change those tables directly.
 - A module exposes only the application operations other modules need. Cross-module work uses those in-process contracts synchronously. The Application layer orchestrates a use case that spans modules.
-- Use one MySQL database and one EF Core `DbContext` in the initial release, with entity configurations grouped by owning module. A multi-module use case that must be atomic uses one database transaction.
+- Use one PostgreSQL database and one EF Core `DbContext` in the initial release, with entity configurations grouped by owning module. A multi-module use case that must be atomic uses one database transaction.
 - Do not add message brokers, distributed transactions or cross-module domain-event infrastructure in the initial release.
 - Dependencies point inward: Domain has no project dependencies; Application depends on Domain; Infrastructure depends on Application and Domain; API depends on Application and Infrastructure and is the composition root. Frontend communicates with backend only through versioned HTTP API contracts.
 - Domain contains business entities, value objects and invariants. Application contains use cases, cross-module orchestration, input validation and authorization. Infrastructure contains EF Core, database configuration and external adapters. API contains HTTP endpoints, DTO mapping, authentication/token validation and dependency composition.
 - Keep persistence entities out of API contracts. Use asynchronous I/O and propagate `CancellationToken`. Return consistent Problem Details errors and centralize exception handling.
-- Backend uses xUnit; frontend uses Vitest and React Testing Library. Unit tests cover domain/application behavior; integration tests cover API, persistence and module boundaries. Use MySQL-compatible integration coverage for persistence behavior.
+- Backend uses xUnit; frontend uses Vitest and React Testing Library. Unit tests cover domain/application behavior; integration tests cover API, persistence and module boundaries. Use PostgreSQL integration coverage for persistence behavior.
 - Apply the repository's .NET formatting and frontend lint/format checks in CI. Do not introduce additional architecture tooling before it solves a concrete problem.
 
 ## 4. Frontend organization
@@ -108,7 +108,7 @@ Each feature owns its screens, API functions, schemas, hooks and feature-specifi
 - OAuth 2.0 access tokens protect `/api/v1/**`; OpenID Connect provides the Shop sign-in protocol. The default server implementation is OpenIddict with EF Core persistence.
 - React uses Authorization Code + PKCE (`S256`) as a public SPA client. The API validates JWT Bearer tokens (signature, issuer, audience, expiry, not-before, token ID and scope).
 - A token represents the Shop context only (`company_id`, `shop_id`, `shop_session_id`); it never contains EmployeeId or employee roles. The API rejects operations tied to revoked/expired ShopSessions.
-- Employee password challenges and single-use EmployeeActionAuthorization remain separate business authorization controls for every protected operation.
+- Every feature-defined protected operation validates the submitted employee credentials directly in the backend for that request. Do not issue or consume an EmployeeActionAuthorization token.
 - No Implicit grant, Resource Owner Password Credentials grant, hand-built JWTs, browser client secrets or token storage in localStorage/sessionStorage.
 
 - Use a proven password hashing implementation.
@@ -116,9 +116,9 @@ Each feature owns its screens, API functions, schemas, hooks and feature-specifi
 - Store secrets outside source control.
 - Apply least privilege to database accounts.
 - Resolve the active Shop from the validated ShopSession; do not use a persistent Employee login identity.
-- Employee accounts use one Company-wide password and the same credentials work in every Shop belonging to that Company. Roles MANAGER and TECHNICIAN are Company-wide.
-- Require a fresh employee password challenge for every protected committed operation; consume a single-use EmployeeActionAuthorization atomically.
-- Validate employee active state, Company ownership and Company-wide `EmployeeRoleAssignment` for the action in the active Shop context. The same password works in every Shop; no per-Shop employee assignment is required.
+- Employee accounts use Company-wide credentials in every Shop. Active profiles are exactly EMPLOYEE, MANAGER and ADMIN; no dual-role assignment. ADMIN inherits MANAGER permissions except where a feature explicitly restricts an action.
+- Require fresh direct employee code/password validation for every protected operation. Resolve the actor and profile on the server; never trust client-supplied employee identity.
+- Validate employee active state, Company membership and the permission defined by the owning feature SPEC in the active Shop context. The same Company-wide employee identity works in every Shop.
 - Record a combined cash/card payment as one PaymentTransaction with multiple PaymentAllocation rows.
 - Restrict inventory operations to Product records; Service has no stock balance. Product quantities are whole units.
 - Model reserve/release separately from on-hand stock; signed quantity-tracked balances may be negative; consume sale stock at full settlement and service-order parts at full payment without waiting for physical PICKED/collection.
@@ -132,12 +132,15 @@ Each feature owns its screens, API functions, schemas, hooks and feature-specifi
 - ShopSession idle and absolute timeout values must be set and validated before production; access tokens remain short-lived with the 10-minute configurable default.
 - Refresh tokens are disabled for the v1 SPA client. Reconsider only through a later ADR that includes rotation and reuse detection.
 - Final OpenIddict package versions and signing-certificate deployment/rotation approach are Phase 2 security setup decisions.
-- MANAGER full-access / TECHNICIAN restricted service-and-technical permission baseline is defined in [Employee Access and Roles](employee-access-and-roles.md); visibility within service context remains to be refined.
+- Current profiles and employee credential rules are defined in [Employee Management](../04-features/employee-management.md); feature-specific permissions are defined in the owning feature SPECs. The former TECHNICIAN matrix is historical only.
 - Hosting and deployment provider.
 - Report generation library.
-- All image bytes are stored in MySQL `MEDIUMBLOB` with compact `BLOB` thumbnails. No external object storage or filesystem is used. See [MySQL Image Storage Architecture](mysql-image-storage.md). Exact GDPR retention/purge schedule remains pending.
-- Reservation expiry automation and multiple stock locations are intentionally out of initial scope. One stock pool per Shop is the baseline. Refurbished grades A/B/C, inspection and complaint workflow are specified; serial uniqueness, acquisition/source details and guarantee coverage/exclusions still need review.
+- All image bytes are stored in PostgreSQL `BYTEA` with compact `BYTEA` thumbnails. No external object storage or filesystem is used. See [PostgreSQL Image Storage Architecture](postgresql-image-storage.md). Exact GDPR retention/purge schedule remains pending.
+- Reservation expiry automation and multiple stock locations are intentionally out of initial scope. One stock pool per Shop is the baseline. Refurbished grades A/B/C, inspection workflow and asset/serial identity are specified; acquisition/source details and customer-facing guarantee coverage/exclusions still need review. Product transfer discrepancy rules are approved; cross-Shop ServiceOrder transfers have a separate pending SPEC.
 - VAT rates, legal VAT registration/status, tax-inclusive/exclusive prices and accountant-approved configuration; the Company VAT feature flag is part of the model.
-- v1 tender methods are CASH and CARD only; card is recorded after external-terminal approval with no processor API integration. Refunds and deposit forfeitures are Manager-only, with original-tender refund and deposit rules in [Financial Model](financial-model.md). Accounting/bookkeeper reconciliation is deferred.
+- v1 tender methods are CASH and CARD only; card is recorded after external-terminal approval with no processor API integration. Payment and deposit refunds require MANAGER or ADMIN; deposit forfeiture is MANAGER-only. Refunds return to original tender in v1. See [Financial Model](financial-model.md). Accounting/bookkeeper reconciliation is deferred.
 
-The one-Company/multiple-Shops model, OAuth/OIDC Shop token boundary and employee-action authentication flow are recorded in [Architecture Decision Records](architecture-decisions.md). See [API Authentication and Token Security](api-authentication-and-token-security.md).
+The one-Company/multiple-Shops model, OAuth/OIDC Shop token boundary and direct employee-credential validation rules are recorded in [Architecture Decision Records](architecture-decisions.md) and [Employee Management](../04-features/employee-management.md). See [API Authentication and Token Security](api-authentication-and-token-security.md).
+
+
+> **Historical terminology notice (2026-11-21):** Any remaining legacy references to `TECHNICIAN` or `EmployeeActionAuthorization` in older examples or discovery notes are superseded. They must not be used in the target architecture or implementation.

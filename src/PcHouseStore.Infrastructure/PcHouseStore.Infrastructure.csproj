@@ -1,0 +1,62 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <Compile Include="DependencyInjection.cs" />
+    <Compile Include="Persistence/Configurations/AuthenticationConfigurations.cs" />
+    <Compile Include="Persistence/Configurations/CatalogueConfigurations.cs" />
+    <Compile Include="Persistence/Configurations/DeviceConfigurations.cs" />
+    <Compile Include="Persistence/Configurations/ServiceOrderConfigurations.cs" />
+    <Compile Include="Persistence/Configurations/ServiceOrderItemConfigurations.cs" />
+    <Compile Include="Persistence/Entities/AuthenticationEntities.cs" />
+    <Compile Include="Persistence/Entities/DeviceEntities.cs" />
+    <Compile Include="Persistence/Entities/ServiceOrderEntities.cs" />
+    <Compile Include="Persistence/Entities/ServiceOrderItemEntities.cs" />
+    <Compile Include="Persistence/Migrations/20261112005610_AuthenticationFoundationInitial.Designer.cs" />
+    <Compile Include="Persistence/Migrations/20261112005610_AuthenticationFoundationInitial.cs" />
+    <Compile Include="Persistence/Migrations/20261113004053_EmployeeAdministration.Designer.cs" />
+    <Compile Include="Persistence/Migrations/20261113004053_EmployeeAdministration.cs" />
+    <Compile Include="Persistence/Migrations/20261113010857_DeploymentOperatorEmployeeBootstrap.Designer.cs" />
+    <Compile Include="Persistence/Migrations/20261113010857_DeploymentOperatorEmployeeBootstrap.cs" />
+    <Compile Include="Persistence/Migrations/20261114013424_CustomerAndCatalogueFoundation.Designer.cs" />
+    <Compile Include="Persistence/Migrations/20261114013424_CustomerAndCatalogueFoundation.cs" />
+    <Compile Include="Persistence/Migrations/20261114024313_CatalogueShopSessionAudit.Designer.cs" />
+    <Compile Include="Persistence/Migrations/20261114024313_CatalogueShopSessionAudit.cs" />
+    <Compile Include="Persistence/Migrations/20261121153000_RemoveEmployeeActionAuthorization.Designer.cs" />
+    <Compile Include="Persistence/Migrations/20261121153000_RemoveEmployeeActionAuthorization.cs" />
+    <Compile Include="Persistence/Migrations/20261124212526_AddShopServiceOrderDisplayCounter.Designer.cs" />
+    <Compile Include="Persistence/Migrations/20261124212526_AddShopServiceOrderDisplayCounter.cs" />
+    <Compile Include="Persistence/Migrations/20261124223000_AddDeviceFoundation.Designer.cs" />
+    <Compile Include="Persistence/Migrations/20261124223000_AddDeviceFoundation.cs" />
+    <Compile Include="Persistence/Migrations/20261124233000_AddServiceOrderFoundation.Designer.cs" />
+    <Compile Include="Persistence/Migrations/20261124233000_AddServiceOrderFoundation.cs" />
+    <Compile Include="Persistence/Migrations/PcHouseStoreDbContextModelSnapshot.cs" />
+    <Compile Include="Persistence/PcHouseStoreDbContext.cs" />
+    <Compile Include="Persistence/PcHouseStoreDesignTimeDbContextFactory.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\PcHouseStore.Application\PcHouseStore.Application.csproj" />
+    <ProjectReference Include="..\PcHouseStore.Domain\PcHouseStore.Domain.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.14" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.12">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
+    <PackageReference Include="OpenIddict.EntityFrameworkCore" Version="7.8.0" />
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.14" />
+    <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.14" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <EnableDefaultEmbeddedResourceItems>false</EnableDefaultEmbeddedResourceItems>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+</Project>

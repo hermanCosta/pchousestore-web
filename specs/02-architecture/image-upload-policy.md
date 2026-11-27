@@ -1,27 +1,26 @@
-# Image Upload and MySQL Storage Policy — pcHouseStore Web
+# Image Upload and PostgreSQL Storage Policy — pcHouseStore Web
 
-**Status:** DRAFT · Owner decision: all binary images must be stored in the same MySQL database. No external object storage, file share, local filesystem or separate file-management service is used.
+**Status:** DRAFT · Owner decision: all binary images must be stored in the same PostgreSQL database. No external object storage, file share, local filesystem or separate file-management service is used.
 
 ## 1. Supported image use cases and limits
 
 | Scope | Max images per record/line | Max file size | Aggregate limit |
 |---|---:|---:|---:|
-| Service procurement request line | 10 | 10 MiB each | 100 MiB per request line |
 | Refurbished physical unit | 10 | 10 MiB each | 100 MiB per unit |
 | Customer complaint case | 10 | 10 MiB each | 100 MiB per case |
 
 The limits are centralized in `MediaUploadPolicy` and enforced by both React and ASP.NET Core. API limits are authoritative. These are project defaults, not a universal market standard.
 
-## 2. MySQL physical storage
+## 2. PostgreSQL physical storage
 
-- Store each normalized binary image in `stored_image.content MEDIUMBLOB` in the same MySQL 8.x/InnoDB database as operational data.
-- Store an optional compact thumbnail in `stored_image.thumbnail_content BLOB`; the generated thumbnail must be at most 60 KiB.
-- `MEDIUMBLOB` holds up to 16,777,215 bytes (approximately 16 MiB), so the 10 MiB project cap fits within one column. A `BLOB` thumbnail has a maximum capacity of 65,535 bytes. See the [MySQL 8.0 BLOB/TEXT reference](https://dev.mysql.com/doc/refman/8.0/en/blob.html).
-- A shared `stored_image` row contains binary content and technical metadata: `id`, `company_id`, `shop_id`, `content`, `thumbnail_content`, `content_type`, `size_bytes`, `width_px`, `height_px`, `sha256`, `uploaded_by_employee_id`, `authorization_id`, `uploaded_at`, `deleted_at`, `deleted_by_employee_id` and `delete_authorization_id`.
-- Domain-specific relation tables keep strict foreign keys to the image and owning record: `service_procurement_request_image`, `refurbished_unit_image` and `customer_complaint_case_attachment`. They store the parent FK, `stored_image_id`, image role, caption and sort order. Do not use a polymorphic `owner_type/owner_id` reference.
+- Store each normalized binary image in `stored_image.content BYTEA` in the same PostgreSQL database as operational data.
+- Store an optional compact thumbnail in `stored_image.thumbnail_content BYTEA`; the generated thumbnail must be at most 60 KiB.
+- Enforce the 10 MiB image and 60 KiB thumbnail limits in the application and include their storage/backup impact in PostgreSQL capacity planning.
+- A shared `stored_image` row contains binary content and technical metadata: `id`, `company_id`, `shop_id`, `content`, `thumbnail_content`, `content_type`, `size_bytes`, `width_px`, `height_px`, `sha256`, `uploaded_by_employee_id`, `uploaded_at`, `deleted_at` and `deleted_by_employee_id`. Do not store an employee-action-authorization ID or token.
+- Domain-specific relation tables keep strict foreign keys to the image and owning record: `refurbished_unit_image` and `customer_complaint_case_attachment`. They store the parent FK, `stored_image_id`, image role, caption and sort order. Do not use a polymorphic `owner_type/owner_id` reference.
 - The `stored_image_id` is unique within each attachment table so one physical image attachment is not accidentally reused by multiple owners. Each image is owned by one Shop and one Company.
-- ASP.NET Core streams the BLOB from MySQL through an authorization-checked endpoint. Do not return a public URL, storage key or filesystem path; the client loads a scoped image endpoint after normal Shop/role validation.
-- Use `MEDIUMBLOB`, not `LONGBLOB`, because the enforced per-image limit is 10 MiB. The database is the sole source of truth for uploaded image bytes.
+- ASP.NET Core streams binary content from PostgreSQL through an authorization-checked endpoint. Do not return a public URL, storage key or filesystem path; the client loads a scoped image endpoint after ShopSession validation and fresh direct employee credential/permission validation for protected image operations.
+- PostgreSQL is the sole source of truth for uploaded image bytes.
 
 ## 3. Lightweight image processing
 
@@ -35,7 +34,7 @@ The limits are centralized in `MediaUploadPolicy` and enforced by both React and
 
 ## 4. Access, deletion and retention
 
-- Upload, view and deletion require a valid ShopSession and an employee authorization permitted for that operation. Manager can access all records; Technician can upload/view service procurement and technical inspection evidence in their permitted workflow.
+- Upload, view and deletion require a valid ShopSession. Each protected operation also requires fresh direct employee code/password validation, active status, Company membership and feature-specific permission. `ADMIN` inherits `MANAGER` permissions. `EMPLOYEE` may upload/view technical inspection and complaint evidence where the owning feature SPEC permits it; Manager-level access remains available to `MANAGER` and `ADMIN`.
 - Scope checks verify the attachment parent, `stored_image.company_id` and `stored_image.shop_id` all match the active context. Do not trust IDs supplied by React.
 - Deletion is soft and audited. A previously used purchase/inspection/complaint image is not physically removed when a user removes it from a screen.
 - Initial v1 behavior has no automatic physical purge. Image retention follows the parent business record. The Company must later approve a GDPR/data-retention schedule; implement any purge as a database-controlled background job, not manual external file handling.
@@ -43,11 +42,11 @@ The limits are centralized in `MediaUploadPolicy` and enforced by both React and
 
 ## 5. Performance and operations
 
-- Use thumbnails for queue/list screens; fetch full-size image bytes only when previewing/downloading the image.
+- Use thumbnails for list screens; fetch full-size image bytes only when previewing/downloading the image.
 - Use EF Core projections that exclude BLOB columns in ordinary entity queries. Load BLOB only by explicit image endpoint/query.
-- Do not eagerly include BLOB columns in service-order, procurement, unit or complaint lists.
+- Do not eagerly include BLOB columns in service-order, refurbished-unit or complaint lists.
 - Use pagination for image galleries and set explicit response/cache headers. Private responses must not enter public/shared caches.
-- Monitor MySQL data size, redo/undo pressure, backup size and restore duration. Since the product owner chose MySQL-only storage, growth management stays in the database/backup plan rather than a separate object-store account.
+- Monitor PostgreSQL data size, redo/undo pressure, backup size and restore duration. Since the product owner chose PostgreSQL-only storage, growth management stays in the database/backup plan rather than a separate object-store account.
 
 ## 6. Security controls
 

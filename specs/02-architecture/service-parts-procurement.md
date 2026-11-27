@@ -1,5 +1,7 @@
 # Service Parts Procurement Workflow
 
+> **SUPERSEDED — DO NOT IMPLEMENT.** On 2026-11-20 the Product Owner replaced this supplier-procurement workflow with the simplified Shop-scoped **Parts to Buy** visibility list. This document is retained only as historical discovery context. Supplier records, procurement requests, request rounds, buyer assignments, supplier purchases, allocations, reference photos, ETA/tracking, purchase receipts and procurement event timelines are out of scope. The authoritative rules are in [SO-01 Service Orders](../04-features/service-orders.md), [Product Owner Decisions](product-owner-decisions.md), and [Stock and Refurbishment](stock-and-refurbishment.md).
+
 **Status:** DRAFT — owner requirement recorded 2026-11-05. See ADR-013 and ADR-014.  
 **Scope:** Identify, queue, source, order, track, receive and reserve electronic parts required to complete a service order. This is an operational procurement workflow, not a supplier accounts-payable module.
 
@@ -130,7 +132,7 @@ After repair, `FIXED` retains reservations. When settled payments and explicitly
 4. A ServiceOrder can have multiple ServiceProcurementRequests over time. Each request belongs to exactly one ServiceOrder and Shop, and contains one or more request lines. Its request number is unique within the ServiceOrder.
 5. Each request line references a requirement in the same ServiceOrder/Shop. Its quantity is a positive whole number and represents the quantity to source in that procurement round, not the total required quantity.
 6. Multiple request rounds may be created as additional parts are identified. Active request quantities and outstanding purchase allocations must be reconciled against the requirement's remaining shortage so the same missing unit is not requested twice.
-7. Request-line images are private, Shop-scoped files. MySQL stores metadata and a private storage key only. Request changes and image operations append a `ServiceProcurementRequestEvent` in the same transaction. Validate file content/MIME, size and hash; do not store permanent public URLs, raw filesystem paths or secrets.
+7. Request-line images are private, Shop-scoped files. PostgreSQL stores metadata and a private storage key only. Request changes and image operations append a `ServiceProcurementRequestEvent` in the same transaction. Validate file content/MIME, size and hash; do not store permanent public URLs, raw filesystem paths or secrets.
 8. A SupplierPurchase belongs to one Shop. Its lines and all allocations must remain in that Shop. Supplier master data is shared at Company level.
 9. `quantity_received` is the cumulative accepted quantity, not an ETA estimate or a supplier's shipment claim. It cannot exceed `quantity_ordered`.
 10. Total allocation on a SupplierPurchaseLine cannot exceed the ordered quantity. Total allocation to a request line cannot exceed its requested quantity.
