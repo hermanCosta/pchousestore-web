@@ -33,7 +33,7 @@ The Shop name is sourced from the authenticated session response (`ShopSession.s
 ### 3.1 First header row
 
 1. Render the PC House logo mark at the left of the header.
-2. Place the owner-provided PC HOUSE wordmark artwork image immediately to the right of the primary logo mark. The artwork already contains the wording “PC HOUSE” and “SELLS AND REPAIRS LAPTOPS”; use the image itself as supplied. Do not recreate, retype, overlay or render those words as HTML text. Preserve the artwork's proportions and avoid cropping or distortion.
+2. Place the owner-provided PC HOUSE wordmark artwork image immediately to the right of the primary logo mark. The artwork already contains the wording “PC HOUSE” and “SELLS AND REPAIRS LAPTOPS”; use the image itself, not separately rendered text. The asset is `frontend/pchousestore-web/public/assets/pc-house-wordmark.webp`, derived from the supplied image with its aspect ratio preserved. Do not recreate, retype or overlay the embedded words.
 3. When a Shop session is active, display the active Shop name and Shop address together in the same Shop identity block on the right side of the header. Do not separate the address into another header region or place it in the brand lockup.
 4. Keep the hamburger trigger at the far right of the first row, after the Shop identity block.
 5. The hamburger is the entry point for Shop settings, Employee settings and session actions.
@@ -126,6 +126,8 @@ The owner confirmed the reorganised header and successful frontend build on 2026
 - [ ] AC-10: Keyboard interaction, focus visibility and menu dismissal are verified.
 - [ ] AC-11: Desktop, tablet and mobile layouts are verified.
 - [ ] AC-12: Navigation preserves the active Shop session and does not expose persistent Employee identity.
+- [x] AC-13: The supplied wordmark artwork is displayed as an image beside the primary logo; embedded wording is not recreated as HTML text.
+- [x] AC-14: The active Shop name and address are grouped in one identity block in the first header row.
 
 ## 8. Automated test implementation and remaining scenarios
 
@@ -135,7 +137,7 @@ The tests and CI change have been committed but have not yet been executed or ob
 
 Remaining validation:
 
-- Render the authenticated shell and verify the primary logo mark with the supplied PC HOUSE wordmark artwork image to its right, the active Shop name and address grouped together, and the right-aligned hamburger.
+- Render the authenticated shell and verify the primary logo mark with the supplied PC HOUSE wordmark artwork image to its right, the active Shop name and address grouped together, and the right-aligned hamburger. A test assertion covers the wordmark image source and Shop address.
 - Select each remaining settings item and verify the correct existing screen opens and the menu closes.
 - Verify the Shop identity/address grouping and brand lockup after their implementation is aligned with the approved reference.
 - Verify the global search field is absent.
@@ -148,6 +150,6 @@ Remaining validation:
 - Product-owner layout direction: APPROVED.
 - Implementation: OWNER-CONFIRMED — 2026-11-26.
 - Frontend build: REPORTED SUCCESSFUL BY OWNER — 2026-11-26; not independently rerun during this documentation update.
-- Automated test suite: IMPLEMENTED; execution and CI result PENDING.
+- Automated test suite: IMPLEMENTED; execution and CI result PENDING. A CI run triggered by the implementation commits is in progress.
 - Responsive and accessibility validation: PENDING.
 - API/data-model impact: NONE.
