@@ -218,8 +218,14 @@ describe("Application shell navigation", () => {
   });
 
   it.each([
-    [401, "The API rejected the access token (HTTP 401). Please sign in again."],
-    [403, "The access token is missing the required Shop API scope (HTTP 403)."],
+    [
+      401,
+      "The API rejected the access token (HTTP 401). Please sign in again.",
+    ],
+    [
+      403,
+      "The access token is missing the required Shop API scope (HTTP 403).",
+    ],
     [500, "Session verification failed (HTTP 500)."],
   ])(
     "reports session verification failure for HTTP %s",
