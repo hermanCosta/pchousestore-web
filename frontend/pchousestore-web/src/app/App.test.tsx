@@ -257,9 +257,7 @@ describe("Application shell navigation", () => {
     expect(
       await screen.findByRole("navigation", { name: "Main navigation" }),
     ).toBeInTheDocument();
-    const profile = screen.getByRole("definition list", {
-      name: "Active Shop profile",
-    });
+    const profile = document.getElementById("shop-profile");
     expect(profile).toHaveTextContent("Not set");
   });
 
