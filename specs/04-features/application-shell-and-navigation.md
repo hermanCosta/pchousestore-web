@@ -121,19 +121,23 @@ The owner confirmed the reorganised header and successful frontend build on 2026
 - [x] AC-05: Operational navigation is displayed in the separate second row.
 - [x] AC-06: The global search bar is absent.
 - [x] AC-07: The frontend build was reported successful by the owner on 2026-11-26.
-- [ ] AC-08: Automated tests cover menu contents, menu selection and sign-out initiation.
-- [ ] AC-09: Automated tests cover each operational navigation destination and active state.
+- [x] AC-08: Frontend tests have been added for menu contents, settings-menu selection and sign-out initiation; execution remains pending.
+- [x] AC-09: Frontend tests have been added for each operational navigation destination and active state; execution remains pending.
 - [ ] AC-10: Keyboard interaction, focus visibility and menu dismissal are verified.
 - [ ] AC-11: Desktop, tablet and mobile layouts are verified.
 - [ ] AC-12: Navigation preserves the active Shop session and does not expose persistent Employee identity.
 
-## 8. Remaining test scenarios
+## 8. Automated test implementation and remaining scenarios
+
+Automated frontend tests are defined in `frontend/pchousestore-web/src/app/App.test.tsx` using Vitest, React Testing Library and user-event. The current suite covers authenticated shell rendering, the approved settings-menu groups and entries, operational navigation destinations and active states, closing the settings menu after a selection, and initiation of the existing OIDC sign-out flow. The frontend CI workflow now invokes `npm run test` before the production build.
+
+The tests and CI change have been committed but have not yet been executed or observed in a CI run. Therefore, test success is NOT YET VERIFIED.
+
+Remaining validation:
 
 - Render the authenticated shell and verify the logo mark with the PC HOUSE wordmark/tagline to its right, the active Shop name and address grouped together, and the right-aligned hamburger.
-- Verify the hamburger contains the three approved groups and all specified entries.
-- Select each settings item and verify the correct existing screen opens and the menu closes.
-- Verify Sign out starts the existing OIDC sign-out flow.
-- Select each of the four operational destinations and verify its screen and active state.
+- Select each remaining settings item and verify the correct existing screen opens and the menu closes.
+- Verify the Shop identity/address grouping and brand lockup after their implementation is aligned with the approved reference.
 - Verify the global search field is absent.
 - Verify navigation does not clear or replace the active Shop session.
 - Verify keyboard and touch operation, focus visibility and menu dismissal.
@@ -144,5 +148,6 @@ The owner confirmed the reorganised header and successful frontend build on 2026
 - Product-owner layout direction: APPROVED.
 - Implementation: OWNER-CONFIRMED — 2026-11-26.
 - Frontend build: REPORTED SUCCESSFUL BY OWNER — 2026-11-26; not independently rerun during this documentation update.
-- Automated, responsive and accessibility validation: PENDING.
+- Automated test suite: IMPLEMENTED; execution and CI result PENDING.
+- Responsive and accessibility validation: PENDING.
 - API/data-model impact: NONE.
