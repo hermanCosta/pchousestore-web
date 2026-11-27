@@ -24,7 +24,7 @@ The product owner confirmed the implemented header reorganisation and successful
 | `frontend/pchousestore-web/src/styles.css` | Header, menu and primary-navigation presentation. |
 | `frontend/pchousestore-web/src/auth/oidc.ts` | Shop OIDC client and access-token retrieval. |
 
-The first row contains the existing PC House logo/wordmark, the active Shop name when authenticated, and the hamburger trigger aligned to the right. The second row contains the operational navigation. The previous search bar is not part of this shell.
+The first row contains the PC House logo mark on the left, with the brand name and tagline immediately to its right. On the right side, the active Shop name and Shop address are displayed together in one identity block, followed by the hamburger trigger at the far right. The second row contains the operational navigation. The previous search bar is not part of this shell.
 
 The Shop name is sourced from the authenticated session response (`ShopSession.shopName`); do not hard-code it or substitute Company or Employee data.
 
@@ -32,12 +32,13 @@ The Shop name is sourced from the authenticated session response (`ShopSession.s
 
 ### 3.1 First header row
 
-1. Render the existing PC House logo and current brand wordmark.
-2. When a Shop session is active, display the active Shop name in the header.
-3. Keep the hamburger trigger aligned to the right of this row.
-4. The hamburger is the entry point for Shop settings, Employee settings and session actions.
-5. Do not add a global search field.
-6. Do not display a persistent Employee name, code or role. The persistent authenticated context is the Shop.
+1. Render the PC House logo mark at the left of the header.
+2. Render the brand name **PC HOUSE** and tagline **SELLS AND REPAIRS LAPTOPS** immediately to the right of the logo mark, as one brand lockup. Preserve the wording and visual hierarchy shown in the owner-provided reference image.
+3. When a Shop session is active, display the active Shop name and Shop address together in the same Shop identity block on the right side of the header. Do not separate the address into another header region or place it in the brand lockup.
+4. Keep the hamburger trigger at the far right of the first row, after the Shop identity block.
+5. The hamburger is the entry point for Shop settings, Employee settings and session actions.
+6. Do not add a global search field.
+7. Do not display a persistent Employee name, code or role. The persistent authenticated context is the Shop.
 
 ### 3.2 Settings hamburger
 
@@ -90,8 +91,9 @@ The shell must not change OIDC, token handling, ShopSession identity, API author
 ## 5. Visual and responsive requirements
 
 - Retain the established PC House visual identity and existing logo asset.
+- In the first row, place the logo mark on the left and the **PC HOUSE** wordmark with **SELLS AND REPAIRS LAPTOPS** tagline immediately to its right.
+- Keep the active Shop name and address together in one identity block on the right side of the first row; place the hamburger at the far right, after that block.
 - Use two distinct horizontal rows: brand/Shop/menu first, operational navigation second.
-- Keep the hamburger at the right of the first row.
 - Do not restore the removed search bar.
 - Keep the Shop identity and menu reachable at narrow viewport widths.
 - Keep the operational navigation usable at desktop, tablet and mobile widths; responsive behavior must be verified rather than assumed.
@@ -127,7 +129,7 @@ The owner confirmed the reorganised header and successful frontend build on 2026
 
 ## 8. Remaining test scenarios
 
-- Render the authenticated shell and verify the logo/wordmark, active Shop name and right-aligned hamburger.
+- Render the authenticated shell and verify the logo mark with the PC HOUSE wordmark/tagline to its right, the active Shop name and address grouped together, and the right-aligned hamburger.
 - Verify the hamburger contains the three approved groups and all specified entries.
 - Select each settings item and verify the correct existing screen opens and the menu closes.
 - Verify Sign out starts the existing OIDC sign-out flow.
