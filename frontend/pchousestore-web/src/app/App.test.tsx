@@ -90,7 +90,11 @@ describe("Application shell navigation", () => {
         .getAllByText("Dublin Central")
         .some((element) => element.closest(".header-shop-identity")),
     ).toBe(true);
-    expect(screen.getByText("12 Main Street, Dublin")).toBeInTheDocument();
+    expect(
+      screen
+        .getAllByText("12 Main Street, Dublin")
+        .some((element) => element.closest(".header-shop-identity")),
+    ).toBe(true);
     expect(
       screen.getByRole("img", {
         name: "PC HOUSE — SELLS AND REPAIRS LAPTOPS",
