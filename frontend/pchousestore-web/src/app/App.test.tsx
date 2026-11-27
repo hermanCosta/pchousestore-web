@@ -221,20 +221,23 @@ describe("Application shell navigation", () => {
     [401, "The API rejected the access token (HTTP 401). Please sign in again."],
     [403, "The access token is missing the required Shop API scope (HTTP 403)."],
     [500, "Session verification failed (HTTP 500)."],
-  ])("reports session verification failure for HTTP %s", async (status, message) => {
-    getShopAccessToken.mockResolvedValue("shop-access-token");
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue({ ok: false, status }),
-    );
+  ])(
+    "reports session verification failure for HTTP %s",
+    async (status, message) => {
+      getShopAccessToken.mockResolvedValue("shop-access-token");
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({ ok: false, status }),
+      );
 
-    render(<App />);
+      render(<App />);
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(message);
-    expect(
-      screen.queryByRole("navigation", { name: "Main navigation" }),
-    ).not.toBeInTheDocument();
-  });
+      expect(await screen.findByRole("alert")).toHaveTextContent(message);
+      expect(
+        screen.queryByRole("navigation", { name: "Main navigation" }),
+      ).not.toBeInTheDocument();
+    },
+  );
 
   it("uses fallback values for optional Shop profile fields", async () => {
     getShopAccessToken.mockResolvedValue("shop-access-token");
@@ -266,20 +269,23 @@ describe("Application shell navigation", () => {
     ["Load employees", "employee-directory-search"],
     ["Create employee", "create-employee"],
     ["Employee directory", "employee-directory"],
-  ])("navigates to employee destination %s", async (label, page) => {
-    const user = userEvent.setup();
-    await renderAuthenticatedApp();
-    await openAdministrationMenu(user);
+  ])(
+    "navigates to employee destination %s",
+    async (label, page) => {
+      const user = userEvent.setup();
+      await renderAuthenticatedApp();
+      await openAdministrationMenu(user);
 
-    await user.click(screen.getByRole("button", { name: label }));
+      await user.click(screen.getByRole("button", { name: label }));
 
-    expect(
-      screen.queryByRole("navigation", { name: "Administration" }),
-    ).not.toBeInTheDocument();
-    expect(screen.getByTestId("employee-administration")).toHaveTextContent(
-      page,
-    );
-  });
+      expect(
+        screen.queryByRole("navigation", { name: "Administration" }),
+      ).not.toBeInTheDocument();
+      expect(screen.getByTestId("employee-administration")).toHaveTextContent(
+        page,
+      );
+    },
+  );
 
   it("updates the hamburger expanded state when the menu is toggled", async () => {
     const user = userEvent.setup();
